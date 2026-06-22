@@ -1,0 +1,46 @@
+export type ProductApiResponse = {
+  id: string;
+  enterprise_id: string;
+  product_name: string;
+  product_description: string | null;
+  product_category: string | null;
+  product_price: number;
+  product_images: string | null;
+  product_status: boolean;
+  sku?: string | null;
+  barcode_upc?: string | null;
+  weight?: string | number | null;
+  dimensions?: string | Record<string, string | number | null> | null;
+  length?: string | number | null;
+  width?: string | number | null;
+  thick?: string | number | null;
+  sale_price?: number | null;
+  cost_price?: number | null;
+  tax_class?: string | null;
+  currency?: string | null;
+  stock_quantity?: number | null;
+  stock_count?: number | null;
+  low_stock_alert_threshold?: number | null;
+  stock_management?: string | null;
+  publish_status?: string | null;
+  created_at?: string | null;
+  enterprise_name?: string | null;
+  rating?: number | null;
+};
+
+export type ProductListItem = {
+  id: string;
+  enterpriseId: string;
+  enterpriseName: string;
+  name: string;
+  description: string;
+  category: string;
+  price: number;
+  image: string;
+  isActive: boolean;
+  rating: string;
+  stockCount: number;
+  length: string;
+  width: string;
+  thick: string;
+};
