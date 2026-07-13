@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Pressable,
@@ -10,84 +10,125 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MessageSquareIcon, PlusIcon } from '@/components/dashboard/DashboardIcons';
 import {
   APPOINTMENT_TABS,
   CALENDAR_DAYS,
+  CALENDAR_MONTH_LABEL,
   filterAppointments,
   type Appointment,
   type AppointmentStatus,
   type AppointmentTab,
 } from '@/constants/appointments';
-import { shadowMd } from '@/utils/shadows';
+import { appointmentChatHref, chatHref } from '@/utils/chatNavigation';
+import { shadowSm } from '@/utils/shadows';
 import { isSmallDevice } from '@/utils/responsive';
 
 const PRIMARY = '#1F5D4E';
-const SURFACE_BG = '#f0f7f3';
-const BODY_BG = '#F5F7F5';
-const TEXT_MUTED = '#5a7a70';
+const MINT = '#EAF4EC';
+const PAGE_BG = '#FFFFFF';
+const BODY_BG = '#F7F8F9';
+const TEXT_MUTED = '#9CA3AF';
+const TEXT_DESC = '#6B7280';
 const TEXT_BLACK = '#111111';
-const BORDER = '#E8EDEA';
-const EMERALD_50 = '#ecfdf5';
-const EMERALD_200 = '#a7f3d0';
-const EMERALD_500 = '#10b981';
-const EMERALD_700 = '#047857';
-const AMBER_50 = '#fffbeb';
-const AMBER_200 = '#fde68a';
-const AMBER_500 = '#f59e0b';
-const AMBER_700 = '#b45309';
-const H_PAD = 20;
+const SWITCH_BG = '#F3F4F6';
+const H_PAD = isSmallDevice ? 16 : 20;
+const ADD_BTN_SIZE = isSmallDevice ? 36 : 40;
+const DAY_CARD_WIDTH = isSmallDevice ? 40 : 44;
+const APPT_IMAGE_SIZE = isSmallDevice ? 64 : 72;
+const ACTION_BTN_HEIGHT = isSmallDevice ? 36 : 40;
+
+const STATUS_STYLES: Record<
+  AppointmentStatus,
+  { bg: string; text: string; dot: string; label: string }
+> = {
+  confirmed: {
+    bg: '#ECFDF5',
+    text: '#047857',
+    dot: '#10B981',
+    label: 'Confirmed',
+  },
+  pending: {
+    bg: '#FFF7ED',
+    text: '#C2410C',
+    dot: '#F97316',
+    label: 'Pending',
+  },
+  upcoming: {
+    bg: '#EFF6FF',
+    text: '#1D4ED8',
+    dot: '#3B82F6',
+    label: 'Upcoming',
+  },
+};
 
 function StatusBadge({ status }: { status: AppointmentStatus }) {
-  const isConfirmed = status === 'confirmed';
+  const config = STATUS_STYLES[status];
 
   return (
-    <View
-      style={[
-        styles.statusBadge,
-        isConfirmed ? styles.statusBadgeConfirmed : styles.statusBadgePending,
-      ]}
-    >
-      <View
-        style={[
-          styles.statusDot,
-          isConfirmed ? styles.statusDotConfirmed : styles.statusDotPending,
-        ]}
-      />
-      <Text
-        style={[
-          styles.statusText,
-          isConfirmed ? styles.statusTextConfirmed : styles.statusTextPending,
-        ]}
-      >
-        {isConfirmed ? 'Confirmed' : 'Pending'}
-      </Text>
+    <View style={[styles.statusBadge, { backgroundColor: config.bg }]}>
+      <View style={[styles.statusDot, { backgroundColor: config.dot }]} />
+      <Text style={[styles.statusText, { color: config.text }]}>{config.label}</Text>
     </View>
   );
 }
 
 function AppointmentCard({ appointment }: { appointment: Appointment }) {
+  const router = useRouter();
+  const chatMode = appointment.isPast ? 'readonly' : 'full';
+
   return (
-    <View style={styles.appointmentCard}>
-      <Image
-        source={{ uri: appointment.image }}
-        style={styles.appointmentImage}
-        contentFit="cover"
-      />
+    <View style={[styles.appointmentCard, { borderTopColor: appointment.accentColor }]}>
+      <View style={styles.cardTop}>
+        <Image source={{ uri: appointment.image }} style={styles.appointmentImage} contentFit="cover" />
 
-      <View style={styles.appointmentContent}>
-        <View style={styles.titleRow}>
-          <Text style={styles.appointmentTitle} numberOfLines={1}>
-            {appointment.title}
+        <View style={styles.appointmentContent}>
+          <View style={styles.titleRow}>
+            <Text style={styles.appointmentTitle} numberOfLines={1}>
+              {appointment.title}
+            </Text>
+            <StatusBadge status={appointment.status} />
+          </View>
+
+          <Text style={styles.instructorText} numberOfLines={1}>
+            with {appointment.instructor}
           </Text>
-          <StatusBadge status={appointment.status} />
-        </View>
 
-        <Text style={styles.instructorText} numberOfLines={1}>
-          {appointment.instructor}
-        </Text>
-        <Text style={styles.scheduleText} numberOfLines={1}>
-          {appointment.schedule}
-        </Text>
+          <Text style={styles.metaText}>🕐 {appointment.time}</Text>
+          <Text style={styles.metaText}>📍 {appointment.location}</Text>
+        </View>
+      </View>
+
+      <View style={styles.actionRow}>
+        <Pressable
+          onPress={() =>
+            router.push(
+              chatMode === 'readonly'
+                ? chatHref(`appointment-${appointment.id}`, {
+                    mode: 'readonly',
+                    appointmentId: appointment.id,
+                    title: appointment.title,
+                    provider: appointment.instructor,
+                    enterprise: appointment.location,
+                  })
+                : appointmentChatHref(appointment.id, {
+                    title: appointment.title,
+                    provider: appointment.instructor,
+                    enterprise: appointment.location,
+                  }),
+            )
+          }
+          style={({ pressed }) => [styles.chatBtn, pressed && styles.pressed]}
+        >
+          <MessageSquareIcon size={16} color={PRIMARY} />
+          <Text style={styles.chatBtnText}>Chat</Text>
+        </Pressable>
+        <Pressable style={({ pressed }) => [styles.rescheduleBtn, pressed && styles.pressed]}>
+          <Text style={styles.rescheduleBtnText}>Reschedule</Text>
+        </Pressable>
+        <Pressable style={({ pressed }) => [styles.directionsBtn, pressed && styles.pressed]}>
+          <Text style={styles.directionsBtnText}>Join / Directions</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -95,24 +136,28 @@ function AppointmentCard({ appointment }: { appointment: Appointment }) {
 
 export function AppointmentsScreen() {
   const insets = useSafeAreaInsets();
-  const statusBarFill = useStatusBarBackground();
   const [activeTab, setActiveTab] = useState<AppointmentTab>('Upcoming');
   const [selectedDate, setSelectedDate] = useState<string>(CALENDAR_DAYS[2].key);
 
   const appointments = useMemo(
-    () => filterAppointments(activeTab),
-    [activeTab],
+    () => filterAppointments(activeTab, activeTab === 'Upcoming' ? selectedDate : undefined),
+    [activeTab, selectedDate],
   );
+
+  const sectionLabel = appointments[0]?.sectionLabel;
 
   return (
     <View style={styles.screen}>
-      <AppStatusBar />
-
-      <View style={[styles.statusBarFill, { height: insets.top, backgroundColor: statusBarFill }]} />
-
-      <View style={styles.topSection}>
-        <View style={[styles.headerCard, { paddingTop: 12 }]}>
+      <View style={[styles.header, { paddingTop: 12 }]}>
+        <View style={styles.titleRowHeader}>
           <Text style={styles.title}>Appointments</Text>
+          <Pressable style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]} hitSlop={6}>
+            <PlusIcon size={isSmallDevice ? 18 : 20} color="#FFFFFF" />
+          </Pressable>
+        </View>
+
+        <View style={styles.monthRow}>
+          <Text style={styles.monthLabel}>{CALENDAR_MONTH_LABEL}</Text>
 
           <View style={styles.tabSwitcher}>
             {APPOINTMENT_TABS.map((tab) => {
@@ -140,49 +185,38 @@ export function AppointmentsScreen() {
               );
             })}
           </View>
+        </View>
 
-          {activeTab === 'Upcoming' && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.calendarScroll}
-            >
-              {CALENDAR_DAYS.map((day) => {
-                const isSelected = selectedDate === day.key;
+        {activeTab === 'Upcoming' ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.calendarScroll}
+          >
+            {CALENDAR_DAYS.map((day) => {
+              const isSelected = selectedDate === day.key;
 
-                return (
-                  <Pressable
-                    key={day.key}
-                    onPress={() => setSelectedDate(day.key)}
-                    style={({ pressed }) => [
-                      styles.dayCard,
-                      isSelected && styles.dayCardSelected,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.dayLabel,
-                        isSelected && styles.dayLabelSelected,
-                      ]}
-                    >
+              return (
+                <Pressable
+                  key={day.key}
+                  onPress={() => setSelectedDate(day.key)}
+                  style={({ pressed }) => [pressed && styles.pressed]}
+                >
+                  <View style={[styles.dayCard, isSelected && styles.dayCardSelected]}>
+                    <Text style={[styles.dayLabel, isSelected && styles.dayLabelSelected]}>
                       {day.day}
                     </Text>
-                    <Text
-                      style={[
-                        styles.dayNumber,
-                        isSelected && styles.dayNumberSelected,
-                      ]}
-                    >
+                    <Text style={[styles.dayNumber, isSelected && styles.dayNumberSelected]}>
                       {day.date}
                     </Text>
-                    {isSelected && <View style={styles.dayDot} />}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          )}
-        </View>
+                    {isSelected ? <View style={styles.dayDotSelected} /> : null}
+                    {!isSelected && day.hasDot ? <View style={styles.dayDot} /> : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
       </View>
 
       <ScrollView
@@ -190,13 +224,16 @@ export function AppointmentsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: H_PAD,
-          paddingBottom: insets.bottom + 16,
-          gap: 12,
+          paddingBottom: insets.bottom + (isSmallDevice ? 20 : 24),
         }}
       >
-        {appointments.map((appointment) => (
-          <AppointmentCard key={appointment.id} appointment={appointment} />
-        ))}
+        {sectionLabel ? <Text style={styles.sectionLabel}>{sectionLabel}</Text> : null}
+
+        <View style={styles.list}>
+          {appointments.map((appointment) => (
+            <AppointmentCard key={appointment.id} appointment={appointment} />
+          ))}
+        </View>
       </ScrollView>
     </View>
   );
@@ -207,112 +244,154 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BODY_BG,
   },
-  statusBarFill: {
-    backgroundColor: '#FFFFFF',
-  },
-  topSection: {
-    backgroundColor: BODY_BG,
-    marginBottom: isSmallDevice ? 12 :  15,
-  },
-  headerCard: {
-    backgroundColor: '#FFFFFF',
+  header: {
+    backgroundColor: PAGE_BG,
     paddingHorizontal: H_PAD,
-    paddingBottom: isSmallDevice ? 12 :  16,
+    paddingBottom: isSmallDevice ? 12 : 14,
+    marginBottom: isSmallDevice ? 6 : 8,
+  },
+  titleRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: isSmallDevice ? 10 : 14,
   },
   title: {
     fontSize: isSmallDevice ? 20 : 22,
-    lineHeight: 30,
+    lineHeight: isSmallDevice ? 26 : 28,
     fontWeight: '800',
-    color: 'black',
-    marginBottom: isSmallDevice ? 12 :  16,
+    color: TEXT_BLACK,
+  },
+  addBtn: {
+    width: ADD_BTN_SIZE,
+    height: ADD_BTN_SIZE,
+    borderRadius: isSmallDevice ? 10 : 12,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: isSmallDevice ? 10 : 14,
+    gap: isSmallDevice ? 8 : 12,
+  },
+  monthLabel: {
+    fontSize: isSmallDevice ? 14 : 16,
+    lineHeight: isSmallDevice ? 20 : 22,
+    fontWeight: '800',
+    color: TEXT_BLACK,
   },
   tabSwitcher: {
     flexDirection: 'row',
-    backgroundColor: SURFACE_BG,
-    borderRadius: 14,
-    padding: isSmallDevice ? 4 :  6,
-    marginBottom: 16,
+    backgroundColor: SWITCH_BG,
+    borderRadius: isSmallDevice ? 16 : 20,
+    padding: isSmallDevice ? 3 : 4,
+    minWidth: isSmallDevice ? 160 : 180,
   },
   tabOption: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: isSmallDevice ? 6 :  8,
-    borderRadius: 10,
+    paddingVertical: isSmallDevice ? 5 : 7,
+    borderRadius: isSmallDevice ? 14 : 16,
   },
   tabOptionActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: PAGE_BG,
+    ...shadowSm,
   },
   tabOptionText: {
-    fontSize: isSmallDevice ? 13 : 14,
-    lineHeight: 20,
+    fontSize: isSmallDevice ? 12 : 13,
+    lineHeight: isSmallDevice ? 14 : 16,
     fontWeight: '600',
     color: TEXT_MUTED,
   },
   tabOptionTextActive: {
     color: PRIMARY,
+    fontWeight: '700',
   },
   calendarScroll: {
-    gap: isSmallDevice ? 6 :  8,
+    gap: isSmallDevice ? 6 : 8,
+    paddingBottom: 2,
   },
   dayCard: {
-    width: isSmallDevice ? 52 :  52,
-    height: isSmallDevice ? 64 :  64,
-    borderRadius: 14,
-    backgroundColor: SURFACE_BG,
+    width: DAY_CARD_WIDTH,
+    minHeight: isSmallDevice ? 60 : 68,
+    borderRadius: isSmallDevice ? 12 : 14,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: isSmallDevice ? 8 :  10,
-    paddingBottom: isSmallDevice ? 6 :  8,
+    paddingVertical: isSmallDevice ? 6 : 8,
   },
   dayCardSelected: {
     backgroundColor: PRIMARY,
+    borderRadius: isSmallDevice ? 14 : 16,
   },
   dayLabel: {
-    fontSize: isSmallDevice ? 11 : 12,
-    lineHeight: 16,
-    fontWeight: '500',
-    color: PRIMARY,
-    marginBottom: isSmallDevice ? 1 :  2,
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 12 : 14,
+    fontWeight: '600',
+    color: TEXT_MUTED,
+    marginBottom: isSmallDevice ? 2 : 4,
   },
   dayLabelSelected: {
-    color: '#FFFFFF',
+    color: 'rgba(255, 255, 255, 0.85)',
   },
   dayNumber: {
-    fontSize: isSmallDevice ? 14 : 16,
-    lineHeight: 20,
-    fontWeight: '700',
-    color: 'black',
+    fontSize: isSmallDevice ? 14 : 15,
+    lineHeight: isSmallDevice ? 16 : 18,
+    fontWeight: '800',
+    color: TEXT_BLACK,
   },
   dayNumberSelected: {
     color: '#FFFFFF',
   },
-  dayDot: {
-    width: isSmallDevice ? 4 :  4,
-    height: isSmallDevice ? 4 :  4,
+  dayDotSelected: {
+    width: 4,
+    height: 4,
     borderRadius: 2,
-    backgroundColor: '#FFFFFF99',
-    marginTop: isSmallDevice ? 2 :  4,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 4,
+  },
+  dayDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: PRIMARY,
+    marginTop: 4,
   },
   listScroll: {
     flex: 1,
+    backgroundColor: BODY_BG,
+  },
+  sectionLabel: {
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 12 : 14,
+    fontWeight: '700',
+    color: TEXT_MUTED,
+    letterSpacing: 0.6,
+    marginBottom: isSmallDevice ? 8 : 10,
+  },
+  list: {
+    gap: isSmallDevice ? 10 : 12,
   },
   appointmentCard: {
+    backgroundColor: PAGE_BG,
+    borderRadius: isSmallDevice ? 14 : 16,
+    borderTopWidth: 4,
+    padding: isSmallDevice ? 10 : 14,
+    ...shadowSm,
+  },
+  cardTop: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: isSmallDevice ? 14 :  16,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: isSmallDevice ? 12 :  14,
-    gap: 12,
-    alignItems: 'center',
-    ...shadowMd,
+    gap: isSmallDevice ? 10 : 12,
+    marginBottom: isSmallDevice ? 10 : 12,
   },
   appointmentImage: {
-    width: isSmallDevice ? 60 : 64,
-    height: isSmallDevice ? 60 : 64,
-    borderRadius: isSmallDevice ? 10 :  12,
-    backgroundColor: BORDER,
+    width: APPT_IMAGE_SIZE,
+    height: APPT_IMAGE_SIZE,
+    borderRadius: isSmallDevice ? 10 : 12,
+    backgroundColor: '#E8EDEA',
     flexShrink: 0,
   },
   appointmentContent: {
@@ -321,70 +400,100 @@ const styles = StyleSheet.create({
   },
   titleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: isSmallDevice ? 6 :  8,
-    marginBottom: isSmallDevice ? 3 : 4,
+    gap: isSmallDevice ? 6 : 8,
+    marginBottom: isSmallDevice ? 2 : 4,
   },
   appointmentTitle: {
     flex: 1,
-    fontSize: isSmallDevice ? 14 : 15,
-    lineHeight: 20,
-    fontWeight: '700',
+    fontSize: isSmallDevice ? 14 : 16,
+    lineHeight: isSmallDevice ? 18 : 20,
+    fontWeight: '800',
     color: TEXT_BLACK,
   },
   instructorText: {
     fontSize: isSmallDevice ? 12 : 13,
-    lineHeight: 18,
-    fontWeight: '400',
-    color: TEXT_MUTED,
-    marginBottom: isSmallDevice ? 3 :  4,
+    lineHeight: isSmallDevice ? 16 : 18,
+    fontWeight: '500',
+    color: TEXT_DESC,
+    marginBottom: isSmallDevice ? 6 : 8,
   },
-  scheduleText: {
-    fontSize: isSmallDevice ? 12 : 14,
-    lineHeight: 18,
-    fontWeight: '700',
-    color: PRIMARY,
+  metaText: {
+    fontSize: isSmallDevice ? 11 : 12,
+    lineHeight: isSmallDevice ? 16 : 18,
+    fontWeight: '500',
+    color: TEXT_DESC,
+    marginBottom: 2,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: isSmallDevice ? 4 :  5,
-    paddingHorizontal: 12,
-    paddingVertical: isSmallDevice ? 3 :  4,
-    borderRadius: 20,
-    borderWidth: 1,
+    gap: isSmallDevice ? 4 : 5,
+    paddingHorizontal: isSmallDevice ? 8 : 10,
+    paddingVertical: isSmallDevice ? 3 : 4,
+    borderRadius: isSmallDevice ? 16 : 20,
     flexShrink: 0,
   },
-  statusBadgeConfirmed: {
-    backgroundColor: EMERALD_50,
-    borderColor: EMERALD_200,
-  },
-  statusBadgePending: {
-    backgroundColor: AMBER_50,
-    borderColor: AMBER_200,
-  },
   statusDot: {
-    width: isSmallDevice ? 4 : 6,
-    height: isSmallDevice ? 4 : 6,
-    borderRadius: isSmallDevice ? 2 : 3,
-  },
-  statusDotConfirmed: {
-    backgroundColor: EMERALD_500,
-  },
-  statusDotPending: {
-    backgroundColor: AMBER_500,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   statusText: {
     fontSize: isSmallDevice ? 10 : 11,
-    lineHeight: 14,
-    fontWeight: '600',
+    lineHeight: isSmallDevice ? 12 : 14,
+    fontWeight: '700',
   },
-  statusTextConfirmed: {
-    color: EMERALD_700,
+  actionRow: {
+    flexDirection: 'row',
+    gap: isSmallDevice ? 6 : 8,
   },
-  statusTextPending: {
-    color: AMBER_700,
+  chatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: isSmallDevice ? 10 : 12,
+    height: ACTION_BTN_HEIGHT,
+    borderRadius: isSmallDevice ? 10 : 12,
+    backgroundColor: MINT,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D1E7D6',
+  },
+  chatBtnText: {
+    fontSize: isSmallDevice ? 11 : 12,
+    lineHeight: isSmallDevice ? 14 : 16,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
+  rescheduleBtn: {
+    flex: 1,
+    height: ACTION_BTN_HEIGHT,
+    borderRadius: isSmallDevice ? 10 : 12,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rescheduleBtnText: {
+    fontSize: isSmallDevice ? 12 : 13,
+    lineHeight: isSmallDevice ? 14 : 16,
+    fontWeight: '700',
+    color: TEXT_DESC,
+  },
+  directionsBtn: {
+    flex: 1,
+    height: ACTION_BTN_HEIGHT,
+    borderRadius: isSmallDevice ? 10 : 12,
+    backgroundColor: MINT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  directionsBtnText: {
+    fontSize: isSmallDevice ? 12 : 13,
+    lineHeight: isSmallDevice ? 14 : 16,
+    fontWeight: '700',
+    color: PRIMARY,
   },
   pressed: {
     opacity: 0.9,

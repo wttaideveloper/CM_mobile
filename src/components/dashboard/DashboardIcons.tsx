@@ -313,6 +313,47 @@ export function HeartIcon({ size = 20, color = '#1F5D4E' }: IconProps) {
   );
 }
 
+export function MessageSquareIcon({ size = 20, color = '#6B7280' }: IconProps) {
+  const s = stroke(color);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+        {...s}
+      />
+    </Svg>
+  );
+}
+
+export function CheckIcon({ size = 16, color = '#FFFFFF' }: IconProps) {
+  const s = stroke(color);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M20 6 9 17l-5-5" {...s} />
+    </Svg>
+  );
+}
+
+export function CirclePlayIcon({ size = 18, color = '#1F5D4E' }: IconProps) {
+  const s = stroke(color);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={10} {...s} />
+      <Path d="M10 8l6 4-6 4V8z" {...s} />
+    </Svg>
+  );
+}
+
+export function LockIcon({ size = 14, color = '#9CA3AF' }: IconProps) {
+  const s = stroke(color);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x={3} y={11} width={18} height={11} rx={2} ry={2} {...s} />
+      <Path d="M7 11V7a5 5 0 0 1 10 0v4" {...s} />
+    </Svg>
+  );
+}
+
 export function ClockIcon({ size = 14, color = '#5a7a70' }: IconProps) {
   const s = stroke(color);
   return (

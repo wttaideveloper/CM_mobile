@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   Pressable,
   ScrollView,
@@ -10,80 +11,177 @@ import {
   Text,
   View,
 } from 'react-native';
+import Svg, {
+  Defs,
+  LinearGradient as SvgGradient,
+  RadialGradient,
+  Rect,
+  Stop,
+} from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { shadowLg, shadowMd, shadowSm } from '@/utils/shadows';
-import { hdUnsplash } from '@/utils/hdImage';
-import { HERO_IMAGE } from '@/constants/images';
 
 import {
   BellIcon,
-  BookOpenIcon,
-  Building2Icon,
   CalendarDaysIcon,
   ChevronRightIcon,
   CircleCheckIcon,
-  ClockIcon,
   HeartIcon,
   MapPinIcon,
-  ShoppingCartIcon,
+  SearchIcon,
   StarIcon,
-  WrenchIcon,
 } from '@/components/dashboard/DashboardIcons';
-import { filterAppointments } from '@/constants/appointments';
-import { COURSES } from '@/constants/courses';
 import { EVENTS } from '@/constants/events';
+import { useEnterprises } from '@/hooks/useEnterprises';
+import { fetchNotificationUnreadCount } from '@/services/notification.service';
+import { useSearchStore } from '@/stores/search.store';
+import type { EnterpriseListItem } from '@/types/enterprise.types';
+import { formatMembersCount } from '@/utils/enterprise.mapper';
+import { detailHref, SEARCH_DATA_ROUTE } from '@/utils/searchNavigation';
 import { isSmallDevice } from '@/utils/responsive';
+import { shadowSm } from '@/utils/shadows';
 
 const PRIMARY = '#1F5D4E';
-const MINT = '#EAF4EC';
+const ACCENT_GREEN = '#4CAF50';
+const LEAF_GREEN = '#6BCF8E';
 const BODY_BG = '#F5F7F5';
-const META = '#5a7a70';
+const TEXT_MUTED = '#6B7280';
+const TEXT_BLACK = '#111111';
 const WHITE = '#FFFFFF';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const H_PAD = 20;
-const HERO_BANNER_HEIGHT = 184;
-const STREAK_DAYS = 12;
-const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-const WEEK_COMPLETED = 5;
-const APPOINTMENT_CARD_WIDTH = SCREEN_WIDTH * 0.62;
+const H_PAD = isSmallDevice ? 16 : 20;
+const FEATURED_BANNER_HEIGHT = isSmallDevice ? 100 : 120;
+const FEATURED_BANNER_WIDTH = SCREEN_WIDTH - H_PAD * 2;
 
-/** Rich HD images for home screen (2x–3x device resolution). */
-const HOME_IMAGES = {
-  hero: HERO_IMAGE,
-  appointments: {
-    'personal-training': hdUnsplash(
-      'photo-1571019613454-1cb2f99b2d8b',
-      APPOINTMENT_CARD_WIDTH,
-      120,
-    ),
-    'nutrition-coaching': hdUnsplash(
-      'photo-1490645935967-10de6ba17061',
-      APPOINTMENT_CARD_WIDTH,
-      120,
-    ),
-    'group-yoga': hdUnsplash(
-      'photo-1599901860904-17e6ed7083a0',
-      APPOINTMENT_CARD_WIDTH,
-      120,
-    ),
-  } as Record<string, string>,
-  event: hdUnsplash('photo-1540575467063-178a50c2df87', SCREEN_WIDTH - H_PAD * 2, 200),
-  course: hdUnsplash('photo-1517836357463-d25dfeac3438', SCREEN_WIDTH - H_PAD * 2, 220),
-};
+const HEADER_ICON_SIZE = isSmallDevice ? 36 : 40;
+const HEADER_ICON_RADIUS = isSmallDevice ? 12 : 14;
+const HEADER_BADGE_SIZE = isSmallDevice ? 16 : 18;
+const HEADER_BADGE_RADIUS = HEADER_BADGE_SIZE / 2;
 
-function getAppointmentImage(id: string) {
-  return (
-    HOME_IMAGES.appointments[id] ??
-    hdUnsplash('photo-1571019613454-1cb2f99b2d8b', APPOINTMENT_CARD_WIDTH, 120)
-  );
-}
+const QUICK_STAT_ICON_SIZE = isSmallDevice ? 12 : 14;
+const SEARCH_ICON_SIZE = isSmallDevice ? 16 : 18;
+const BELL_ICON_SIZE = isSmallDevice ? 18 : 20;
+const CHEVRON_ICON_SIZE = isSmallDevice ? 16 : 18;
+const CATEGORY_ICON_SIZE = isSmallDevice ? 52 : 58;
+const CATEGORY_ITEM_WIDTH = isSmallDevice ? 58 : 64;
+const ENTERPRISE_AVATAR_SIZE = isSmallDevice ? 44 : 50;
+const STAT_GAP = isSmallDevice ? 6 : 8;
+
+/** Decorative header arcs — left top-corner + large top-right sweep (Figma). */
+const HEADER_ARC_LEFT_SIZE = SCREEN_WIDTH * 0.35;
+const HEADER_ARC_RIGHT_SIZE = SCREEN_WIDTH * 1.12;
+
+const CATEGORIES = [
+  { key: 'fitness', label: 'Fitness', emoji: '💪' },
+  { key: 'nutrition', label: 'Nutrition', emoji: '🥗' },
+  { key: 'mindfulness', label: 'Mindfulness', emoji: '🧘' },
+  { key: 'healthcare', label: 'Healthcare', emoji: '🏥' },
+  { key: 'training', label: 'Training', emoji: '🎓' },
+  { key: 'massage', label: 'Massage', emoji: '💆' },
+] as const;
+
+const QUICK_STATS = [
+  {
+    key: 'nearby',
+    value: '24',
+    label: 'Nearby',
+    icon: (color: string) => <MapPinIcon size={QUICK_STAT_ICON_SIZE} color={color} />,
+    iconColor: PRIMARY,
+    iconBg: '#EAF4EC',
+  },
+  {
+    key: 'booked',
+    value: '3',
+    label: 'Booked',
+    icon: (color: string) => <CalendarDaysIcon size={QUICK_STAT_ICON_SIZE} color={color} />,
+    iconColor: '#2563EB',
+    iconBg: '#EFF6FF',
+  },
+  {
+    key: 'saved',
+    value: '12',
+    label: 'Saved',
+    icon: (color: string) => <HeartIcon size={QUICK_STAT_ICON_SIZE} color={color} />,
+    iconColor: '#E11D48',
+    iconBg: '#FFF1F2',
+  },
+  {
+    key: 'reviews',
+    value: '8',
+    label: 'Reviews',
+    icon: (color: string) => <StarIcon size={QUICK_STAT_ICON_SIZE} color={color} />,
+    iconColor: '#F59E0B',
+    iconBg: '#FFFBEB',
+  },
+] as const;
 
 function getGreeting() {
   const hour = new Date().getHours();
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
+}
+
+function HeaderBackground() {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Svg width="100%" height="100%" preserveAspectRatio="none">
+        <Defs>
+          <SvgGradient id="headerGrad" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor="#163D34" />
+            <Stop offset="0.55" stopColor="#1A5245" />
+            <Stop offset="1" stopColor="#1F5D4E" />
+          </SvgGradient>
+          <RadialGradient
+            id="headerLeafGlow"
+            cx="1"
+            cy="1"
+            r="1.05"
+            gradientUnits="objectBoundingBox"
+          >
+            <Stop offset="0" stopColor={'#2B773F'} stopOpacity={0.80} />
+            <Stop offset="0.32" stopColor="#2B773F" stopOpacity={0.6} />
+            <Stop offset="0.65" stopColor="#2B773F" stopOpacity={0.22} />
+            <Stop offset="1" stopColor="#2B773F" stopOpacity={0} />
+          </RadialGradient>
+          <SvgGradient id="headerLeafSweep" x1="1" y1="1" x2="0.1" y2="0.15">
+            <Stop offset="0" stopColor={ACCENT_GREEN} stopOpacity={0.45} />
+            <Stop offset="0.4" stopColor="#38A06E" stopOpacity={0.22} />
+            <Stop offset="1" stopColor="#163D34" stopOpacity={0} />
+          </SvgGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#headerGrad)" />
+        <Rect width="100%" height="100%" fill="url(#headerLeafGlow)" />
+        <Rect width="100%" height="100%" fill="url(#headerLeafSweep)" />
+      </Svg>
+      <View style={styles.headerArcLeft} />
+      <View style={styles.headerArcRight} />
+    </View>
+  );
+}
+
+function BannerGradientOverlay() {
+  return (
+    <View style={styles.featuredOverlayWrap} pointerEvents="none">
+      <Svg
+        width={FEATURED_BANNER_WIDTH}
+        height={FEATURED_BANNER_HEIGHT}
+        preserveAspectRatio="none"
+      >
+        <Defs>
+          <SvgGradient id="homeFeaturedGrad" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#1F5D4E" stopOpacity={0.85} />
+            <Stop offset="1" stopColor="#1F5D4E" stopOpacity={0.4} />
+          </SvgGradient>
+        </Defs>
+        <Rect
+          width={FEATURED_BANNER_WIDTH}
+          height={FEATURED_BANNER_HEIGHT}
+          fill="url(#homeFeaturedGrad)"
+        />
+      </Svg>
+    </View>
+  );
 }
 
 type SectionHeaderProps = {
@@ -105,149 +203,139 @@ function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
   );
 }
 
-type StatCardProps = {
+type QuickStatCardProps = {
   icon: ReactNode;
   value: string;
   label: string;
-  hint?: string;
-  bg: string;
-  border: string;
   iconBg: string;
-  valueColor: string;
 };
 
-function StatCard({ icon, value, label, hint, bg, border, iconBg, valueColor }: StatCardProps) {
+function QuickStatCard({ icon, value, label, iconBg }: QuickStatCardProps) {
   return (
-    <View style={[styles.statCard, { backgroundColor: bg, borderColor: border }]}>
-      <View style={styles.statCardTop}>
-        <View style={[styles.statCardIcon, { backgroundColor: iconBg }]}>{icon}</View>
-        {hint ? (
-          <View style={[styles.statHintPill, { backgroundColor: iconBg }]}>
-            <Text style={[styles.statHintText, { color: valueColor }]}>{hint}</Text>
-          </View>
-        ) : null}
-      </View>
-      <Text style={[styles.statCardValue, { color: valueColor }]}>{value}</Text>
-      <Text style={styles.statCardLabel}>{label}</Text>
+    <View style={styles.quickStatCard}>
+      <View style={[styles.quickStatIcon, { backgroundColor: iconBg }]}>{icon}</View>
+      <Text style={styles.quickStatValue}>{value}</Text>
+      <Text style={styles.quickStatLabel}>{label}</Text>
     </View>
   );
 }
 
-const EXPLORE_TILE_WIDTH = 76;
-
-const EXPLORE_ITEMS = [
-  {
-    key: 'enterprises',
-    label: 'Enterprises',
-    icon: Building2Icon,
-    color: PRIMARY,
-    accentSoft: MINT,
-    route: '/(main)/(tabs)/explore' as const,
-  },
-  {
-    key: 'services',
-    label: 'Services',
-    icon: WrenchIcon,
-    color: '#0D9488',
-    accentSoft: '#E6FAF5',
-    route: '/(main)/(tabs)/shop' as const,
-  },
-  {
-    key: 'shop',
-    label: 'Shop',
-    icon: ShoppingCartIcon,
-    color: '#7C3AED',
-    accentSoft: '#F5F0FF',
-    route: '/(main)/(tabs)/shop' as const,
-  },
-  {
-    key: 'events',
-    label: 'Events',
-    icon: CalendarDaysIcon,
-    color: '#2563EB',
-    accentSoft: '#EFF6FF',
-    route: '/(main)/(tabs)/events' as const,
-  },
-] as const;
-
-type ExploreTileProps = {
-  icon: ReactNode;
+type CategoryItemProps = {
+  emoji: string;
   label: string;
-  accentSoft: string;
-  onPress?: () => void;
+  active: boolean;
+  onPress: () => void;
 };
 
-function StreakHeroBanner({ onPress }: { onPress: () => void }) {
+function CategoryItem({ emoji, label, active, onPress }: CategoryItemProps) {
   return (
-    <Pressable
-      style={({ pressed }) => [styles.streakBanner, pressed && styles.pressed]}
-      onPress={onPress}
-    >
-      <Image
-        source={HOME_IMAGES.hero}
-        style={styles.streakBannerImage}
-        contentFit="cover"
-        contentPosition="center"
-        priority="high"
-        cachePolicy="memory-disk"
-        allowDownscaling={false}
-        transition={200}
-      />
-      <View style={styles.streakBannerOverlay} />
-      <View style={styles.streakBannerGlow} />
-      <View style={styles.streakBannerOrb} />
-      <View style={styles.streakBannerContent}>
-        <View style={styles.streakBannerTop}>
-          <View style={styles.streakFireBadge}>
-            <StarIcon size={12} color="#FBBF24" />
-            <Text style={styles.streakFireText}>On fire</Text>
-          </View>
-          <View style={styles.streakTopRight}>
-            <View style={styles.streakCountRing}>
-              <Text style={styles.streakCountValue}>{STREAK_DAYS}</Text>
-              <Text style={styles.streakCountUnit}>days</Text>
-            </View>
-            <View style={styles.streakBannerArrow}>
-              <ChevronRightIcon size={16} color={WHITE} />
-            </View>
-          </View>
-        </View>
-        <Text style={styles.streakBannerTitle}>Keep your streak alive</Text>
-        <Text style={styles.streakBannerSubtitle}>4 sessions completed this week</Text>
-        {/* <View style={styles.streakWeekRow}> */}
-          {/* {WEEK_DAYS.map((day, index) => {
-            const done = index < WEEK_COMPLETED;
-            return (
-              <View key={`${day}-${index}`} style={styles.streakDayCol}>
-                <View style={[styles.streakDayDot, done && styles.streakDayDotDone]}>
-                  {done ? <CircleCheckIcon size={10} color={WHITE} /> : null}
-                </View>
-                <Text style={[styles.streakDayLabel, done && styles.streakDayLabelDone]}>{day}</Text>
-              </View>
-            );
-          })} */}
-        {/* </View> */}
+    <Pressable onPress={onPress} style={styles.categoryItem}>
+      <View style={[styles.categoryIcon, active && styles.categoryIconActive]}>
+        <Text style={[styles.categoryEmoji, active && styles.categoryEmojiActive]}>{emoji}</Text>
       </View>
-    </Pressable>
-  );
-}
-
-function ExploreTile({ icon, label, accentSoft, onPress }: ExploreTileProps) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.exploreTile, pressed && styles.pressed]}
-    >
-      <View style={[styles.exploreIconWrap, { backgroundColor: accentSoft }]}>{icon}</View>
-      <Text style={styles.exploreLabel} numberOfLines={1}>
+      <Text style={[styles.categoryLabel, active && styles.categoryLabelActive]} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>
   );
 }
 
+function HomeStarRating({ rating }: { rating: string }) {
+  const value = Math.max(0, Math.min(5, Number.parseFloat(rating) || 0));
+  const fullStars = Math.floor(value);
+  const hasHalf = value - fullStars >= 0.5;
+
+  return (
+    <View style={styles.starsRow}>
+      {Array.from({ length: 5 }, (_, index) => {
+        const filled = index < fullStars || (index === fullStars && hasHalf);
+        return (
+          <StarIcon
+            key={index}
+            size={11}
+            color={filled ? '#FBBF24' : '#E5E7EB'}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+function EnterpriseHomeCard({ enterprise }: { enterprise: EnterpriseListItem }) {
+  const router = useRouter();
+  const initial = enterprise.name === 'NA' ? '?' : enterprise.name.charAt(0).toUpperCase();
+  const hasLogo = Boolean(enterprise.logoUrl);
+  const rating =
+    enterprise.rating === 'NA' || enterprise.rating === '0' ? '0' : enterprise.rating;
+
+  return (
+    <Pressable
+      onPress={() =>
+        router.push(detailHref('/(main)/(tabs)/explore', enterprise.id))
+      }
+      style={({ pressed }) => [styles.enterpriseCard, pressed && styles.pressed]}
+    >
+      <View style={styles.enterpriseAvatar}>
+        {hasLogo ? (
+          <Image
+            source={{ uri: enterprise.logoUrl! }}
+            style={styles.enterpriseAvatarImage}
+            contentFit="cover"
+          />
+        ) : (
+          <Text style={styles.enterpriseAvatarText}>{initial}</Text>
+        )}
+      </View>
+
+      <View style={styles.enterpriseMain}>
+        <View style={styles.enterpriseNameRow}>
+          <Text style={styles.enterpriseName} numberOfLines={1}>
+            {enterprise.name}
+          </Text>
+          {enterprise.isVerified ? (
+            <CircleCheckIcon size={14} color={ACCENT_GREEN} />
+          ) : null}
+        </View>
+        <Text style={styles.enterpriseMeta} numberOfLines={1}>
+          {enterprise.category}
+          {enterprise.location !== 'NA' ? ` · ${enterprise.location}` : ''}
+        </Text>
+        <View style={styles.enterpriseRatingRow}>
+          <HomeStarRating rating={rating} />
+          <Text style={styles.enterpriseRatingText}>
+            {rating} · {formatMembersCount(enterprise.members)} members
+          </Text>
+        </View>
+      </View>
+
+      <ChevronRightIcon size={CHEVRON_ICON_SIZE} color="#9CA3AF" />
+    </Pressable>
+  );
+}
+
 function NotificationBell() {
   const router = useRouter();
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  const loadUnreadCount = useCallback(async () => {
+    try {
+      const data = await fetchNotificationUnreadCount();
+      setUnreadNotifications(data.unread_notifications);
+    } catch (error) {
+      if (__DEV__) {
+        console.error('[NOTIFICATIONS] Unread count API ← failed', error);
+      }
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadUnreadCount();
+    }, [loadUnreadCount]),
+  );
+
+  const badgeLabel =
+    unreadNotifications > 99 ? '99+' : String(unreadNotifications);
 
   return (
     <Pressable
@@ -255,43 +343,65 @@ function NotificationBell() {
       style={({ pressed }) => [styles.bellOuter, pressed && styles.pressed]}
       hitSlop={8}
     >
-      <View style={styles.bellCircle}>
-        <BellIcon size={20} color={WHITE} />
+      <View style={styles.headerIconWrap}>
+        <BellIcon size={BELL_ICON_SIZE} color={WHITE} />
       </View>
-      <View style={styles.bellBadge}>
-        <Text style={styles.bellBadgeText}>2</Text>
+      <View style={styles.headerIconBadge}>
+        <Text style={styles.headerIconBadgeText}>{badgeLabel}</Text>
       </View>
     </Pressable>
   );
 }
 
-const upcomingAppointments = filterAppointments('Upcoming').slice(0, 2);
-const nextEvent = EVENTS[0];
-const activeCourse = COURSES[0];
+function SearchBar() {
+  const router = useRouter();
+
+  return (
+    <Pressable
+      onPress={() => router.push('/(main)/search-data')}
+      style={({ pressed }) => [styles.searchBar, pressed && styles.pressed]}
+    >
+      <SearchIcon size={SEARCH_ICON_SIZE} color="rgba(255,255,255,0.55)" />
+      <Text style={styles.searchPlaceholder}>Search wellness services...</Text>
+    </Pressable>
+  );
+}
+
+const featuredEvent = EVENTS[0];
+const featuredBannerImage = featuredEvent.detailImage || featuredEvent.image;
+const featuredDateLabel = featuredEvent.dateTime.split(' · ')[0] ?? featuredEvent.dateTime;
 
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const statusBarFill = useStatusBarBackground();
+  const setSearchQuery = useSearchStore((state) => state.setQuery);
+  const [activeCategory, setActiveCategory] = useState<string>('fitness');
+
+  const { data: enterprises, isLoading: isEnterprisesLoading } = useEnterprises();
+  const topEnterprises = useMemo(() => (enterprises ?? []).slice(0, 3), [enterprises]);
+
+  const openCategorySearch = (category: (typeof CATEGORIES)[number]) => {
+    setActiveCategory(category.key);
+    setSearchQuery(category.label);
+    router.push(SEARCH_DATA_ROUTE);
+  };
 
   return (
     <View style={styles.screen}>
-      <AppStatusBar />
-      <View style={[styles.statusBarFill, { height: insets.top, backgroundColor: statusBarFill }]} />
-
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + (isSmallDevice ? 20 : 24) }}
       >
-        {/* Header */}
         <View style={styles.header}>
+          <HeaderBackground />
+
           <View style={styles.greetingRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>SJ</Text>
+            <View style={styles.headerIconWrap}>
+              <Text style={styles.avatarText}>S</Text>
             </View>
             <View style={styles.greetingText}>
-              <Text style={styles.greetingMuted}>{getGreeting()}</Text>
+              <Text style={styles.greetingMuted}>{getGreeting()} ✦</Text>
               <Text style={styles.greetingName} numberOfLines={1}>
                 Sarah Johnson
               </Text>
@@ -299,220 +409,100 @@ export function HomeScreen() {
             <NotificationBell />
           </View>
 
-          <StreakHeroBanner
-            onPress={() => router.navigate('/(main)/(tabs)/events/appointments')}
-          />
+          <SearchBar />
         </View>
 
-        {/* Body — curved top */}
+        <View style={styles.statsRow}>
+          {QUICK_STATS.map((stat) => (
+            <QuickStatCard
+              key={stat.key}
+              icon={stat.icon(stat.iconColor)}
+              value={stat.value}
+              label={stat.label}
+              iconBg={stat.iconBg}
+            />
+          ))}
+        </View>
+
         <View style={styles.body}>
-          {/* Wellness stats */}
-          <View style={styles.statsGrid}>
-            <View style={styles.statsRow}>
-              <StatCard
-                icon={<CircleCheckIcon size={18} color={PRIMARY} />}
-                value="4"
-                label="Sessions"
-                hint="This week"
-                bg="#F0FAF4"
-                border="#C8E6D4"
-                iconBg={WHITE}
-                valueColor={PRIMARY}
-              />
-              <StatCard
-                icon={<HeartIcon size={18} color="#E11D48" />}
-                value="12"
-                label="Day streak"
-                hint="On fire"
-                bg="#FFF5F7"
-                border="#FECDD3"
-                iconBg={WHITE}
-                valueColor="#BE123C"
-              />
-            </View>
-            <View style={styles.statsRow}>
-              <StatCard
-                icon={<ClockIcon size={18} color="#2563EB" />}
-                value="3"
-                label="Upcoming"
-                hint="Booked"
-                bg="#EFF6FF"
-                border="#BFDBFE"
-                iconBg={WHITE}
-                valueColor="#1D4ED8"
-              />
-              <StatCard
-                icon={<BookOpenIcon size={18} color="#7C3AED" />}
-                value="2"
-                label="Courses"
-                hint="Active"
-                bg="#F5F3FF"
-                border="#DDD6FE"
-                iconBg={WHITE}
-                valueColor="#6D28D9"
-              />
-            </View>
-          </View>
-
-          <View style={styles.exploreSection}>
-            <Text style={styles.exploreSectionTitle}>Explore</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.exploreRow}
-            >
-              {EXPLORE_ITEMS.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <ExploreTile
-                    key={item.key}
-                    icon={<Icon size={20} color={item.color} />}
-                    label={item.label}
-                    accentSoft={item.accentSoft}
-                    onPress={() => router.navigate(item.route)}
-                  />
-                );
-              })}
-            </ScrollView>
-          </View>
-
           <SectionHeader
-            title="Upcoming"
+            title="Browse Categories"
             actionLabel="See all"
-            onAction={() => router.push('/(main)/(tabs)/events/appointments')}
+            onAction={() => router.navigate('/(main)/(tabs)/explore')}
           />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.upcomingScroll}
+            contentContainerStyle={styles.categoriesRow}
           >
-            {upcomingAppointments.map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => router.push('/(main)/(tabs)/events/appointments')}
-                style={({ pressed }) => [styles.appointmentCard, pressed && styles.pressed]}
-              >
-                <Image
-                  source={{ uri: getAppointmentImage(item.id) }}
-                  style={styles.appointmentImage}
-                  contentFit="cover"
-                  contentPosition="center"
-                  priority="normal"
-                  cachePolicy="memory-disk"
-                  allowDownscaling={false}
-                  transition={200}
-                />
-                <View style={styles.appointmentBody}>
-                  <View
-                    style={[
-                      styles.statusPill,
-                      item.status === 'confirmed' ? styles.statusConfirmed : styles.statusPending,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.statusText,
-                        item.status === 'confirmed' ? styles.statusTextConfirmed : styles.statusTextPending,
-                      ]}
-                    >
-                      {item.status === 'confirmed' ? 'Confirmed' : 'Pending'}
-                    </Text>
-                  </View>
-                  <Text style={styles.appointmentTitle} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.appointmentMeta} numberOfLines={1}>
-                    {item.instructor}
-                  </Text>
-                  <View style={styles.appointmentTimeRow}>
-                    <ClockIcon size={12} color={META} />
-                    <Text style={styles.appointmentTime}>{item.schedule}</Text>
-                  </View>
-                </View>
-              </Pressable>
+            {CATEGORIES.map((category) => (
+              <CategoryItem
+                key={category.key}
+                emoji={category.emoji}
+                label={category.label}
+                active={activeCategory === category.key}
+                onPress={() => openCategorySearch(category)}
+              />
             ))}
           </ScrollView>
 
-          <SectionHeader
-            title="Featured event"
-            actionLabel="Browse"
-            onAction={() => router.navigate('/(main)/(tabs)/events')}
-          />
           <Pressable
-            onPress={() => router.push(`/(main)/event/${nextEvent.id}`)}
-            style={({ pressed }) => [styles.eventCard, pressed && styles.pressed]}
+            onPress={() => router.push(`/(main)/event/${featuredEvent.id}`)}
+            style={({ pressed }) => [styles.featuredBanner, pressed && styles.pressed]}
           >
             <Image
-              source={{ uri: HOME_IMAGES.event }}
-              style={styles.eventImage}
+              source={{ uri: featuredBannerImage }}
+              style={styles.featuredImage}
               contentFit="cover"
               contentPosition="center"
-              priority="normal"
               cachePolicy="memory-disk"
-              allowDownscaling={false}
               transition={200}
             />
-            <View style={styles.eventOverlay} />
-            <View style={styles.eventContent}>
-              <View style={styles.eventBadge}>
-                <Text style={styles.eventBadgeText}>{nextEvent.priceLabel}</Text>
-              </View>
-              <Text style={styles.eventTitle}>{nextEvent.name}</Text>
-              <View style={styles.eventMetaRow}>
-                <ClockIcon size={13} color="rgba(255,255,255,0.9)" />
-                <Text style={styles.eventMeta}>{nextEvent.dateTime}</Text>
-              </View>
-              <View style={styles.eventMetaRow}>
-                <MapPinIcon size={13} color="rgba(255,255,255,0.9)" />
-                <Text style={styles.eventMeta}>{nextEvent.location}</Text>
-              </View>
+            <BannerGradientOverlay />
+            <View style={styles.featuredContent}>
+              <Text style={styles.featuredTag}>FEATURED THIS WEEK</Text>
+              <Text style={styles.featuredTitle}>{featuredEvent.name}</Text>
+              <Text style={styles.featuredMeta}>
+                {featuredDateLabel} · {featuredEvent.location} · {featuredEvent.priceLabel}
+              </Text>
+            </View>
+            <View style={styles.featuredJoinBtn}>
+              <Text style={styles.featuredJoinText}>Join</Text>
             </View>
           </Pressable>
 
           <SectionHeader
-            title="Continue learning"
-            actionLabel="My courses"
-            onAction={() => router.navigate('/(main)/(tabs)/events/courses')}
+            title="Top Enterprises"
+            actionLabel="See all"
+            onAction={() => router.navigate('/(main)/(tabs)/explore')}
           />
-          <Pressable
-            onPress={() => router.push(`/(main)/course/${activeCourse.id}`)}
-            style={({ pressed }) => [styles.courseCard, pressed && styles.pressed]}
-          >
-            <Image
-              source={{ uri: HOME_IMAGES.course }}
-              style={styles.courseImage}
-              contentFit="cover"
-              contentPosition="center"
-              priority="normal"
-              cachePolicy="memory-disk"
-              allowDownscaling={false}
-              transition={200}
-            />
-            <View style={styles.courseOverlay} />
-            <View style={styles.courseContent}>
-              <Text style={styles.courseLevel}>{activeCourse.level}</Text>
-              <Text style={styles.courseName}>{activeCourse.name}</Text>
-              <Text style={styles.courseMeta}>
-                {activeCourse.instructor} · {activeCourse.lessons} lessons · {activeCourse.weeks} weeks
-              </Text>
-              <View style={styles.courseProgressTrack}>
-                <View style={styles.courseProgressFill} />
-              </View>
-              <Text style={styles.courseProgressLabel}>35% complete</Text>
+
+          {isEnterprisesLoading ? (
+            <View style={styles.enterprisesLoading}>
+              <ActivityIndicator color={PRIMARY} />
             </View>
-          </Pressable>
+          ) : topEnterprises.length > 0 ? (
+            <View style={styles.enterprisesList}>
+              {topEnterprises.map((enterprise) => (
+                <EnterpriseHomeCard key={enterprise.id} enterprise={enterprise} />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.enterprisesEmpty}>
+              <Text style={styles.enterprisesEmptyText}>No enterprises available yet.</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
   );
 }
 
+const STAT_CARD_WIDTH = (SCREEN_WIDTH - H_PAD * 2 - STAT_GAP * 3) / 4;
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: PRIMARY,
-  },
-  statusBarFill: {
     backgroundColor: PRIMARY,
   },
   scroll: {
@@ -520,553 +510,379 @@ const styles = StyleSheet.create({
     backgroundColor: BODY_BG,
   },
   header: {
-    backgroundColor: PRIMARY,
     paddingHorizontal: H_PAD,
-    paddingTop: 18,
-    paddingBottom: 28,
+    paddingTop: isSmallDevice ? 10 : 14,
+    paddingBottom: isSmallDevice ? 72 : 84,
+    overflow: 'visible',
+  },
+  headerArcLeft: {
+    position: 'absolute',
+    top: -H_PAD - HEADER_ARC_LEFT_SIZE *-0.36,
+    left: -H_PAD - HEADER_ARC_LEFT_SIZE * 0.2,
+    width: HEADER_ARC_LEFT_SIZE,
+    height: HEADER_ARC_LEFT_SIZE,
+    borderRadius: HEADER_ARC_LEFT_SIZE / 2,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  headerArcRight: {
+    position: 'absolute',
+    top: -H_PAD - HEADER_ARC_RIGHT_SIZE * 0.4,
+    right: -H_PAD - HEADER_ARC_RIGHT_SIZE * 0.48,
+    width: HEADER_ARC_RIGHT_SIZE,
+    height: HEADER_ARC_RIGHT_SIZE,
+    borderRadius: HEADER_ARC_RIGHT_SIZE / 2,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   greetingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    gap: 12,
+    marginBottom: isSmallDevice ? 14 : 20,
+    gap: isSmallDevice ? 10 : 12,
+    zIndex: 2,
   },
-  avatar: {
-    width: isSmallDevice ? 40 : 48,
-    height: isSmallDevice ? 40 : 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.35)',
+  headerIconWrap: {
+    width: HEADER_ICON_SIZE,
+    height: HEADER_ICON_SIZE,
+    borderRadius: HEADER_ICON_RADIUS,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: isSmallDevice ? 14 : 16,
+    fontSize: isSmallDevice ? 16 : 18,
     fontWeight: '700',
     color: WHITE,
-    letterSpacing: 0.5,
   },
   greetingText: {
     flex: 1,
     minWidth: 0,
   },
   greetingMuted: {
-    fontSize: isSmallDevice ? 12 : 13,
-    lineHeight: 18,
+    fontSize: isSmallDevice ? 11 : 12,
+    lineHeight: isSmallDevice ? 14 : 16,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.65)',
     marginBottom: 2,
   },
   greetingName: {
-    fontSize: isSmallDevice ? 18 :  20,
-    lineHeight: 26,
-    fontWeight: '700',
-    color: WHITE,
-  },
-  streakBanner: {
-    height: isSmallDevice ? 160 :   HERO_BANNER_HEIGHT,
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    ...shadowLg,
-  },
-  streakBannerImage: {
-    ...StyleSheet.absoluteFill,
-  },
-  streakBannerOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(15, 52, 43, 0.78)',
-  },
-  streakBannerGlow: {
-    position: 'absolute',
-    top: -30,
-    right: -20,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(251, 191, 36, 0.22)',
-  },
-  streakBannerOrb: {
-    position: 'absolute',
-    bottom: -40,
-    left: -30,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(74, 222, 128, 0.12)',
-  },
-  streakBannerContent: {
-    flex: 1,
-    padding: 18,
-    justifyContent: 'space-between',
-  },
-  streakBannerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  streakTopRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  streakFireBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(251, 191, 36, 0.22)',
-    borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.45)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  streakFireText: {
-    fontSize: isSmallDevice ? 10 : 11,
-    fontWeight: '800',
-    color: '#FDE68A',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  streakCountRing: {
-    width: isSmallDevice ? 50 : 58,
-    height: isSmallDevice ? 50 : 58,
-    borderRadius: 29,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  streakCountValue: {
-    fontSize: isSmallDevice ? 20 : 22,
-    lineHeight: 24,
+    fontSize: isSmallDevice ? 17 : 20,
+    lineHeight: isSmallDevice ? 22 : 26,
     fontWeight: '900',
     color: WHITE,
-    letterSpacing: -0.5,
-  },
-  streakCountUnit: {
-    fontSize: isSmallDevice ? 8 : 9,
-    lineHeight: 11,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.8)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  streakBannerTitle: {
-    fontSize: isSmallDevice ? 17 : 19,
-    lineHeight: 24,
-    fontWeight: '800',
-    color: WHITE,
-    marginTop: 4,
-  },
-  streakBannerSubtitle: {
-    fontSize: isSmallDevice ? 11 : 12,
-    lineHeight: 16,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.82)',
-    marginBottom: 10,
-  },
-  streakWeekRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-  },
-  streakDayCol: {
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-  },
-  streakDayDot: {
-    width: isSmallDevice ? 20 : 22,
-    height: isSmallDevice ? 20 : 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  streakDayDotDone: {
-    backgroundColor: '#F59E0B',
-    borderColor: '#FCD34D',
-  },
-  streakDayLabel: {
-    fontSize: isSmallDevice ? 8 : 9,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.45)',
-  },
-  streakDayLabelDone: {
-    color: 'rgba(255,255,255,0.9)',
-  },
-  streakBannerArrow: {
-    width: isSmallDevice ? 26 : 28,
-    height: isSmallDevice ? 26 : 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    letterSpacing: -0.3,
   },
   bellOuter: {
-    width: isSmallDevice ? 40 :  44,
-    height: isSmallDevice ? 40 :  44,
+    width: HEADER_ICON_SIZE,
+    height: HEADER_ICON_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bellCircle: {
-    width: isSmallDevice ? 36 :  40,
-    height: isSmallDevice ? 36 :  40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bellBadge: {
+  headerIconBadge: {
     position: 'absolute',
-    top: isSmallDevice ? 1 :  2,
-    right: 2,
-    minWidth: 18,
-    height: isSmallDevice ? 16 :  18,
-    borderRadius: 9,
-    backgroundColor: '#4CAF50',
+    top: isSmallDevice ? 4 : 6,
+    right: isSmallDevice ? 2 : 4,
+    minWidth: HEADER_BADGE_SIZE,
+    height: HEADER_BADGE_SIZE,
+    borderRadius: HEADER_BADGE_RADIUS,
+    backgroundColor: ACCENT_GREEN,
     borderWidth: 2,
     borderColor: PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: isSmallDevice ? 3 :  4,
+    paddingHorizontal: 4,
+    transform: [
+      { translateX: HEADER_BADGE_RADIUS },
+      { translateY: -HEADER_BADGE_RADIUS },
+    ],
   },
-  bellBadgeText: {
+  headerIconBadgeText: {
     fontSize: isSmallDevice ? 9 : 10,
     fontWeight: '700',
     color: WHITE,
-    lineHeight: 12,
+    lineHeight: HEADER_BADGE_SIZE - 4,
+    textAlign: 'center',
   },
-  body: {
-    marginTop: isSmallDevice ? -14 :  -16,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: BODY_BG,
-    paddingHorizontal: H_PAD,
-    paddingTop: isSmallDevice ? 20 :  24,
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: isSmallDevice ? 14 : 16,
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    paddingVertical: isSmallDevice ? 10 : 13,
+    gap: isSmallDevice ? 8 : 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
-  statsGrid: {
-    gap: 12,
-    marginBottom: isSmallDevice ? 24 :  28,
+  searchPlaceholder: {
+    flex: 1,
+    fontSize: isSmallDevice ? 13 : 14,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.55)',
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 12,
+    paddingHorizontal: H_PAD,
+    gap: STAT_GAP,
+    marginTop: isSmallDevice ? -40 : -48,
+    marginBottom: isSmallDevice ? 16 : 20,
   },
-  statCard: {
-    flex: 1,
-    borderRadius: 22,
+  quickStatCard: {
+    width: STAT_CARD_WIDTH,
+    backgroundColor: WHITE,
+    borderRadius: isSmallDevice ? 16 : 20,
+    paddingVertical: isSmallDevice ? 10 : 12,
+    paddingHorizontal: isSmallDevice ? 4 : 6,
+    alignItems: 'center',
     borderWidth: 1,
-    padding: isSmallDevice ? 12 : 16,
-    minHeight: isSmallDevice ? 100 : 128,
-    justifyContent: 'space-between',
+    borderColor: 'rgba(0,0,0,0.04)',
     ...shadowSm,
   },
-  statCardTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: isSmallDevice ? 12 : 14,
-  },
-  statCardIcon: {
-    width: isSmallDevice ? 38 :  42,
-    height: isSmallDevice ? 38 :  42,
-    borderRadius: isSmallDevice ? 12 : 14,
+  quickStatIcon: {
+    width: isSmallDevice ? 24 : 28,
+    height: isSmallDevice ? 24 : 28,
+    borderRadius: isSmallDevice ? 8 : 10,
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadowSm,
+    marginBottom: isSmallDevice ? 6 : 8,
   },
-  statHintPill: {
-    paddingHorizontal: isSmallDevice ? 6 : 8,
-    paddingVertical: isSmallDevice ? 3 : 4,
-    borderRadius: isSmallDevice ? 10 : 20,
-  },
-  statHintText: {
-    fontSize: isSmallDevice ? 9 : 10,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  statCardValue: {
-    fontSize: isSmallDevice ? 28 :  32,
-    lineHeight: 36,
+  quickStatValue: {
+    fontSize: isSmallDevice ? 16 : 20,
+    lineHeight: isSmallDevice ? 20 : 24,
     fontWeight: '800',
+    color: TEXT_BLACK,
     letterSpacing: -0.5,
     marginBottom: 2,
   },
-  statCardLabel: {
-    fontSize: isSmallDevice ? 12 :  13,
-    lineHeight: 18,
-    fontWeight: '600',
-    color: META,
+  quickStatLabel: {
+    fontSize: isSmallDevice ? 9 : 10,
+    lineHeight: isSmallDevice ? 12 : 13,
+    fontWeight: '500',
+    color: TEXT_MUTED,
+    textAlign: 'center',
+  },
+  body: {
+    paddingHorizontal: H_PAD,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: isSmallDevice ? 8 : 10,
   },
   sectionTitle: {
-    fontSize: isSmallDevice ? 16 :  18,
-    lineHeight: 24,
+    fontSize: isSmallDevice ? 15 : 17,
+    lineHeight: isSmallDevice ? 20 : 24,
     fontWeight: '800',
-    color: '#111111',
+    color: TEXT_BLACK,
+    letterSpacing: -0.3,
   },
   sectionAction: {
-    fontSize: isSmallDevice ? 13 :  14,
-    lineHeight: 20,
+    fontSize: isSmallDevice ? 12 : 13,
+    lineHeight: isSmallDevice ? 18 : 20,
     fontWeight: '600',
     color: PRIMARY,
   },
-  exploreSection: {
-    backgroundColor: WHITE,
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 10,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#E8EEE9',
-    ...shadowSm,
+  categoriesRow: {
+    gap: isSmallDevice ? 10 : 14,
+    paddingBottom: 4,
+    marginBottom: isSmallDevice ? 16 : 20,
   },
-  exploreSectionTitle: {
-    fontSize: isSmallDevice ? 14 :  16,
-    lineHeight: 20,
-    fontWeight: '800',
-    color: '#111111',
-    marginBottom: 10,
-    paddingHorizontal: 4,
-  },
-  exploreRow: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: isSmallDevice ? 6 : 8,
-    paddingHorizontal: isSmallDevice ? 3 : 4,
-    paddingBottom: 2,
-  },
-  exploreTile: {
-    width: isSmallDevice ? 72 : EXPLORE_TILE_WIDTH,
+  categoryItem: {
     alignItems: 'center',
-    backgroundColor: '#FAFBFA',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#EEF2EE',
-    paddingTop: isSmallDevice ? 8 : 10,
-    paddingBottom: 8,
-    paddingHorizontal: isSmallDevice ? 3 : 4,
-    ...shadowSm,
+    width: CATEGORY_ITEM_WIDTH,
   },
-  exploreIconWrap: {
-    width: isSmallDevice ? 40 :  44,
-    height: isSmallDevice ? 40 :  44,
-    borderRadius: isSmallDevice ? 12 : 14,
+  categoryIcon: {
+    width: CATEGORY_ICON_SIZE,
+    height: CATEGORY_ICON_SIZE,
+    borderRadius: isSmallDevice ? 16 : 20,
+    backgroundColor: WHITE,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: isSmallDevice ? 6 : 8,
-  },
-  exploreLabel: {
-    fontSize: isSmallDevice ? 10 :  11,
-    lineHeight: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    textAlign: 'center',
-  },
-  upcomingScroll: {
-    gap: 12,
-    paddingBottom: 4,
-    marginBottom: 28,
-  },
-  appointmentCard: {
-    width: SCREEN_WIDTH * 0.62,
-    backgroundColor: WHITE,
-    borderRadius: 20,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
     ...shadowSm,
   },
-  appointmentImage: {
-    width: '100%',
-    height: 120,
-    backgroundColor: MINT,
+  categoryIconActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  appointmentBody: {
-    padding: 14,
+  categoryEmoji: {
+    fontSize: isSmallDevice ? 20 : 24,
   },
-  statusPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    marginBottom: 8,
+  categoryEmojiActive: {
+    opacity: 1,
   },
-  statusConfirmed: {
-    backgroundColor: MINT,
+  categoryLabel: {
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 13 : 14,
+    fontWeight: '500',
+    color: TEXT_MUTED,
+    textAlign: 'center',
   },
-  statusPending: {
-    backgroundColor: '#FEF3C7',
+  categoryLabelActive: {
+    fontWeight: '700',
+    color: PRIMARY,
   },
-  statusText: {
+  featuredBanner: {
+    borderRadius: isSmallDevice ? 16 : 20,
+    overflow: 'hidden',
+    height: FEATURED_BANNER_HEIGHT,
+    marginBottom: isSmallDevice ? 18 : 24,
+    position: 'relative',
+    ...shadowSm,
+  },
+  featuredImage: {
+    width: FEATURED_BANNER_WIDTH,
+    height: FEATURED_BANNER_HEIGHT,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  featuredOverlayWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: FEATURED_BANNER_WIDTH,
+    height: FEATURED_BANNER_HEIGHT,
+  },
+  featuredContent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    paddingHorizontal: isSmallDevice ? 14 : 18,
+    paddingVertical: isSmallDevice ? 12 : 16,
+    justifyContent: 'center',
+    maxWidth: '68%',
+  },
+  featuredTag: {
     fontSize: isSmallDevice ? 9 : 10,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    color: ACCENT_GREEN,
+    letterSpacing: 0.08 * 10,
     textTransform: 'uppercase',
   },
-  statusTextConfirmed: {
-    color: PRIMARY,
-  },
-  statusTextPending: {
-    color: '#B45309',
-  },
-  appointmentTitle: {
-    fontSize: isSmallDevice ? 13 :  15,
-    lineHeight: 20,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 2,
-  },
-  appointmentMeta: {
-    fontSize: isSmallDevice ? 11 :  12,
-    lineHeight: 16,
-    fontWeight: '500',
-    color: META,
-    marginBottom: 8,
-  },
-  appointmentTimeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  appointmentTime: {
-    fontSize: isSmallDevice ? 10 :  11,
-    lineHeight: 14,
-    fontWeight: '500',
-    color: META,
-    flex: 1,
-  },
-  eventCard: {
-    height: 180,
-    borderRadius: 22,
-    overflow: 'hidden',
-    marginBottom: 28,
-    ...shadowMd,
-  },
-  eventImage: {
-    ...StyleSheet.absoluteFill,
-  },
-  eventOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(22, 69, 57, 0.55)',
-  },
-  eventContent: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    padding: 18,
-  },
-  eventBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: WHITE,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  eventBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: PRIMARY,
-  },
-  eventTitle: {
-    fontSize: 20,
-    lineHeight: 26,
+  featuredTitle: {
+    fontSize: isSmallDevice ? 14 : 16,
     fontWeight: '800',
     color: WHITE,
+    marginTop: isSmallDevice ? 2 : 4,
+    letterSpacing: -0.3,
+  },
+  featuredMeta: {
+    fontSize: isSmallDevice ? 10 : 11,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 2,
+  },
+  featuredJoinBtn: {
+    position: 'absolute',
+    right: isSmallDevice ? 10 : 14,
+    top: '50%',
+    transform: [{ translateY: isSmallDevice ? -14 : -16 }],
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    paddingVertical: isSmallDevice ? 6 : 8,
+    backgroundColor: WHITE,
+    borderRadius: isSmallDevice ? 10 : 12,
+  },
+  featuredJoinText: {
+    fontSize: isSmallDevice ? 10 : 11,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
+  enterprisesList: {
+    gap: isSmallDevice ? 8 : 10,
     marginBottom: 8,
   },
-  eventMetaRow: {
+  enterpriseCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: WHITE,
+    borderRadius: isSmallDevice ? 14 : 18,
+    padding: isSmallDevice ? 10 : 14,
+    gap: isSmallDevice ? 10 : 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    ...shadowSm,
+  },
+  enterpriseAvatar: {
+    width: ENTERPRISE_AVATAR_SIZE,
+    height: ENTERPRISE_AVATAR_SIZE,
+    borderRadius: isSmallDevice ? 12 : 14,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  enterpriseAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  enterpriseAvatarText: {
+    fontSize: isSmallDevice ? 18 : 20,
+    fontWeight: '700',
+    color: WHITE,
+  },
+  enterpriseMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  enterpriseNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 2,
+  },
+  enterpriseName: {
+    flexShrink: 1,
+    fontSize: isSmallDevice ? 13 : 14,
+    lineHeight: isSmallDevice ? 18 : 20,
+    fontWeight: '700',
+    color: TEXT_BLACK,
+  },
+  enterpriseMeta: {
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 14 : 15,
+    fontWeight: '500',
+    color: TEXT_MUTED,
+    marginBottom: isSmallDevice ? 2 : 4,
+  },
+  enterpriseRatingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 2,
   },
-  eventMeta: {
-    fontSize: 12,
-    lineHeight: 16,
+  starsRow: {
+    flexDirection: 'row',
+    gap: 1,
+  },
+  enterpriseRatingText: {
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 13 : 14,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.9)',
-    flex: 1,
+    color: TEXT_MUTED,
   },
-  courseCard: {
-    height: 200,
-    borderRadius: 22,
-    overflow: 'hidden',
-    marginBottom: 8,
-    ...shadowMd,
+  enterprisesLoading: {
+    paddingVertical: 32,
+    alignItems: 'center',
   },
-  courseImage: {
-    ...StyleSheet.absoluteFill,
+  enterprisesEmpty: {
+    paddingVertical: 24,
+    alignItems: 'center',
   },
-  courseOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(22, 69, 57, 0.7)',
-  },
-  courseContent: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    padding: 18,
-  },
-  courseLevel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.85)',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    marginBottom: 6,
-  },
-  courseName: {
-    fontSize: 18,
-    lineHeight: 24,
-    fontWeight: '800',
-    color: WHITE,
-    marginBottom: 4,
-  },
-  courseMeta: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.85)',
-    marginBottom: 12,
-  },
-  courseProgressTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    marginBottom: 6,
-  },
-  courseProgressFill: {
-    width: '35%',
-    height: '100%',
-    borderRadius: 2,
-    backgroundColor: '#4ADE80',
-  },
-  courseProgressLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
+  enterprisesEmptyText: {
+    fontSize: 13,
+    color: TEXT_MUTED,
   },
   pressed: {
-    opacity: 0.9,
+    opacity: 0.92,
     transform: [{ scale: 0.98 }],
   },
 });

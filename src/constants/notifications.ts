@@ -1,9 +1,10 @@
 export type NotificationType =
   | 'booking'
-  | 'product'
+  | 'enterprise'
   | 'event'
   | 'review'
-  | 'course';
+  | 'course'
+  | 'sale';
 
 export type Notification = {
   id: string;
@@ -14,44 +15,64 @@ export type Notification = {
   read: boolean;
 };
 
+export const NOTIFICATION_ICON: Record<
+  NotificationType,
+  { emoji: string; backgroundColor: string }
+> = {
+  booking: { emoji: '✅', backgroundColor: '#F0FDF4' },
+  enterprise: { emoji: '🏢', backgroundColor: '#EAF4EC' },
+  event: { emoji: '📅', backgroundColor: '#FFFBEB' },
+  review: { emoji: '⭐', backgroundColor: '#FFFBEB' },
+  course: { emoji: '📚', backgroundColor: '#EFF6FF' },
+  sale: { emoji: '🎯', backgroundColor: '#FFF1F2' },
+};
+
 export const NOTIFICATIONS: Notification[] = [
   {
     id: 'booking-confirmed',
     type: 'booking',
-    title: 'Booking Confirmed',
+    title: 'Booking Confirmed ✓',
     description: 'Personal Training with Alex Martinez — Mon, Jun 19 · 10:00 AM',
     timestamp: '2 min ago',
     read: false,
   },
   {
-    id: 'new-product',
-    type: 'product',
-    title: 'New Product Alert',
-    description: 'Pinnacle Wellness added "Premium Kettlebell Set"',
-    timestamp: '18 min ago',
+    id: 'enterprise-nearby',
+    type: 'enterprise',
+    title: 'New Enterprise Nearby',
+    description: 'GreenLeaf Nutrition just joined Invigorate Health near you',
+    timestamp: '20 min ago',
     read: false,
   },
   {
     id: 'event-reminder',
     type: 'event',
     title: 'Event Reminder',
-    description: 'Summer Wellness Summit starts in 5 days',
+    description: "Summer Wellness Summit starts in 5 days — you're registered!",
     timestamp: '1 hr ago',
     read: false,
   },
   {
-    id: 'review-request',
+    id: 'session-review',
     type: 'review',
-    title: 'Review Request',
-    description: 'How was your Nutrition Coaching with Dr. Sarah Kim?',
+    title: 'How was your session?',
+    description: 'Rate your Nutrition Coaching with Dr. Sarah Kim',
     timestamp: '3 hrs ago',
     read: true,
   },
   {
-    id: 'course-update',
+    id: 'course-content',
     type: 'course',
-    title: 'Course Update',
-    description: 'Week 3 content for Foundation Fitness is now available',
+    title: 'New Course Content',
+    description: 'Week 3 of Foundation Fitness Program is now available',
+    timestamp: 'Yesterday',
+    read: true,
+  },
+  {
+    id: 'flash-sale',
+    type: 'sale',
+    title: 'Flash Sale 🔥',
+    description: '20% off all premium equipment — ends in 24 hours',
     timestamp: 'Yesterday',
     read: true,
   },

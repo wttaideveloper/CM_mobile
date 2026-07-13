@@ -1,8 +1,8 @@
 import type { ImageSource } from 'expo-image';
 
 /** Full-screen auth backgrounds (photo + wavy card baked in) */
-export const AUTH_BG_ONBOARDING: ImageSource = require('../assets/images/auth-bg-onboarding.png');
-export const AUTH_BG_LOGIN: ImageSource = require('../assets/images/auth-bg-login.png');
+export const AUTH_BG_ONBOARDING: ImageSource = require('../assets/images/auth-bg-onboarding.jpg');
+export const AUTH_BG_LOGIN: ImageSource = require('../assets/images/auth-bg-login.jpg');
 
 // Legacy hero image — kept for reference/fallback
 export const HERO_IMAGE: ImageSource = require('../assets/images/hero-family.jpg');

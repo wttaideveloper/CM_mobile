@@ -1,12 +1,20 @@
 export type ProductApiResponse = {
   id: string;
   enterprise_id: string;
-  product_name: string;
-  product_description: string | null;
-  product_category: string | null;
-  product_price: number;
-  product_images: string | null;
-  product_status: boolean;
+  tenant_id?: string | null;
+  location_id?: string | null;
+  product_name?: string;
+  product_description?: string | null;
+  description?: string | null;
+  product_category?: string | null;
+  category?: string | null;
+  product_price?: number | null;
+  price?: number | null;
+  product_images?: string | null;
+  image_urls?: string | null;
+  images?: string[] | null;
+  product_status?: boolean | null;
+  status?: string | null;
   sku?: string | null;
   barcode_upc?: string | null;
   weight?: string | number | null;
@@ -28,6 +36,34 @@ export type ProductApiResponse = {
   rating?: number | null;
 };
 
+export type ProductPagination = {
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+};
+
+export type ProductsPaginatedApiResponse = {
+  items: ProductApiResponse[];
+  pagination: ProductPagination;
+};
+
+export type ProductListQuery = {
+  search?: string;
+  tenant_id?: string;
+  enterprise_id?: string;
+  category?: string;
+  location_id?: string;
+  status?: string;
+  page?: number;
+  page_size?: number;
+};
+
+export type ProductsPaginatedResult = {
+  items: ProductListItem[];
+  pagination: ProductPagination;
+};
+
 export type ProductListItem = {
   id: string;
   enterpriseId: string;
@@ -43,4 +79,18 @@ export type ProductListItem = {
   length: string;
   width: string;
   thick: string;
+};
+
+export type ProductDetailItem = ProductListItem & {
+  salePrice: number | null;
+  costPrice: number | null;
+  currency: string;
+  sku: string;
+  barcodeUpc: string;
+  weight: string;
+  taxClass: string;
+  publishStatus: string;
+  lowStockThreshold: number | null;
+  stockManagement: string;
+  images: string[];
 };

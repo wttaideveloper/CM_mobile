@@ -4,11 +4,12 @@ import { useCallback } from 'react';
 import { Platform, StatusBar as RNStatusBar, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+/** Light mode: white bar, black icons. Dark mode: black bar, white icons. */
 export const STATUS_BAR_LIGHT_BG = '#FFFFFF';
 export const STATUS_BAR_DARK_BG = '#000000';
 
 type AppStatusBarProps = {
-  /** Splash / full-screen green only — keeps light status icons */
+  /** Splash / full-screen dark only — keeps light status icons */
   variant?: 'auto' | 'light';
   backgroundColor?: string;
 };
@@ -34,7 +35,8 @@ export function AppStatusBar({
 
   const applyNativeStatusBar = useCallback(() => {
     if (Platform.OS === 'android') {
-      RNStatusBar.setTranslucent(false);
+      const isTransparent = bg === 'transparent';
+      RNStatusBar.setTranslucent(isTransparent);
       RNStatusBar.setBackgroundColor(bg, true);
       RNStatusBar.setBarStyle(style === 'light' ? 'light-content' : 'dark-content', true);
     }
@@ -49,7 +51,10 @@ export function AppStatusBar({
   return <StatusBar style={style} animated />;
 }
 
-export function StatusBarFill({ lightColor, darkColor }: { lightColor?: string; darkColor?: string } = {}) {
+export function StatusBarFill({
+  lightColor,
+  darkColor,
+}: { lightColor?: string; darkColor?: string } = {}) {
   const insets = useSafeAreaInsets();
   const backgroundColor = useStatusBarBackground(lightColor, darkColor);
 

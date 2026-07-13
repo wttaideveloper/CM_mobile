@@ -1,9 +1,11 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Image } from 'expo-image';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,15 +13,21 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
+import { EmptyState } from '@/components/EmptyState';
+import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
 import {
+  ChevronLeftIcon,
   CircleCheckIcon,
   MapPinIcon,
   SearchIcon,
 } from '@/components/dashboard/DashboardIcons';
-import { useEnterprises } from '@/hooks/useEnterprises';
-import type { EnterpriseListItem } from '@/types/enterprise.types';
+import { ENTERPRISE_CATEGORY_FILTERS } from '@/constants/enterprises';
+import { ENTERPRISE_FILTER_PAGE_SIZE } from '@/services/enterprise.service';
+import { useInfiniteEnterprises } from '@/hooks/useEnterprises';
+import { useRouteSearchParam, useSyncedSearchState } from '@/hooks/useRouteSearchParam';
+import type { EnterpriseListItem, EnterpriseListQuery } from '@/types/enterprise.types';
 import { formatMembersCount, formatRevenue } from '@/utils/enterprise.mapper';
+import { detailHref, isFromSearchParam } from '@/utils/searchNavigation';
 import { shadowSm } from '@/utils/shadows';
 import { isSmallDevice } from '@/utils/responsive';
 const PRIMARY = '#1F5D4E';
@@ -28,7 +36,8 @@ const BODY_BG = '#F5F7F5';
 const TEXT_MUTED = '#5a7a70';
 const TEXT_BLACK = '#111111';
 const BORDER = '#E8EDEA';
-const H_PAD = 20;
+const H_PAD = isSmallDevice ? 16 : 20;
+const SEARCH_DEBOUNCE_MS = 400;
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   NA: { bg: '#F3F4F6', text: '#6B7280' },
@@ -37,19 +46,35 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   Inactive: { bg: '#F3F4F6', text: '#6B7280' },
 };
 
-function EnterpriseRow({ enterprise }: { enterprise: EnterpriseListItem }) {
+export function EnterpriseRow({
+  enterprise,
+  fromSearch,
+}: {
+  enterprise: EnterpriseListItem;
+  fromSearch?: boolean;
+}) {
   const router = useRouter();
   const statusStyle = STATUS_STYLES[enterprise.status] ?? STATUS_STYLES.NA;
   const initial = enterprise.name === 'NA' ? '?' : enterprise.name.charAt(0).toUpperCase();
+  const enterprisePath = fromSearch ? '/(main)/enterprise' : '/(main)/(tabs)/explore';
+  const hasLogo = Boolean(enterprise.logoUrl);
 
   return (
     <Pressable
-      onPress={() => router.push(`/(main)/(tabs)/explore/${enterprise.id}`)}
+      onPress={() => router.push(detailHref(enterprisePath, enterprise.id, fromSearch))}
       style={({ pressed }) => [styles.rowCard, pressed && styles.rowPressed]}
     >
       <View style={styles.rowTop}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initial}</Text>
+          {hasLogo ? (
+            <Image
+              source={{ uri: enterprise.logoUrl! }}
+              style={styles.avatarImage}
+              contentFit="cover"
+            />
+          ) : (
+            <Text style={styles.avatarText}>{initial}</Text>
+          )}
         </View>
 
         <View style={styles.rowMain}>
@@ -87,8 +112,12 @@ function EnterpriseRow({ enterprise }: { enterprise: EnterpriseListItem }) {
         </Text>
         <Text style={styles.metaDot}>·</Text>
         <Text style={styles.metaItem}>{formatRevenue(enterprise.revenue)}</Text>
-        <Text style={styles.metaDot}>·</Text>
-        <Text style={styles.metaItem}>{enterprise.joined}</Text>
+        {enterprise.joined !== 'NA' ? (
+          <>
+            <Text style={styles.metaDot}>·</Text>
+            <Text style={styles.metaItem}>Joined: {enterprise.joined}</Text>
+          </>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -96,39 +125,102 @@ function EnterpriseRow({ enterprise }: { enterprise: EnterpriseListItem }) {
 
 export function EnterprisesScreen() {
   const insets = useSafeAreaInsets();
-  const statusBarFill = useStatusBarBackground();
-  const [search, setSearch] = useState('');
-  const { data, isLoading, isError, refetch } = useEnterprises({ enabled: false });
+  const router = useRouter();
+  const { fromSearch } = useLocalSearchParams<{ fromSearch?: string }>();
+  const openedFromSearch = isFromSearchParam(fromSearch);
+  const listRef = useRef<FlatList<EnterpriseListItem>>(null);
+  const routeSearch = useRouteSearchParam();
+  const { search, setSearch, debouncedSearch, setDebouncedSearch } =
+    useSyncedSearchState(routeSearch);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refetch();
-    }, [refetch]),
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const apiQuery = useMemo((): EnterpriseListQuery => {
+    const hasSearch = debouncedSearch.length > 0;
+    const hasCategory = Boolean(activeCategory);
+    const isFiltered = hasSearch || hasCategory;
+
+    const query: EnterpriseListQuery = {
+      page_size: isFiltered ? ENTERPRISE_FILTER_PAGE_SIZE : undefined,
+    };
+
+    if (hasSearch) {
+      query.search = debouncedSearch;
+    }
+
+    if (hasCategory && activeCategory) {
+      query.category = activeCategory;
+    }
+
+    return query;
+  }, [activeCategory, debouncedSearch]);
+
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isError,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+    isRefetching,
+  } = useInfiniteEnterprises(apiQuery);
+
+  const enterprises = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data],
   );
 
-  const filteredEnterprises = useMemo(() => {
-    const list = data ?? [];
-    const query = search.trim().toLowerCase();
-    if (!query) return list;
+  const totalCount = data?.pages[0]?.pagination.total ?? enterprises.length;
+  const isFiltering = isFetching && !isFetchingNextPage;
 
-    return list.filter(
-      (enterprise) =>
-        enterprise.name.toLowerCase().includes(query) ||
-        enterprise.category.toLowerCase().includes(query) ||
-        enterprise.location.toLowerCase().includes(query),
-    );
-  }, [search, data]);
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [apiQuery.search, apiQuery.category]);
+
+  const handleSearchChange = (text: string) => {
+    setSearch(text);
+  };
+
+  const handleCategoryPress = (category: string) => {
+    setActiveCategory((current) => (current === category ? null : category));
+  };
+
+  const handleLoadMore = () => {
+    if (hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  };
 
   return (
     <View style={styles.screen}>
-      <AppStatusBar />
-      <View style={[styles.statusBarFill, { height: insets.top, backgroundColor: statusBarFill }]} />
-
+      {openedFromSearch ? (
+        <>
+          <AppStatusBar />
+          <StatusBarFill />
+        </>
+      ) : null}
       <View style={styles.headerSection}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Enterprises</Text>
-          <Text style={styles.subtitle}>
-            Manage and oversee all registered enterprise accounts.
+        <View style={[styles.header, openedFromSearch && styles.headerWithBack]}>
+          {openedFromSearch ? (
+            <Pressable
+              onPress={() => router.back()}
+              style={({ pressed }) => [styles.backBtn, pressed && styles.rowPressed]}
+              hitSlop={8}
+            >
+              <ChevronLeftIcon size={22} color={PRIMARY} />
+            </Pressable>
+          ) : null}
+          <Text style={[styles.title, openedFromSearch && styles.titleInHeader]}>
+            Enterprises
           </Text>
         </View>
 
@@ -136,52 +228,85 @@ export function EnterprisesScreen() {
           <SearchIcon size={18} color={TEXT_MUTED} />
           <TextInput
             value={search}
-            onChangeText={setSearch}
+            onChangeText={handleSearchChange}
             placeholder="Search by name, category, or location..."
             placeholderTextColor="#9CA3AF"
             style={styles.searchInput}
+            returnKeyType="search"
+            autoCorrect={false}
+            onSubmitEditing={() => setDebouncedSearch(search.trim())}
           />
         </View>
 
-        <View style={styles.filtersRow}>
-          {['Category', 'Status', 'Location'].map((filter) => (
-            <Pressable key={filter} style={styles.filterChip}>
-              <Text style={styles.filterChipText}>{filter}</Text>
-            </Pressable>
-          ))}
-        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtersScroll}
+        >
+          {ENTERPRISE_CATEGORY_FILTERS.map((category) => {
+            const isActive = activeCategory === category;
+            return (
+              <Pressable
+                key={category}
+                onPress={() => handleCategoryPress(category)}
+                style={[styles.filterChip, isActive && styles.filterChipActive]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    isActive && styles.filterChipTextActive,
+                  ]}
+                >
+                  {category}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
         <Text style={styles.resultCount}>
-          {filteredEnterprises.length} enterprises found
+          {totalCount} enterprises found
         </Text>
       </View>
 
       <FlatList
-        data={filteredEnterprises}
+        ref={listRef}
+        data={enterprises}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <EnterpriseRow enterprise={item} />}
+        renderItem={({ item }) => (
+          <EnterpriseRow enterprise={item} fromSearch={openedFromSearch} />
+        )}
         style={styles.listScroll}
         contentContainerStyle={[
           styles.listContent,
-          filteredEnterprises.length === 0 && styles.listContentEmpty,
+          enterprises.length === 0 && styles.listContentEmpty,
           { paddingBottom: insets.bottom + 24 },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.35}
+        refreshing={isRefetching && !isFetchingNextPage}
+        onRefresh={() => {
+          void refetch();
+        }}
         ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
+        ListFooterComponent={
+          isFetchingNextPage || (isFiltering && enterprises.length > 0) ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator color={PRIMARY} />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
-          isLoading ? (
+          isLoading || isFiltering ? (
             <View style={styles.emptyState}>
               <ActivityIndicator color={PRIMARY} />
             </View>
           ) : isError ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>Failed to load enterprises.</Text>
-            </View>
+            <EmptyState variant="error" entity="enterprises" onAction={() => void refetch()} />
           ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No enterprises found.</Text>
-            </View>
+            <EmptyState entity="enterprises" />
           )
         }
       />
@@ -194,9 +319,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BODY_BG,
   },
-  statusBarFill: {
-    backgroundColor: BODY_BG,
-  },
   headerSection: {
     backgroundColor: BODY_BG,
     paddingBottom: 4,
@@ -204,14 +326,35 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: H_PAD,
     paddingTop: 10,
-    paddingBottom: 20,
+    paddingBottom: 12,
+  },
+  headerWithBack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  backBtn: {
+    width: isSmallDevice ? 32 : 36,
+    height: isSmallDevice ? 32 : 36,
+    borderRadius: isSmallDevice ? 10 : 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: isSmallDevice ? 20 : 22,
     lineHeight: 34,
     fontWeight: '800',
     color: TEXT_BLACK,
-    marginBottom: isSmallDevice ? 4 :  6,
+    marginBottom: isSmallDevice ? 4 : 6,
+    marginHorizontal: H_PAD,
+    marginTop: 10,
+  },
+  titleInHeader: {
+    flex: 1,
+    minWidth: 0,
+    marginHorizontal: 0,
+    marginTop: 0,
+    marginBottom: 0,
   },
   subtitle: {
     fontSize: isSmallDevice ? 13 : 14,
@@ -222,14 +365,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: H_PAD,
-    marginBottom: isSmallDevice ? 12 :  14,
-    paddingHorizontal: 14,
-    height: 48,
-    borderRadius: 14,
+    marginBottom: isSmallDevice ? 12 : 14,
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    height: isSmallDevice ? 44 : 48,
+    borderRadius: isSmallDevice ? 12 : 14,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: BORDER,
-    gap: 10,
+    gap: isSmallDevice ? 8 : 10,
   },
   searchInput: {
     flex: 1,
@@ -237,25 +380,30 @@ const styles = StyleSheet.create({
     color: TEXT_BLACK,
     paddingVertical: 0,
   },
-  filtersRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  filtersScroll: {
     paddingHorizontal: H_PAD,
-    gap: 8,
-    marginBottom: isSmallDevice ? 12 :  14,
+    gap: isSmallDevice ? 6 : 8,
+    marginBottom: isSmallDevice ? 12 : 14,
   },
   filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    paddingVertical: isSmallDevice ? 6 : 8,
+    borderRadius: isSmallDevice ? 16 : 20,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: BORDER,
+  },
+  filterChipActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
   },
   filterChipText: {
     fontSize: isSmallDevice ? 12 : 13,
     fontWeight: '600',
     color: TEXT_MUTED,
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
   },
   resultCount: {
     paddingHorizontal: H_PAD,
@@ -278,14 +426,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   emptyState: {
-    paddingVertical: isSmallDevice ? 36 :   40,
+    paddingVertical: isSmallDevice ? 36 : 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyText: {
-    fontSize: isSmallDevice ? 13 : 14,
-    color: TEXT_MUTED,
-    fontWeight: '500',
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rowCard: {
     backgroundColor: '#FFFFFF',
@@ -312,6 +460,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: isSmallDevice ? 16 : 18,
@@ -371,7 +524,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: isSmallDevice ? 4 :  6,
+    gap: isSmallDevice ? 4 : 6,
     paddingLeft: isSmallDevice ? 52 : 56,
   },
   metaItem: {

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -21,12 +23,22 @@ import { getButtonHeight, getFontSize, getSpacing, isSmallDevice } from '@/utils
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const login = useAuthStore((state) => state.login);
+  const isLoading = useAuthStore((state) => state.isLoading);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
 
-  const handleLogin = () => {
-    login();
+  const handleLogin = async () => {
+    try {
+      await login();
+    } catch (error) {
+      const message =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message: string }).message)
+          : 'Could not get dev token. Check your connection and try again.';
+
+      Alert.alert('Login failed', message);
+    }
   };
 
   return (
@@ -92,8 +104,16 @@ export function LoginScreen() {
         </ScrollView>
 
         <View style={[styles.footer, { paddingBottom: insets.bottom + getSpacing(24) }]}>
-          <Pressable style={styles.primaryButton} onPress={handleLogin}>
-            <Text style={styles.primaryButtonText}>Login</Text>
+          <Pressable
+            style={[styles.primaryButton, isLoading && styles.primaryButtonDisabled]}
+            onPress={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Login</Text>
+            )}
           </Pressable>
 
           <View style={styles.createAccountRow}>
@@ -200,6 +220,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: getSpacing(20),
+  },
+  primaryButtonDisabled: {
+    opacity: 0.7,
   },
   primaryButtonText: {
     color: authTheme.primaryButtonText.color,

@@ -1,3 +1,3 @@
-import { ServicesScreen } from '@/screens/ServicesScreen';
+import { ShopScreen } from '@/screens/ShopScreen';
 
-export default ServicesScreen;
+export default ShopScreen;

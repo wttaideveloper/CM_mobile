@@ -31,6 +31,7 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
@@ -43,3 +44,6 @@ yarn-error.*
 # local backups
 src.zip
 .cursor/
+
+# Local Gradle cache (from local android builds — do not upload to EAS)
+.gradle-home/

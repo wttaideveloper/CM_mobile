@@ -1,4 +1,4 @@
-import type { ProductApiResponse, ProductListItem } from '@/types/product.types';
+import type { ProductApiResponse, ProductDetailItem, ProductListItem } from '@/types/product.types';
 
 const DEFAULT_PRODUCT_IMAGE =
   'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=160&h=160&fit=crop';
@@ -33,6 +33,52 @@ export function formatProductRating(value?: number | null): string {
   }
 
   return value.toFixed(1);
+}
+
+function pickProductImages(
+  productImages?: string | null,
+  imageUrls?: string | null,
+  imagesArray?: string[] | null,
+): string[] {
+  if (Array.isArray(imagesArray) && imagesArray.length > 0) {
+    const urls = imagesArray
+      .map((url) => pickProductImage(url))
+      .filter((url) => Boolean(url.trim()));
+
+    if (urls.length > 0) {
+      return urls;
+    }
+  }
+
+  const raw = productImages?.trim() || imageUrls?.trim() || '';
+  if (!raw) {
+    return [DEFAULT_PRODUCT_IMAGE];
+  }
+
+  if (raw.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const urls = parsed
+          .map((entry) => pickProductImage(typeof entry === 'string' ? entry : null))
+          .filter((url) => Boolean(url.trim()));
+
+        if (urls.length > 0) {
+          return urls;
+        }
+      }
+    } catch {
+      // fall through to delimiter parsing
+    }
+  }
+
+  const urls = raw
+    .split(/[,;|]/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map(pickProductImage);
+
+  return urls.length > 0 ? urls : [DEFAULT_PRODUCT_IMAGE];
 }
 
 function pickProductImage(url?: string | null): string {
@@ -118,17 +164,26 @@ function pickDimensions(item: ProductApiResponse): {
 
 export function mapProductApiToListItem(item: ProductApiResponse): ProductListItem {
   const dimensions = pickDimensions(item);
+  const price = item.product_price ?? item.price ?? 0;
+  const isActive =
+    item.product_status ??
+    (typeof item.status === 'string' ? item.status.toLowerCase() === 'active' : false);
+  const images = pickProductImages(
+    item.product_images,
+    item.image_urls,
+    item.images,
+  );
 
   return {
     id: item.id,
     enterpriseId: item.enterprise_id,
     enterpriseName: textOrNa(item.enterprise_name),
     name: textOrNa(item.product_name),
-    description: textOrNa(item.product_description),
-    category: textOrNa(item.product_category),
-    price: item.product_price ?? 0,
-    image: pickProductImage(item.product_images),
-    isActive: item.product_status,
+    description: textOrNa(item.product_description ?? item.description),
+    category: textOrNa(item.product_category ?? item.category),
+    price,
+    image: images[0],
+    isActive: Boolean(isActive),
     rating: formatProductRating(item.rating),
     stockCount: pickStockCount(item),
     length: dimensions.length,
@@ -137,21 +192,46 @@ export function mapProductApiToListItem(item: ProductApiResponse): ProductListIt
   };
 }
 
+export function mapProductApiToDetailItem(item: ProductApiResponse): ProductDetailItem {
+  const base = mapProductApiToListItem(item);
+
+  return {
+    ...base,
+    salePrice: item.sale_price ?? null,
+    costPrice: item.cost_price ?? null,
+    currency: item.currency?.trim() || 'USD',
+    sku: textOrNa(item.sku),
+    barcodeUpc: textOrNa(item.barcode_upc),
+    weight: specOrZero(item.weight),
+    taxClass: textOrNa(item.tax_class),
+    publishStatus: textOrNa(item.publish_status),
+    lowStockThreshold: item.low_stock_alert_threshold ?? null,
+    stockManagement: textOrNa(item.stock_management),
+    images: pickProductImages(item.product_images, item.image_urls, item.images),
+  };
+}
+
 export function mapProductsApiResponse(items: ProductApiResponse[]): ProductListItem[] {
   return items.map(mapProductApiToListItem);
 }
 
-export function formatProductPrice(price: number): string {
+export function formatProductPrice(price: number, currency = 'USD'): string {
   if (!price) {
-    return '$0';
+    return currency === 'INR' ? '₹0' : '$0';
   }
 
-  return `$${price.toLocaleString('en-US', {
+  const symbol = currency === 'INR' ? '₹' : '$';
+
+  return `${symbol}${price.toLocaleString('en-US', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })}`;
 }
 
 export function formatProductStockLabel(stockCount: number): string {
-  return `In Stock · ${stockCount} units`;
+  if (stockCount <= 0) {
+    return 'Out of Stock';
+  }
+
+  return `In Stock · ${stockCount} units remaining`;
 }

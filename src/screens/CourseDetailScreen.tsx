@@ -1,6 +1,5 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
 import {
   Dimensions,
   Pressable,
@@ -9,50 +8,223 @@ import {
   Text,
   View,
 } from 'react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
+import { EmptyState } from '@/components/EmptyState';
+import { LeafyGradientButton } from '@/components/LeafyGradientButton';
 
 import {
-  BookOpenIcon,
+  CheckIcon,
   ChevronLeftIcon,
+  CirclePlayIcon,
+  LockIcon,
+  StarIcon,
 } from '@/components/dashboard/DashboardIcons';
-import { getCourseById, type CourseModule } from '@/constants/courses';
+import {
+  getCourseById,
+  type CourseLevel,
+  type CourseModule,
+  type ModuleStatus,
+} from '@/constants/courses';
+import { useDetailBack } from '@/hooks/useDetailBack';
+import { shadowSm } from '@/utils/shadows';
 import { isSmallDevice } from '@/utils/responsive';
 
 const PRIMARY = '#1F5D4E';
 const MINT = '#EAF4EC';
-const TEXT_MUTED = '#5a7a70';
+const TEXT_MUTED = '#6B7280';
 const TEXT_BLACK = '#111111';
+const CARD_BG = '#F5F7F5';
 const BORDER = '#E8EDEA';
-const BODY_BG = '#F5F7F5';
-const LEVEL_BLUE_50 = '#eff6ff';
-const LEVEL_BLUE_700 = '#1d4ed8';
+const LEVEL_BEGINNER_BG = '#2563EB';
+const LEVEL_ADVANCED_BG = '#FEE2E2';
+const LEVEL_ADVANCED_TEXT = '#DC2626';
+const LEVEL_ALL_BG = '#EFF6FF';
+const LEVEL_ALL_TEXT = '#1D4ED8';
+const INSTRUCTOR_AVATAR_SIZE = isSmallDevice ? 40 : 44;
+const AVATAR_RADIUS = isSmallDevice ? 10 : 12;
+const MODULE_ICON_SIZE = isSmallDevice ? 32 : 36;
+const MODULE_ICON_RADIUS = isSmallDevice ? 10 : 12;
+const PROGRESS_HEIGHT = isSmallDevice ? 6 : 8;
+const HERO_BTN_SIZE = isSmallDevice ? 34 : 38;
+const HERO_BTN_BG = 'rgba(0, 0, 0, 0.45)';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const H_PAD = 20;
-const HERO_HEIGHT = Math.round(SCREEN_WIDTH * (240 / 375));
+const H_PAD = isSmallDevice ? 16 : 20;
+const HERO_HEIGHT = Math.round(SCREEN_WIDTH * (isSmallDevice ? 220 / 375 : 250 / 375));
 
-function StatCard({ value, label }: { value: string; label: string }) {
+function instructorInitial(name: string): string {
+  return name.trim().charAt(0).toUpperCase() || '?';
+}
+
+function levelHeroStyle(level: CourseLevel) {
+  switch (level) {
+    case 'Beginner':
+      return { bg: LEVEL_BEGINNER_BG, text: '#FFFFFF' };
+    case 'Advanced':
+      return { bg: LEVEL_ADVANCED_BG, text: LEVEL_ADVANCED_TEXT };
+    default:
+      return { bg: LEVEL_ALL_BG, text: LEVEL_ALL_TEXT };
+  }
+}
+
+function HeroFadeOverlay({ width, height }: { width: number; height: number }) {
+  const fadeHeight = Math.round(height * 0.55);
+
+  return (
+    <>
+      <View style={styles.heroScrim} pointerEvents="none" />
+      <Svg
+        width={width}
+        height={fadeHeight}
+        style={[styles.heroFade, { height: fadeHeight }]}
+        pointerEvents="none"
+      >
+        <Defs>
+          <LinearGradient id="courseHeroFade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#000000" stopOpacity={0} />
+            <Stop offset="1" stopColor="#000000" stopOpacity={0.55} />
+          </LinearGradient>
+        </Defs>
+        <Rect x={0} y={0} width={width} height={fadeHeight} fill="url(#courseHeroFade)" />
+      </Svg>
+    </>
+  );
+}
+
+function InstructorAvatar({ initial }: { initial: string }) {
+  return (
+    <View style={styles.instructorAvatar}>
+      <Svg
+        width={INSTRUCTOR_AVATAR_SIZE}
+        height={INSTRUCTOR_AVATAR_SIZE}
+        style={StyleSheet.absoluteFill}
+      >
+        <Defs>
+          <LinearGradient id="instructorAvatarGrad" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#1F5D4E" />
+            <Stop offset="1" stopColor="#3E7041" />
+          </LinearGradient>
+        </Defs>
+        <Rect
+          x={0}
+          y={0}
+          width={INSTRUCTOR_AVATAR_SIZE}
+          height={INSTRUCTOR_AVATAR_SIZE}
+          rx={AVATAR_RADIUS}
+          fill="url(#instructorAvatarGrad)"
+        />
+      </Svg>
+      <Text style={styles.instructorAvatarText}>{initial}</Text>
+    </View>
+  );
+}
+
+function RatingStars({ rating }: { rating: number }) {
+  const count = Math.min(5, Math.max(1, Math.round(rating)));
+
+  return (
+    <View style={styles.ratingRow}>
+      {Array.from({ length: count }).map((_, index) => (
+        <StarIcon key={index} size={14} color="#F59E0B" />
+      ))}
+    </View>
+  );
+}
+
+function ProgressBar({ percent }: { percent: number }) {
+  return (
+    <View style={styles.progressTrack}>
+      <View style={[styles.progressFill, { width: `${percent}%` }]} />
+    </View>
+  );
+}
+
+function StatCard({ emoji, value, label }: { emoji: string; value: string; label: string }) {
   return (
     <View style={styles.statCard}>
+      <Text style={styles.statEmoji}>{emoji}</Text>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
-function ModuleCard({ module }: { module: CourseModule }) {
-  return (
-    <View style={styles.moduleCard}>
-      <View style={styles.moduleIconWrap}>
-        <BookOpenIcon size={18} color={PRIMARY} />
+function ModuleIcon({ status }: { status?: ModuleStatus }) {
+  if (status === 'done') {
+    return (
+      <View style={[styles.moduleIcon, styles.moduleIconDone]}>
+        <CheckIcon size={16} color="#FFFFFF" />
       </View>
+    );
+  }
+
+  if (status === 'in_progress') {
+    return (
+      <View style={[styles.moduleIcon, styles.moduleIconActive]}>
+        <CirclePlayIcon size={18} color={PRIMARY} />
+      </View>
+    );
+  }
+
+  if (status === 'locked') {
+    return (
+      <View style={[styles.moduleIcon, styles.moduleIconLocked]}>
+        <LockIcon size={14} color="#9CA3AF" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.moduleIcon, styles.moduleIconDefault]}>
+      <Text style={styles.moduleIconDefaultText}>📖</Text>
+    </View>
+  );
+}
+
+function ModuleStatusLabel({ status }: { status?: ModuleStatus }) {
+  if (status === 'done') {
+    return <Text style={styles.moduleStatusDone}>✓ Done</Text>;
+  }
+
+  if (status === 'in_progress') {
+    return <Text style={styles.moduleStatusActive}>In Progress</Text>;
+  }
+
+  return null;
+}
+
+function CurriculumCard({ module }: { module: CourseModule }) {
+  const isLocked = module.status === 'locked';
+  const isActive = module.status === 'in_progress';
+
+  return (
+    <View
+      style={[
+        styles.moduleCard,
+        isActive && styles.moduleCardActive,
+        isLocked && styles.moduleCardLocked,
+      ]}
+    >
+      <ModuleIcon status={module.status} />
+
       <View style={styles.moduleText}>
-        <Text style={styles.moduleWeek}>{module.weekRange}</Text>
-        <Text style={styles.moduleTitle} numberOfLines={2}>
+        <Text style={[styles.moduleWeek, isLocked && styles.moduleTextLocked]}>{module.weekRange}</Text>
+        <Text
+          style={[styles.moduleTitle, isLocked && styles.moduleTextLocked]}
+          numberOfLines={2}
+        >
           {module.title}
         </Text>
       </View>
-      <Text style={styles.moduleLessons}>{module.lessonCount} lessons</Text>
+
+      <View style={styles.moduleMeta}>
+        <Text style={[styles.moduleLessons, isLocked && styles.moduleTextLocked]}>
+          {module.lessonCount} lessons
+        </Text>
+        <ModuleStatusLabel status={module.status} />
+      </View>
     </View>
   );
 }
@@ -60,6 +232,7 @@ function ModuleCard({ module }: { module: CourseModule }) {
 export function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const goBack = useDetailBack();
   const insets = useSafeAreaInsets();
   const statusBarFill = useStatusBarBackground();
 
@@ -68,14 +241,25 @@ export function CourseDetailScreen() {
   if (!course) {
     return (
       <View style={styles.screen}>
-        <Text style={styles.errorText}>Course not found</Text>
+        <AppStatusBar />
+        <EmptyState
+          variant="notFound"
+          entity="course"
+          onAction={goBack}
+          actionLabel="Go back"
+        />
       </View>
     );
   }
 
-  const enrollLabel = course.isFree
-    ? 'Enroll Now — Free'
-    : `Enroll Now — ${course.priceLabel}`;
+  const levelStyle = levelHeroStyle(course.level);
+  const progress = course.enrollmentProgress;
+  const showProgress = course.isEnrolled && progress;
+  const footerLabel = showProgress
+    ? 'Continue Learning →'
+    : course.isFree
+      ? 'Enroll Now — Free'
+      : `Enroll Now — ${course.priceLabel}`;
 
   return (
     <View style={styles.screen}>
@@ -87,9 +271,7 @@ export function CourseDetailScreen() {
         <ScrollView
           style={styles.contentScroll}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingBottom: insets.bottom + 24,
-          }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 88 }}
         >
           <View style={[styles.hero, { height: HERO_HEIGHT }]}>
             <Image
@@ -98,51 +280,86 @@ export function CourseDetailScreen() {
               contentFit="cover"
             />
 
+            <HeroFadeOverlay width={SCREEN_WIDTH} height={HERO_HEIGHT} />
+
             <View style={styles.heroActions}>
               <Pressable
-                onPress={() => router.back()}
+                onPress={goBack}
                 style={({ pressed }) => [styles.heroBtn, pressed && styles.pressed]}
                 hitSlop={8}
               >
-                <ChevronLeftIcon size={22} color="#FFFFFF" />
+                <ChevronLeftIcon size={20} color="#FFFFFF" />
               </Pressable>
+            </View>
+
+            <View style={styles.heroBottom}>
+              <View style={[styles.levelBadge, { backgroundColor: levelStyle.bg }]}>
+                <Text style={[styles.levelBadgeText, { color: levelStyle.text }]}>
+                  {course.level.toUpperCase()}
+                </Text>
+              </View>
+              <Text style={styles.heroTitle}>{course.name}</Text>
             </View>
           </View>
 
-          <View style={styles.content}>
-            <View style={styles.levelBadge}>
-              <Text style={styles.levelBadgeText}>{course.level}</Text>
+          <View style={styles.contentSheet}>
+            <View style={styles.instructorRow}>
+              <InstructorAvatar initial={instructorInitial(course.instructor)} />
+              <View style={styles.instructorInfo}>
+                <Text style={styles.instructorName}>{course.instructor}</Text>
+                <Text style={styles.instructorRole} numberOfLines={1}>
+                  Certified Trainer · {course.enterprise}
+                </Text>
+              </View>
+              <RatingStars rating={course.rating} />
             </View>
-
-            <Text style={styles.courseTitle}>{course.name}</Text>
-            <Text style={styles.providerText}>
-              by {course.instructor} · {course.enterprise}
-            </Text>
 
             <View style={styles.statsRow}>
-              <StatCard value={String(course.lessons)} label="Lessons" />
-              <StatCard value={`${course.weeks} wks`} label="Duration" />
-              <StatCard value={String(course.enrolled)} label="Enrolled" />
+              <StatCard emoji="📚" value={String(course.lessons)} label="Lessons" />
+              <StatCard emoji="⏱" value={`${course.weeks} weeks`} label="Duration" />
+              <StatCard emoji="👥" value={String(course.enrolled)} label="Enrolled" />
             </View>
 
-            <Text style={styles.description}>{course.description}</Text>
+            {showProgress && progress ? (
+              <View style={styles.progressCard}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressTitle}>Your Progress</Text>
+                  <Text style={styles.progressPercent}>{progress.percent}% complete</Text>
+                </View>
 
-            <Text style={styles.sectionTitle}>COURSE MODULES</Text>
+                <ProgressBar percent={progress.percent} />
+
+                <Text style={styles.progressMeta}>
+                  Week {progress.currentWeek} · Lesson {progress.currentLesson} of{' '}
+                  {progress.totalLessons} completed
+                </Text>
+              </View>
+            ) : null}
+
+            <Text style={styles.sectionTitle}>Course Curriculum</Text>
 
             <View style={styles.modulesList}>
               {course.modules.map((module) => (
-                <ModuleCard key={module.id} module={module} />
+                <CurriculumCard key={module.id} module={module} />
               ))}
             </View>
-
-            <Pressable
-              onPress={() => router.replace('/(main)/(tabs)/events/appointments')}
-              style={({ pressed }) => [styles.enrollBtn, pressed && styles.pressed]}
-            >
-              <Text style={styles.enrollBtnText}>{enrollLabel}</Text>
-            </Pressable>
           </View>
         </ScrollView>
+
+        <View
+          style={[
+            styles.footer,
+            { paddingBottom: insets.bottom + 10, paddingTop: 10 },
+          ]}
+        >
+          <LeafyGradientButton
+            onPress={() => router.replace('/(main)/(tabs)/events/appointments')}
+            style={styles.footerBtn}
+            borderRadius={14}
+          >
+            <Text style={styles.footerBtnText}>{footerLabel}</Text>
+          </LeafyGradientButton>
+        </View>
       </View>
     </View>
   );
@@ -160,181 +377,308 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  contentScroll: {
+    flex: 1,
+  },
   hero: {
     backgroundColor: '#1A1A1A',
     position: 'relative',
   },
   heroImage: {
-    height: isSmallDevice ? 160 :  HERO_HEIGHT,
     backgroundColor: '#E8EDEA',
+  },
+  heroScrim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.18)',
+  },
+  heroFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   heroActions: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: isSmallDevice ? 12 :  16,
-    paddingTop: isSmallDevice ? 6 :  8,
-    paddingBottom: isSmallDevice ? 6 :  8,
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    paddingTop: isSmallDevice ? 12 : 16,
   },
   heroBtn: {
-    width: isSmallDevice ? 36 : 40,
-    height: isSmallDevice ? 36 : 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    width: HERO_BTN_SIZE,
+    height: HERO_BTN_SIZE,
+    borderRadius: HERO_BTN_SIZE / 2,
+    backgroundColor: HERO_BTN_BG,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  contentScroll: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: H_PAD,
-    paddingTop: isSmallDevice ? 16 :  20,
+  heroBottom: {
+    position: 'absolute',
+    left: H_PAD,
+    right: H_PAD,
+    bottom: isSmallDevice ? 16 : 20,
   },
   levelBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: LEVEL_BLUE_50,
-    paddingHorizontal: isSmallDevice ? 8 :  10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: isSmallDevice ? 10 :  12,
-    borderWidth: 1,
-    borderColor: BORDER,
+    paddingHorizontal: isSmallDevice ? 8 : 10,
+    paddingVertical: isSmallDevice ? 3 : 4,
+    borderRadius: isSmallDevice ? 6 : 8,
+    marginBottom: isSmallDevice ? 6 : 8,
   },
   levelBadgeText: {
-    fontSize: isSmallDevice ? 11 : 12,
-    lineHeight: 16,
-    fontWeight: '600',
-    color: LEVEL_BLUE_700,
+    fontSize: isSmallDevice ? 9 : 10,
+    lineHeight: isSmallDevice ? 11 : 12,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
-  courseTitle: {
-    fontSize: isSmallDevice ? 20 : 22,
-    lineHeight: 28,
+  heroTitle: {
+    fontSize: isSmallDevice ? 18 : 22,
+    lineHeight: isSmallDevice ? 24 : 28,
     fontWeight: '900',
-    color: TEXT_BLACK,
-    marginBottom: isSmallDevice ? 6 :  8,
+    color: '#FFFFFF',
   },
-  providerText: {
-    fontSize: isSmallDevice ? 13 : 14,
-    lineHeight: 20,
-    fontWeight: '400',
+  contentSheet: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: H_PAD,
+    paddingTop: isSmallDevice ? 14 : 18,
+    paddingBottom: 8,
+  },
+  instructorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: isSmallDevice ? 10 : 12,
+    marginBottom: isSmallDevice ? 12 : 16,
+  },
+  instructorAvatar: {
+    width: INSTRUCTOR_AVATAR_SIZE,
+    height: INSTRUCTOR_AVATAR_SIZE,
+    borderRadius: AVATAR_RADIUS,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  instructorAvatarText: {
+    fontSize: isSmallDevice ? 16 : 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  instructorInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  instructorName: {
+    fontSize: isSmallDevice ? 14 : 15,
+    lineHeight: isSmallDevice ? 18 : 20,
+    fontWeight: '800',
+    color: TEXT_BLACK,
+    marginBottom: 2,
+  },
+  instructorRole: {
+    fontSize: isSmallDevice ? 11 : 12,
+    lineHeight: isSmallDevice ? 14 : 16,
+    fontWeight: '500',
     color: TEXT_MUTED,
-    marginBottom: isSmallDevice ? 16 :  20,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    flexShrink: 0,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: isSmallDevice ? 8 :  10,
-    marginBottom: isSmallDevice ? 12 :  15,
+    gap: isSmallDevice ? 6 : 8,
+    marginBottom: isSmallDevice ? 12 : 16,
   },
   statCard: {
     flex: 1,
     minWidth: 0,
-    backgroundColor: BODY_BG,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingVertical: isSmallDevice ? 12 :  14,
-    paddingHorizontal: 8,
+    backgroundColor: CARD_BG,
+    borderRadius: isSmallDevice ? 12 : 14,
+    paddingVertical: isSmallDevice ? 10 : 12,
+    paddingHorizontal: isSmallDevice ? 4 : 6,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: isSmallDevice ? 2 : 4,
+  },
+  statEmoji: {
+    fontSize: isSmallDevice ? 14 : 16,
+    marginBottom: isSmallDevice ? 2 : 4,
   },
   statValue: {
-    fontSize: isSmallDevice ? 14 : 16,
-    lineHeight: 22,
-    fontWeight: '700',
+    fontSize: isSmallDevice ? 14 : 15,
+    lineHeight: 18,
+    fontWeight: '800',
     color: TEXT_BLACK,
-    marginBottom: 4,
     textAlign: 'center',
   },
   statLabel: {
-    fontSize: isSmallDevice ? 11 : 12,
-    lineHeight: 16,
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 12 : 14,
     fontWeight: '500',
     color: TEXT_MUTED,
     textAlign: 'center',
   },
-  description: {
-    fontSize: isSmallDevice ? 14 : 15,
-    lineHeight: 22,
-    fontWeight: '400',
-    color: TEXT_MUTED,
-    marginBottom: 24,
+  progressCard: {
+    backgroundColor: MINT,
+    borderRadius: isSmallDevice ? 14 : 16,
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    paddingVertical: isSmallDevice ? 12 : 14,
+    marginBottom: isSmallDevice ? 14 : 18,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: isSmallDevice ? 8 : 10,
+  },
+  progressTitle: {
+    fontSize: isSmallDevice ? 13 : 14,
+    lineHeight: isSmallDevice ? 16 : 18,
+    fontWeight: '800',
+    color: PRIMARY,
+  },
+  progressPercent: {
+    fontSize: isSmallDevice ? 13 : 14,
+    lineHeight: isSmallDevice ? 16 : 18,
+    fontWeight: '800',
+    color: PRIMARY,
+  },
+  progressTrack: {
+    height: PROGRESS_HEIGHT,
+    borderRadius: PROGRESS_HEIGHT / 2,
+    backgroundColor: 'rgba(31, 93, 78, 0.15)',
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: PROGRESS_HEIGHT / 2,
+    backgroundColor: PRIMARY,
+  },
+  progressMeta: {
+    fontSize: isSmallDevice ? 11 : 12,
+    lineHeight: isSmallDevice ? 14 : 16,
+    fontWeight: '600',
+    color: 'rgb(90, 122, 112)',
   },
   sectionTitle: {
-    fontSize: isSmallDevice ? 12 : 13,
-    lineHeight: 18,
-    fontWeight: '700',
+    fontSize: isSmallDevice ? 14 : 16,
+    lineHeight: isSmallDevice ? 20 : 22,
+    fontWeight: '800',
     color: TEXT_BLACK,
-    letterSpacing: 0.6,
-    marginBottom: 14,
+    marginBottom: isSmallDevice ? 10 : 12,
   },
   modulesList: {
-    gap: 10,
-    marginBottom: 24,
+    gap: isSmallDevice ? 8 : 10,
   },
   moduleCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: BODY_BG,
-    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: isSmallDevice ? 12 : 14,
     borderWidth: 1,
     borderColor: BORDER,
-    padding: 14,
-    gap: 12,
+    paddingHorizontal: isSmallDevice ? 10 : 12,
+    paddingVertical: isSmallDevice ? 10 : 12,
+    gap: isSmallDevice ? 10 : 12,
+    ...shadowSm,
   },
-  moduleIconWrap: {
-    width: isSmallDevice ? 36 :   40,
-    height: isSmallDevice ? 36 : 40,
-    borderRadius: 20,
-    backgroundColor: MINT,
+  moduleCardActive: {
+    borderColor: PRIMARY,
+    backgroundColor: '#F7FBF8',
+  },
+  moduleCardLocked: {
+    backgroundColor: '#FAFAFA',
+  },
+  moduleIcon: {
+    width: MODULE_ICON_SIZE,
+    height: MODULE_ICON_SIZE,
+    borderRadius: MODULE_ICON_RADIUS,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  moduleIconDone: {
+    backgroundColor: PRIMARY,
+  },
+  moduleIconActive: {
+    backgroundColor: '#FFFFFF',
+  },
+  moduleIconLocked: {
+    backgroundColor: '#F5F7F6',
+  },
+  moduleIconDefault: {
+    backgroundColor: MINT,
+  },
+  moduleIconDefaultText: {
+    fontSize: isSmallDevice ? 12 : 14,
   },
   moduleText: {
     flex: 1,
     minWidth: 0,
   },
   moduleWeek: {
-    fontSize: isSmallDevice ? 11 : 12,
-    lineHeight: 16,
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 12 : 14,
     fontWeight: '500',
     color: TEXT_MUTED,
-    marginBottom: 4,
+    marginBottom: isSmallDevice ? 2 : 3,
   },
   moduleTitle: {
-    fontSize: isSmallDevice ? 14 : 15,
-    lineHeight: 20,
-    fontWeight: '700',
+    fontSize: isSmallDevice ? 13 : 14,
+    lineHeight: isSmallDevice ? 16 : 18,
+    fontWeight: '800',
     color: TEXT_BLACK,
   },
+  moduleTextLocked: {
+    color: '#9CA3AF',
+  },
+  moduleMeta: {
+    alignItems: 'flex-end',
+    flexShrink: 0,
+    gap: 4,
+  },
   moduleLessons: {
-    fontSize: isSmallDevice ? 11 :    12,
-    lineHeight: 16,
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 12 : 14,
     fontWeight: '500',
     color: TEXT_MUTED,
-    flexShrink: 0,
   },
-  enrollBtn: {
-    height: isSmallDevice ? 40 : 52,
-    borderRadius: 16,
-    backgroundColor: PRIMARY,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  enrollBtnText: {
-    fontSize: isSmallDevice ? 14 : 15,
-    lineHeight: 20,
+  moduleStatusDone: {
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 12 : 14,
     fontWeight: '700',
+    color: 'rgb(34, 197, 94)',
+  },
+  moduleStatusActive: {
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 12 : 14,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: H_PAD,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: BORDER,
+    ...shadowSm,
+  },
+  footerBtn: {
+    height: isSmallDevice ? 44 : 48,
+  },
+  footerBtnText: {
+    fontSize: isSmallDevice ? 14 : 15,
+    lineHeight: isSmallDevice ? 16 : 18,
+    fontWeight: '900',
     color: '#FFFFFF',
   },
   pressed: {
     opacity: 0.9,
-  },
-  errorText: {
-    margin: 24,
-    fontSize: isSmallDevice ? 14 : 16,
-    color: TEXT_MUTED,
   },
 });

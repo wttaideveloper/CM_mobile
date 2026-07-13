@@ -4,13 +4,15 @@ export const PRODUCT_CATEGORIES = [
   'Supplements',
   'Recovery',
   'Digital',
+  'Accessories',
 ] as const;
 
 export type ProductCategory =
   | 'Equipment'
   | 'Supplements'
   | 'Recovery'
-  | 'Digital';
+  | 'Digital'
+  | 'Accessories';
 
 export type ProductSpec = {
   value: string;

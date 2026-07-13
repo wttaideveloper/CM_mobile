@@ -8,10 +8,6 @@
     "scheme": "invigoratehealth",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#FFFFFF",
-    "splash": {
-      "backgroundColor": "#FFFFFF",
-      "resizeMode": "contain"
-    },
     "ios": {
       "bundleIdentifier": "com.sureshinti.invigoratehealth",
       "supportsTablet": true,
@@ -20,6 +16,8 @@
       }
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#1F5D4E",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -45,8 +43,48 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/splash-icon.png",
           "backgroundColor": "#FFFFFF",
           "resizeMode": "contain"
+        }
+      ],
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-build-properties",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow InvigorateHealth to record voice messages."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow InvigorateHealth to take photos in chat.",
+          "photosPermission": "Allow InvigorateHealth to access your photos."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow InvigorateHealth to use the microphone for voice typing.",
+          "speechRecognitionPermission": "Allow InvigorateHealth to convert your speech to text."
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#1F5D4E",
+          "enableBackgroundRemoteNotifications": true
         }
       ]
     ],

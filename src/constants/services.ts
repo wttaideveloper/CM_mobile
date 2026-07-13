@@ -5,6 +5,7 @@ export const SERVICE_CATEGORIES = [
   'Classes',
   'Recovery',
   'Therapy',
+  'Mindfulness',
 ] as const;
 
 export type ServiceCategory =
@@ -12,7 +13,8 @@ export type ServiceCategory =
   | 'Coaching'
   | 'Classes'
   | 'Recovery'
-  | 'Therapy';
+  | 'Therapy'
+  | 'Mindfulness';
 
 export type ServiceSlot = {
   id: string;

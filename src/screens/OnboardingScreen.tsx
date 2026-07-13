@@ -37,8 +37,8 @@ export function OnboardingScreen({ onNavigateToLogin }: OnboardingScreenProps) {
 
         <View style={styles.dots}>
           <View style={styles.activeDot} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
+          {/* <View style={styles.dot} /> */}
+          {/* <View style={styles.dot} /> */}
           <View style={styles.dot} />
         </View>
       </View>

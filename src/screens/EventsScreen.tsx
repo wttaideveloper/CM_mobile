@@ -1,6 +1,5 @@
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Dimensions,
@@ -10,151 +9,263 @@ import {
   Text,
   View,
 } from 'react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { EmptyState } from '@/components/EmptyState';
+import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
+import { ChevronLeftIcon } from '@/components/dashboard/DashboardIcons';
+import { useRouteSearchParam } from '@/hooks/useRouteSearchParam';
+import { isFromSearchParam } from '@/utils/searchNavigation';
 
-import {
-  ClockIcon,
-  MapPinIcon,
-} from '@/components/dashboard/DashboardIcons';
 import {
   EVENT_FILTERS,
   filterEvents,
+  getFeaturedEvent,
+  getListEvents,
   type Event,
 } from '@/constants/events';
-import { shadowSm } from '@/utils/shadows';
+import { detailHref } from '@/utils/searchNavigation';
+import { shadowMd, shadowSm } from '@/utils/shadows';
 import { isSmallDevice } from '@/utils/responsive';
 
 const PRIMARY = '#1F5D4E';
-const MINT = '#EAF4EC';
+const ACCENT_GREEN = '#4CAF50';
+const PAGE_BG = '#FFFFFF';
 const BODY_BG = '#F5F7F5';
-const TEXT_MUTED = '#5a7a70';
+const TEXT_MUTED = '#9CA3AF';
 const TEXT_BLACK = '#111111';
-const BORDER = '#E8EDEA';
-const H_PAD = 20;
+const CHIP_INACTIVE_BG = '#F3F4F6';
+const MINT = '#EAF4EC';
+const PRICE_CHIP_PAID_BG = '#FEF3E2';
+const PRICE_CHIP_PAID_TEXT = '#B45309';
+const H_PAD = isSmallDevice ? 16 : 20;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_IMAGE_HEIGHT = Math.round(((SCREEN_WIDTH - H_PAD * 2) * 170) / 375);
+const FEATURED_HEIGHT = Math.round(((SCREEN_WIDTH - H_PAD * 2) * (isSmallDevice ? 180 / 375 : 200 / 375)));
+const LIST_IMAGE_SIZE = isSmallDevice ? 80 : 88;
 
-function EventCard({ event }: { event: Event }) {
+function eventProgress(event: Event): number {
+  if (!event.capacity) {
+    return 0;
+  }
+  return Math.min(1, event.registered / event.capacity);
+}
+
+function FeaturedEventCard({ event }: { event: Event }) {
   const router = useRouter();
+  const cardWidth = SCREEN_WIDTH - H_PAD * 2;
 
   return (
     <Pressable
-      onPress={() => router.push(`/(main)/event/${event.id}`)}
-      style={({ pressed }) => [styles.eventCard, pressed && styles.cardPressed]}
+      onPress={() => router.push(detailHref('/(main)/event', event.id))}
+      style={({ pressed }) => [styles.featuredCard, pressed && styles.cardPressed]}
     >
-      <View style={styles.imageWrap}>
-        <Image
-          source={{ uri: event.image }}
-          style={styles.eventImage}
-          contentFit="cover"
-        />
-        <View style={styles.imageOverlay} />
+      <Image source={{ uri: event.image }} style={styles.featuredImage} contentFit="cover" />
 
-        <View
-          style={[
-            styles.priceBadge,
-            event.isFree && styles.priceBadgeFree,
-          ]}
-        >
-          <Text
-            style={[
-              styles.priceBadgeText,
-              event.isFree && styles.priceBadgeTextFree,
-            ]}
-          >
-            {event.priceLabel}
-          </Text>
-        </View>
+      <Svg
+        width={cardWidth}
+        height={FEATURED_HEIGHT}
+        style={styles.featuredFade}
+        pointerEvents="none"
+      >
+        <Defs>
+          <LinearGradient id="featuredEventFade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#000000" stopOpacity={0} />
+            <Stop offset="0.45" stopColor="#000000" stopOpacity={0.15} />
+            <Stop offset="1" stopColor="#000000" stopOpacity={0.72} />
+          </LinearGradient>
+        </Defs>
+        <Rect x={0} y={0} width={cardWidth} height={FEATURED_HEIGHT} fill="url(#featuredEventFade)" />
+      </Svg>
 
-        <Text style={styles.eventTitle} numberOfLines={2}>
-          {event.name}
-        </Text>
+      <View style={styles.featuredBadge}>
+        <Text style={styles.featuredBadgeText}>FEATURED</Text>
       </View>
 
-      <View style={styles.cardFooter}>
-        <View style={styles.metaBlock}>
-          <View style={styles.metaRow}>
-            <ClockIcon size={14} color={TEXT_MUTED} />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {event.dateTime}
-            </Text>
-          </View>
-          <View style={styles.metaRow}>
-            <MapPinIcon size={14} color={TEXT_MUTED} />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {event.location}
-            </Text>
-          </View>
+      <View style={styles.featuredPriceBadge}>
+        <Text style={styles.featuredPriceText}>{event.priceLabel}</Text>
+      </View>
+
+      <View style={styles.featuredBottom}>
+        <View style={styles.featuredInfo}>
+          <Text style={styles.featuredTitle} numberOfLines={1}>
+            {event.name}
+          </Text>
+          <Text style={styles.featuredMeta}>📅 {event.dateTime}</Text>
+          <Text style={styles.featuredMeta}>📍 {event.location}</Text>
         </View>
 
         <Pressable
-          style={({ pressed }) => [styles.joinBtn, pressed && styles.joinBtnPressed]}
+          onPress={() => router.push(detailHref('/(main)/event', event.id))}
+          style={({ pressed }) => [styles.registerBtn, pressed && styles.cardPressed]}
         >
-          <Text style={styles.joinBtnText}>Join</Text>
+          <Text style={styles.registerBtnText}>Register →</Text>
         </Pressable>
       </View>
     </Pressable>
   );
 }
 
+export function EventCard({
+  event,
+  fromSearch,
+}: {
+  event: Event;
+  fromSearch?: boolean;
+}) {
+  const router = useRouter();
+  const progress = eventProgress(event);
+
+  return (
+    <Pressable
+      onPress={() => router.push(detailHref('/(main)/event', event.id, fromSearch))}
+      style={({ pressed }) => [styles.listCard, pressed && styles.cardPressed]}
+    >
+      <View style={styles.listImageWrap}>
+        <Image source={{ uri: event.image }} style={styles.listImage} contentFit="cover" />
+      </View>
+
+      <View style={styles.listBody}>
+        <View style={styles.listHeader}>
+          <Text style={styles.listTitle} numberOfLines={2}>
+            {event.name}
+          </Text>
+          <View
+            style={[
+              styles.listPriceChip,
+              event.isFree ? styles.listPriceChipFree : styles.listPriceChipPaid,
+            ]}
+          >
+            <Text
+              style={[
+                styles.listPrice,
+                event.isFree ? styles.listPriceFree : styles.listPricePaid,
+              ]}
+            >
+              {event.priceLabel}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.listMeta}>📅 {event.dateTime}</Text>
+        <Text style={[styles.listMeta, styles.listMetaLast]}>📍 {event.location}</Text>
+
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function matchesEventSearch(event: Event, query: string) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return true;
+  }
+
+  return [
+    event.name,
+    event.location,
+    event.description,
+    event.status,
+    event.priceLabel,
+    ...event.filterTags,
+  ].some((value) => value.toLowerCase().includes(normalized));
+}
+
 export function EventsScreen() {
   const insets = useSafeAreaInsets();
-  const statusBarFill = useStatusBarBackground();
+  const router = useRouter();
+  const routeSearch = useRouteSearchParam();
+  const { fromSearch } = useLocalSearchParams<{ fromSearch?: string }>();
+  const openedFromSearch = isFromSearchParam(fromSearch);
   const [activeFilter, setActiveFilter] = useState<string>('All');
 
-  const filteredEvents = useMemo(
-    () => filterEvents(activeFilter),
-    [activeFilter],
-  );
+  const featuredEvent = getFeaturedEvent();
+  const filteredEvents = useMemo(() => {
+    const byFilter = filterEvents(activeFilter);
+    return byFilter.filter((event) => matchesEventSearch(event, routeSearch));
+  }, [activeFilter, routeSearch]);
+  const listEvents = useMemo(() => getListEvents(filteredEvents), [filteredEvents]);
+  const showFeatured =
+    featuredEvent &&
+    (activeFilter === 'All' || filteredEvents.some((event) => event.id === featuredEvent.id));
 
   return (
     <View style={styles.screen}>
-      <AppStatusBar />
-
-      <View style={[styles.statusBarFill, { height: insets.top, backgroundColor: statusBarFill }]} />
-
-      <View style={[styles.topSection, { paddingTop: 12 }]}>
-        <Text style={styles.title}>Events</Text>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersScroll}
-        >
-          {EVENT_FILTERS.map((filter) => {
-            const isActive = activeFilter === filter;
-            return (
-              <Pressable
-                key={filter}
-                onPress={() => setActiveFilter(filter)}
-                style={[styles.filterChip, isActive && styles.filterChipActive]}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    isActive && styles.filterChipTextActive,
-                  ]}
-                >
-                  {filter}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
+      {openedFromSearch ? (
+        <>
+          <AppStatusBar />
+          <StatusBarFill />
+        </>
+      ) : null}
       <ScrollView
-        style={styles.listScroll}
+        style={styles.scroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingBottom: 24 },
-        ]}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
       >
-        {filteredEvents.map((event) => (
-          <EventCard key={event.id} event={event} />
-        ))}
+        <View style={[styles.topSection, { paddingTop: 12 }]}>
+          <View style={styles.titleRow}>
+            {openedFromSearch ? (
+              <Pressable
+                onPress={() => router.back()}
+                style={({ pressed }) => [styles.backBtn, pressed && styles.cardPressed]}
+                hitSlop={8}
+              >
+                <ChevronLeftIcon size={22} color={PRIMARY} />
+              </Pressable>
+            ) : null}
+            <Text style={styles.title}>Events</Text>
+          </View>
+
+          <ScrollView
+            horizontal
+            nestedScrollEnabled
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtersScroll}
+          >
+            {EVENT_FILTERS.map((filter) => {
+              const isActive = activeFilter === filter;
+
+              return (
+                <Pressable
+                  key={filter}
+                  onPress={() => setActiveFilter(filter)}
+                  style={[styles.filterChip, isActive && styles.filterChipActive]}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      isActive && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {filter}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        <View style={styles.content}>
+          {showFeatured && featuredEvent ? (
+            <FeaturedEventCard event={featuredEvent} />
+          ) : null}
+
+          {listEvents.length > 0 ? (
+            <>
+              <Text style={styles.sectionTitle}>All Events</Text>
+              <View style={styles.list}>
+                {listEvents.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </View>
+            </>
+          ) : !showFeatured ? (
+            <EmptyState entity="events" />
+          ) : null}
+        </View>
       </ScrollView>
     </View>
   );
@@ -165,147 +276,257 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BODY_BG,
   },
-  statusBarFill: {
+  scroll: {
+    flex: 1,
     backgroundColor: BODY_BG,
   },
   topSection: {
-    backgroundColor: BODY_BG,
+    backgroundColor: PAGE_BG,
     paddingHorizontal: H_PAD,
+    paddingBottom: isSmallDevice ? 12 : 14,
+    marginBottom: isSmallDevice ? 10 : 12,
   },
   title: {
     fontSize: isSmallDevice ? 20 : 22,
-    lineHeight: 32,
+    lineHeight: 28,
     fontWeight: '800',
     color: TEXT_BLACK,
-    marginBottom: isSmallDevice ? 12 :  16,
+    flex: 1,
+    minWidth: 0,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: isSmallDevice ? 12 : 14,
+  },
+  backBtn: {
+    width: isSmallDevice ? 32 : 36,
+    height: isSmallDevice ? 32 : 36,
+    borderRadius: isSmallDevice ? 10 : 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filtersScroll: {
-    gap: isSmallDevice ? 6 :  8,
-    paddingBottom: isSmallDevice ? 12 :  16,
+    gap: isSmallDevice ? 8 : 10,
   },
   filterChip: {
-    paddingHorizontal: isSmallDevice ? 12 :  16,
-    paddingVertical: isSmallDevice ? 4 :  6,
+    paddingHorizontal: isSmallDevice ? 14 : 16,
+    paddingVertical: isSmallDevice ? 8 : 9,
     borderRadius: 20,
-    backgroundColor: MINT,
+    backgroundColor: CHIP_INACTIVE_BG,
   },
   filterChipActive: {
     backgroundColor: PRIMARY,
+    ...shadowSm,
   },
   filterChipText: {
     fontSize: isSmallDevice ? 13 : 14,
-    lineHeight: 20,
+    lineHeight: 18,
     fontWeight: '600',
     color: PRIMARY,
   },
   filterChipTextActive: {
-    fontSize: isSmallDevice ? 13 : 14,
-    lineHeight: 20,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  listScroll: {
-    flex: 1,
-    backgroundColor: BODY_BG,
-  },
-  listContent: {
-    paddingHorizontal: H_PAD,
-    gap: 16,
-  },
-  eventCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: isSmallDevice ? 16 :  20,
-    borderWidth: 1,
-    borderColor: BORDER,
-    ...shadowSm,
-  },
-  imageWrap: {
-    height: CARD_IMAGE_HEIGHT,
-    backgroundColor: '#E8EDEA',
-    borderTopLeftRadius: isSmallDevice ? 16 :  19,
-    borderTopRightRadius: isSmallDevice ? 16 :  19,
-    overflow: 'hidden',
-  },
-  eventImage: {
-    width: '100%',
-    height: CARD_IMAGE_HEIGHT,
-  },
-  imageOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-  },
-  priceBadge: {
-    position: 'absolute',
-    top: isSmallDevice ? 12 :  14,
-    right: isSmallDevice ? 12 :  14,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: isSmallDevice ? 4 :  6,
-    borderRadius: 20,
-  },
-  priceBadgeFree: {
-    backgroundColor:  '#4caf50',
-  },
-  priceBadgeText: {
-    fontSize: 13,
-    lineHeight: 18,
+    color: PAGE_BG,
     fontWeight: '700',
-    color: TEXT_BLACK,
   },
-  priceBadgeTextFree: {
-    color: '#FFFFFF',
+  content: {
+    paddingHorizontal: H_PAD,
   },
-  eventTitle: {
+  featuredCard: {
+    height: FEATURED_HEIGHT,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#1A1A1A',
+    marginBottom: isSmallDevice ? 18 : 22,
+    ...shadowMd,
+  },
+  featuredImage: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 14,
-    fontSize: isSmallDevice ? 16 : 17,
-    lineHeight: 24,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#2A2A2A',
   },
-  cardFooter: {
+  featuredFade: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  featuredBadge: {
+    position: 'absolute',
+    top: isSmallDevice ? 12 : 14,
+    left: isSmallDevice ? 12 : 14,
+    backgroundColor: ACCENT_GREEN,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  featuredBadgeText: {
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: '800',
+    color: PAGE_BG,
+    letterSpacing: 0.6,
+  },
+  featuredPriceBadge: {
+    position: 'absolute',
+    top: isSmallDevice ? 12 : 14,
+    right: isSmallDevice ? 12 : 14,
+    backgroundColor: PAGE_BG,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  featuredPriceText: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '800',
+    color: PRIMARY,
+  },
+  featuredBottom: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
+    paddingHorizontal: isSmallDevice ? 14 : 16,
+    paddingBottom: isSmallDevice ? 14 : 16,
     gap: 12,
-    paddingHorizontal: isSmallDevice ? 12 :  16,
-    paddingVertical: isSmallDevice ? 12 :  14,
   },
-  metaBlock: {
+  featuredInfo: {
     flex: 1,
     minWidth: 0,
-    gap: isSmallDevice ? 3 :  4,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: isSmallDevice ? 6 :  8,
+  featuredTitle: {
+    fontSize: isSmallDevice ? 16 : 17,
+    lineHeight: 22,
+    fontWeight: '800',
+    color: PAGE_BG,
+    marginBottom: 6,
   },
-  metaText: {
-    flex: 1,
+  featuredMeta: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.75)',
+    marginBottom: 3,
+  },
+  registerBtn: {
+    backgroundColor: PAGE_BG,
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    paddingVertical: isSmallDevice ? 8 : 10,
+    borderRadius: 12,
+    flexShrink: 0,
+  },
+  registerBtnText: {
     fontSize: isSmallDevice ? 12 : 13,
-    lineHeight: 18,
-    fontWeight: '400',
-    color: TEXT_MUTED,
-  },
-  joinBtn: {
-    paddingHorizontal:  isSmallDevice ? 12 : 16,
-    paddingVertical: isSmallDevice ? 4 : 6,
-    borderRadius: 20,
-    backgroundColor: isSmallDevice ? '#1f5d4e' : '#1f5d4e',
-    flexShrink: isSmallDevice ? 0 : 0,
-    flexGrow: isSmallDevice ? 0 : 0,
-  },
-  joinBtnPressed: {
-    opacity: isSmallDevice ? 0.9 :  0.9,
-  },
-  joinBtnText: {
-    fontSize: isSmallDevice ? 13 : 14,
-    lineHeight: 20,
+    lineHeight: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: PRIMARY,
+  },
+  sectionTitle: {
+    fontSize: isSmallDevice ? 15 : 16,
+    lineHeight: 22,
+    fontWeight: '800',
+    color: TEXT_BLACK,
+    marginBottom: isSmallDevice ? 10 : 12,
+  },
+  list: {
+    gap: isSmallDevice ? 10 : 12,
+  },
+  listCard: {
+    flexDirection: 'row',
+    backgroundColor: PAGE_BG,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...shadowSm,
+  },
+  listImageWrap: {
+    width: LIST_IMAGE_SIZE,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  listImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: LIST_IMAGE_SIZE,
+    backgroundColor: '#E8EDEA',
+  },
+  listBody: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: LIST_IMAGE_SIZE,
+    justifyContent: 'space-between',
+    paddingVertical: isSmallDevice ? 11 : 13,
+    paddingHorizontal: isSmallDevice ? 11 : 13,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 5,
+  },
+  listTitle: {
+    flex: 1,
+    fontSize: isSmallDevice ? 14 : 15,
+    lineHeight: 20,
+    fontWeight: '800',
+    color: TEXT_BLACK,
+  },
+  listPriceChip: {
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    flexShrink: 0,
+  },
+  listPriceChipFree: {
+    backgroundColor: MINT,
+  },
+  listPriceChipPaid: {
+    backgroundColor: PRICE_CHIP_PAID_BG,
+  },
+  listPrice: {
+    fontSize: isSmallDevice ? 11 : 12,
+    lineHeight: 14,
+    fontWeight: '800',
+  },
+  listPriceFree: {
+    color: PRIMARY,
+  },
+  listPricePaid: {
+    color: PRICE_CHIP_PAID_TEXT,
+  },
+  listMeta: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '500',
+    color: TEXT_MUTED,
+    marginBottom: 4,
+  },
+  listMetaLast: {
+    marginBottom: 0,
+  },
+  progressTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E5E7EB',
+    overflow: 'hidden',
+    marginTop: 7,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+    backgroundColor: PRIMARY,
   },
   cardPressed: {
     opacity: 0.92,

@@ -1,5 +1,4 @@
 import { useRouter } from 'expo-router';
-import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
 import {
   Pressable,
   ScrollView,
@@ -7,34 +6,119 @@ import {
   Text,
   View,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   ChevronRightIcon,
   LogOutIcon,
 } from '@/components/dashboard/DashboardIcons';
-import { PROFILE_USER, SETTINGS_SECTIONS } from '@/constants/settings';
+import {
+  APP_VERSION,
+  PROFILE_USER,
+  SETTINGS_SECTIONS,
+  type SettingsMenuItem,
+} from '@/constants/settings';
 import { useAuthStore } from '@/stores/auth.store';
+import { shadowSm } from '@/utils/shadows';
 import { isSmallDevice } from '@/utils/responsive';
 
 const PRIMARY = '#1F5D4E';
-const MINT = '#EAF4EC';
-const BODY_BG = '#F5F7F5';
-const TEXT_MUTED = '#5a7a70';
+const PAGE_BG = '#FFFFFF';
+const BODY_BG = '#F7F8F9';
+const TEXT_MUTED = '#9CA3AF';
 const TEXT_BLACK = '#111111';
-const BORDER = '#E8EDEA';
-const EMERALD_50 = '#eaf4ec80';
-const SIGN_OUT_BG = '#fef2f2';
+const ICON_BG = '#F5F7F6';
+const SIGN_OUT_BG = '#FEF2F2';
 const SIGN_OUT_BORDER = '#FECACA';
 const SIGN_OUT_RED = '#DC2626';
-const H_PAD = 20;
+const H_PAD = isSmallDevice ? 16 : 20;
+const AVATAR_SIZE = isSmallDevice ? 44 : 50;
+const AVATAR_RADIUS = isSmallDevice ? 12 : 14;
+const ICON_SIZE = isSmallDevice ? 28 : 30;
+const ICON_RADIUS = isSmallDevice ? 10 : 12;
+const PROFILE_CARD_RADIUS = isSmallDevice ? 20 : 24;
 
-function SettingsMenuItem({
-  label,
+function PencilIcon({ size = 15, color = '#FFFFFF' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function ProfileCard() {
+  return (
+    <LinearGradient
+      colors={['#163D34', '#1F5D4E', '#2B773F', '#4CAF50']}
+      locations={[0, 0.35, 0.7, 1]}
+      start={{ x: 0, y: 0.5 }}
+      end={{ x: 1, y: 0.5 }}
+      style={styles.profileCard}
+    >
+      <View style={styles.profileGlow} pointerEvents="none" />
+
+      <View style={styles.profileRow}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{PROFILE_USER.avatarLetter}</Text>
+        </View>
+
+        <View style={styles.profileInfo}>
+          <Text style={styles.profileName}>{PROFILE_USER.name}</Text>
+          <Text style={styles.profileEmail}>{PROFILE_USER.email}</Text>
+
+          <View style={styles.badgeRow}>
+            <View style={styles.roleBadge}>
+              <Text style={styles.roleBadgeText}>{PROFILE_USER.role}</Text>
+            </View>
+            {PROFILE_USER.verified ? (
+              <View style={styles.verifiedBadge}>
+                <Text style={styles.verifiedBadgeText}>✓ Verified</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        <Pressable style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]} hitSlop={6}>
+          <PencilIcon />
+        </Pressable>
+      </View>
+    </LinearGradient>
+  );
+}
+
+function StatsRow() {
+  const stats = [
+    { value: String(PROFILE_USER.stats.bookings), label: 'Bookings' },
+    { value: String(PROFILE_USER.stats.saved), label: 'Saved' },
+    { value: String(PROFILE_USER.stats.reviews), label: 'Reviews' },
+  ];
+
+  return (
+    <View style={styles.statsRow}>
+      {stats.map((stat) => (
+        <View key={stat.label} style={styles.statCard}>
+          <Text style={styles.statValue}>{stat.value}</Text>
+          <Text style={styles.statLabel}>{stat.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function MenuItem({
+  item,
   isLast,
   onPress,
 }: {
-  label: string;
+  item: SettingsMenuItem;
   isLast: boolean;
   onPress?: () => void;
 }) {
@@ -42,15 +126,20 @@ function SettingsMenuItem({
     <View>
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [
-          styles.menuItem,
-          pressed && styles.menuItemPressed,
-        ]}
+        style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}
       >
-        <Text style={styles.menuItemText}>{label}</Text>
-        <ChevronRightIcon size={18} color="#C5D5CC" />
+        <View style={styles.menuIconWrap}>
+          <Text style={styles.menuEmoji}>{item.emoji}</Text>
+        </View>
+
+        <View style={styles.menuTextWrap}>
+          <Text style={styles.menuLabel}>{item.label}</Text>
+          <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+        </View>
+
+        <ChevronRightIcon size={isSmallDevice ? 16 : 18} color="#D1D5DB" />
       </Pressable>
-      {!isLast && <View style={styles.menuDivider} />}
+      {!isLast ? <View style={styles.menuDivider} /> : null}
     </View>
   );
 }
@@ -58,56 +147,39 @@ function SettingsMenuItem({
 export function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const statusBarFill = useStatusBarBackground();
   const logout = useAuthStore((state) => state.logout);
 
-  const handleMenuPress = (label: string) => {
-    if (label === 'Notifications') {
+  const handleMenuPress = (item: SettingsMenuItem) => {
+    if (item.id === 'notifications') {
       router.push('/(main)/notifications');
     }
   };
 
   return (
     <View style={styles.screen}>
-      <AppStatusBar />
-
-      <View style={[styles.statusBarFill, { height: insets.top, backgroundColor: statusBarFill }]} />
-
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingBottom: insets.bottom + 24,
+          paddingBottom: insets.bottom + (isSmallDevice ? 20 : 24),
         }}
       >
-        <View style={styles.titleWrap}>
-          <Text style={styles.title}>Settings</Text>
-        </View>
-
-        <View style={styles.profileBand}>
-          <View style={styles.profileRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{PROFILE_USER.avatarLetter}</Text>
-            </View>
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{PROFILE_USER.name}</Text>
-              <Text style={styles.profileEmail}>{PROFILE_USER.email}</Text>
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleBadgeText}>{PROFILE_USER.role}</Text>
-              </View>
-            </View>
-          </View>
+        <View style={styles.header}>
+          <Text style={styles.title}>Profile & Settings</Text>
         </View>
 
         <View style={styles.body}>
+          <ProfileCard />
+          <StatsRow />
+
           {SETTINGS_SECTIONS.map((section) => (
             <View key={section.id} style={styles.section}>
               <Text style={styles.sectionTitle}>{section.title}</Text>
               <View style={styles.menuCard}>
                 {section.items.map((item, index) => (
-                  <SettingsMenuItem
-                    key={item}
-                    label={item}
+                  <MenuItem
+                    key={item.id}
+                    item={item}
                     isLast={index === section.items.length - 1}
                     onPress={() => handleMenuPress(item)}
                   />
@@ -118,14 +190,13 @@ export function SettingsScreen() {
 
           <Pressable
             onPress={logout}
-            style={({ pressed }) => [
-              styles.signOutBtn,
-              pressed && styles.signOutPressed,
-            ]}
+            style={({ pressed }) => [styles.signOutBtn, pressed && styles.pressed]}
           >
-            <LogOutIcon size={18} color={SIGN_OUT_RED} />
+            <LogOutIcon size={isSmallDevice ? 16 : 18} color={SIGN_OUT_RED} />
             <Text style={styles.signOutText}>Sign Out</Text>
           </Pressable>
+
+          <Text style={styles.versionText}>{APP_VERSION}</Text>
         </View>
       </ScrollView>
     </View>
@@ -137,49 +208,62 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BODY_BG,
   },
-  statusBarFill: {
-    backgroundColor: BODY_BG,
-  },
   scroll: {
     flex: 1,
   },
-  titleWrap: {
+  header: {
+    backgroundColor: PAGE_BG,
     paddingHorizontal: H_PAD,
-    paddingTop: isSmallDevice ? 8 :  12,
-    paddingBottom: isSmallDevice ? 16 :  20,
+    paddingTop: isSmallDevice ? 10 : 12,
+    paddingBottom: isSmallDevice ? 12 : 14,
   },
   title: {
-    fontSize: isSmallDevice ? 20 : 22,
-    lineHeight: 32,
-    fontWeight: '800',
+    fontSize: isSmallDevice ? 18 : 20,
+    lineHeight: isSmallDevice ? 24 : 26,
+    fontWeight: '700',
     color: TEXT_BLACK,
   },
-  profileBand: {
-    backgroundColor: EMERALD_50,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
-    paddingVertical: isSmallDevice ? 16 :  20,
-    marginBottom: 24,
+  body: {
+    paddingHorizontal: H_PAD,
+    paddingTop: isSmallDevice ? 10 : 12,
+  },
+  profileCard: {
+    borderRadius: PROFILE_CARD_RADIUS,
+    overflow: 'hidden',
+    marginBottom: isSmallDevice ? 10 : 12,
+    minHeight: isSmallDevice ? 90 : 100,
+    justifyContent: 'center',
+  },
+  profileGlow: {
+    position: 'absolute',
+    top: isSmallDevice ? -8 : -10,
+    right: isSmallDevice ? 8 : 12,
+    width: isSmallDevice ? 72 : 88,
+    height: isSmallDevice ? 72 : 88,
+    borderRadius: isSmallDevice ? 36 : 44,
+    backgroundColor: 'rgba(76, 175, 80, 0.18)',
   },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: isSmallDevice ? 12 :  14,
-    paddingHorizontal: H_PAD,
+    gap: isSmallDevice ? 10 : 12,
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    paddingTop: isSmallDevice ? 12 : 14,
+    paddingBottom: isSmallDevice ? 12 : 14,
   },
   avatar: {
-    width: isSmallDevice ? 48 : 52,
-    height: isSmallDevice ? 48 :  52,
-    borderRadius: isSmallDevice ? 12 :  14,
-    backgroundColor: PRIMARY,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_RADIUS,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   avatarText: {
-    fontSize: isSmallDevice ? 20 : 22,
-    lineHeight: 26,
+    fontSize: isSmallDevice ? 18 : 20,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -188,97 +272,170 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   profileName: {
-    fontSize: isSmallDevice ? 15 : 17,
-    lineHeight: 24,
+    fontSize: isSmallDevice ? 14 : 16,
+    lineHeight: isSmallDevice ? 18 : 20,
     fontWeight: '700',
-    color: TEXT_BLACK,
-    marginBottom: isSmallDevice ? 1 :  2,
+    color: '#FFFFFF',
+    marginBottom: isSmallDevice ? 2 : 4,
   },
   profileEmail: {
-    fontSize: isSmallDevice ? 12 : 13,
-    lineHeight: 18,
+    fontSize: isSmallDevice ? 11 : 12,
+    lineHeight: isSmallDevice ? 14 : 16,
     fontWeight: '400',
-    color: TEXT_MUTED,
-    marginBottom: isSmallDevice ? 6 :  8,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginBottom: isSmallDevice ? 6 : 8,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: isSmallDevice ? 6 : 8,
+    flexWrap: 'wrap',
   },
   roleBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: MINT,
-    paddingHorizontal: isSmallDevice ? 8 :  10,
-    paddingVertical: isSmallDevice ? 3 :  4,
-    borderRadius: isSmallDevice ? 10 :  12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
+    paddingHorizontal: isSmallDevice ? 7 : 9,
+    paddingVertical: isSmallDevice ? 2 : 3,
+    borderRadius: isSmallDevice ? 6 : 8,
   },
   roleBadgeText: {
-    fontSize: isSmallDevice ? 11 : 12,
-    lineHeight: 16,
+    fontSize: isSmallDevice ? 9 : 10,
+    lineHeight: isSmallDevice ? 12 : 13,
     fontWeight: '600',
-    color: PRIMARY,
+    color: '#FFFFFF',
   },
-  body: {
-    paddingHorizontal: H_PAD,
+  verifiedBadge: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: isSmallDevice ? 7 : 9,
+    paddingVertical: isSmallDevice ? 2 : 3,
+    borderRadius: isSmallDevice ? 6 : 8,
+  },
+  verifiedBadgeText: {
+    fontSize: isSmallDevice ? 9 : 10,
+    lineHeight: isSmallDevice ? 12 : 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  editBtn: {
+    width: isSmallDevice ? 32 : 36,
+    height: isSmallDevice ? 32 : 36,
+    borderRadius: isSmallDevice ? 10 : 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: isSmallDevice ? 8 : 10,
+    marginBottom: isSmallDevice ? 14 : 18,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: PAGE_BG,
+    borderRadius: isSmallDevice ? 12 : 14,
+    paddingVertical: isSmallDevice ? 10 : 12,
+    alignItems: 'center',
+    ...shadowSm,
+  },
+  statValue: {
+    fontSize: isSmallDevice ? 14 : 16,
+    lineHeight: isSmallDevice ? 18 : 20,
+    fontWeight: '700',
+    color: TEXT_BLACK,
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 12 : 14,
+    fontWeight: '500',
+    color: TEXT_MUTED,
   },
   section: {
-    marginBottom: isSmallDevice ? 16 :  20,
+    marginBottom: isSmallDevice ? 12 : 16,
   },
   sectionTitle: {
-    fontSize: isSmallDevice ? 11 : 12,
-    lineHeight: 16,
-    fontWeight: '700',
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 12 : 14,
+    fontWeight: '600',
     color: TEXT_MUTED,
-    letterSpacing: 0.6,
-    marginBottom: isSmallDevice ? 8 :  10,
+    letterSpacing: 0.7,
+    marginBottom: isSmallDevice ? 6 : 8,
   },
   menuCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: isSmallDevice ? 14 :  16,
-    borderWidth: 1,
-    borderColor: BORDER,
+    backgroundColor: PAGE_BG,
+    borderRadius: isSmallDevice ? 14 : 16,
     overflow: 'hidden',
+    ...shadowSm,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: isSmallDevice ? 12 :  16,
-    paddingVertical: isSmallDevice ? 12 :  15,
-    backgroundColor: '#FFFFFF',
+    gap: isSmallDevice ? 10 : 12,
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    paddingVertical: isSmallDevice ? 8 : 10,
+  },
+  menuIconWrap: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    borderRadius: ICON_RADIUS,
+    backgroundColor: ICON_BG,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  menuEmoji: {
+    fontSize: isSmallDevice ? 12 : 14,
+  },
+  menuTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  menuLabel: {
+    fontSize: isSmallDevice ? 13 : 14,
+    lineHeight: isSmallDevice ? 16 : 18,
+    fontWeight: '600',
+    color: TEXT_BLACK,
+    marginBottom: 2,
+  },
+  menuSubtitle: {
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 13 : 15,
+    fontWeight: '400',
+    color: TEXT_MUTED,
   },
   menuDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: BORDER,
-    marginLeft: isSmallDevice ? 12 :  16,
-    marginRight: isSmallDevice ? 12 :  16,
-  },
-  menuItemPressed: {
-    opacity: 0.92,
-  },
-  menuItemText: {
-    fontSize: isSmallDevice ? 14 : 15,
-    lineHeight: 20,
-    fontWeight: '600',
-    color: TEXT_BLACK,
+    backgroundColor: '#E5E7EB',
+    marginLeft: (isSmallDevice ? 12 : 14) + ICON_SIZE + (isSmallDevice ? 10 : 12),
+    marginRight: isSmallDevice ? 12 : 14,
   },
   signOutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: isSmallDevice ? 6 :  8,
+    gap: isSmallDevice ? 6 : 8,
     backgroundColor: SIGN_OUT_BG,
-    borderRadius: isSmallDevice ? 14 : 16,
-    borderWidth: 0.5,
+    borderWidth: 1,
     borderColor: SIGN_OUT_BORDER,
-    paddingVertical: 16,
+    borderRadius: isSmallDevice ? 14 : 16,
+    paddingVertical: isSmallDevice ? 11 : 13,
     marginTop: 4,
-  },
-  signOutPressed: {
-    opacity: 0.9,
+    marginBottom: isSmallDevice ? 12 : 16,
   },
   signOutText: {
-    fontSize: isSmallDevice ? 14 : 15,
-    lineHeight: 20,
-    fontWeight: '700',
+    fontSize: isSmallDevice ? 13 : 14,
+    lineHeight: isSmallDevice ? 16 : 18,
+    fontWeight: '600',
     color: SIGN_OUT_RED,
+  },
+  versionText: {
+    fontSize: isSmallDevice ? 10 : 11,
+    lineHeight: isSmallDevice ? 13 : 15,
+    fontWeight: '400',
+    color: TEXT_MUTED,
+    textAlign: 'center',
+  },
+  pressed: {
+    opacity: 0.9,
   },
 });

@@ -15,7 +15,7 @@ function iosShadow(offsetY: number, opacity: number, radius: number): ViewStyle 
 export const shadowSm: ViewStyle =
   Platform.select({
     ios: iosShadow(1, 0.04, 3),
-    android: { elevation: 1 },
+    android: { elevation: 0.5 },
     default: {},
   }) ?? {};
 

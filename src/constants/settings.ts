@@ -1,39 +1,114 @@
-export const SETTINGS_SECTIONS = [
+export type SettingsMenuItem = {
+  id: string;
+  label: string;
+  subtitle: string;
+  emoji: string;
+};
+
+export type SettingsSection = {
+  id: string;
+  title: string;
+  items: SettingsMenuItem[];
+};
+
+export const PROFILE_USER = {
+  name: 'Sarah Johnson',
+  email: 'sarah@email.com',
+  role: 'Customer',
+  avatarLetter: 'S',
+  verified: true,
+  stats: {
+    bookings: 42,
+    saved: 12,
+    reviews: 8,
+  },
+};
+
+export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'account',
     title: 'ACCOUNT',
     items: [
-      'Edit Profile',
-      'Security & Password',
-      'Notifications',
-      'Privacy',
+      {
+        id: 'edit-profile',
+        label: 'Edit Profile',
+        subtitle: 'Name, photo, bio',
+        emoji: '👤',
+      },
+      {
+        id: 'security',
+        label: 'Security',
+        subtitle: 'Password, 2FA',
+        emoji: '🔒',
+      },
+      {
+        id: 'notifications',
+        label: 'Notifications',
+        subtitle: 'Push, email, SMS',
+        emoji: '🔔',
+      },
+      {
+        id: 'privacy',
+        label: 'Privacy & Data',
+        subtitle: 'Manage your data',
+        emoji: '🛡',
+      },
     ],
   },
   {
-    id: 'enterprise',
-    title: 'ENTERPRISE',
+    id: 'preferences',
+    title: 'PREFERENCES',
     items: [
-      'Enterprise Profile',
-      'Team Members',
-      'Billing & Subscription',
-      'Integrations',
+      {
+        id: 'saved-enterprises',
+        label: 'Saved Enterprises',
+        subtitle: '12 saved',
+        emoji: '❤️',
+      },
+      {
+        id: 'booking-history',
+        label: 'Booking History',
+        subtitle: '42 past bookings',
+        emoji: '📋',
+      },
+      {
+        id: 'payment-methods',
+        label: 'Payment Methods',
+        subtitle: '2 cards saved',
+        emoji: '💳',
+      },
+      {
+        id: 'language',
+        label: 'Language',
+        subtitle: 'English (US)',
+        emoji: '🌐',
+      },
     ],
   },
   {
-    id: 'app',
-    title: 'APP',
+    id: 'support',
+    title: 'SUPPORT',
     items: [
-      'Appearance',
-      'Language',
-      'Accessibility',
-      'About Invigorate',
+      {
+        id: 'help-centre',
+        label: 'Help Centre',
+        subtitle: 'FAQs and guides',
+        emoji: '❓',
+      },
+      {
+        id: 'rate-app',
+        label: 'Rate Invigorate',
+        subtitle: 'Leave a review',
+        emoji: '⭐',
+      },
+      {
+        id: 'terms',
+        label: 'Terms & Privacy',
+        subtitle: 'Legal',
+        emoji: '📄',
+      },
     ],
   },
-] as const;
+];
 
-export const PROFILE_USER = {
-  name: 'Sarah Johnson',
-  email: 'sarah@pinnaclewellness.com',
-  role: 'Enterprise Admin',
-  avatarLetter: 'S',
-};
+export const APP_VERSION = 'Invigorate Health v2.1.0';
