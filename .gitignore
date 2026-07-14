@@ -34,6 +34,13 @@ yarn-error.*
 .env
 .env*.local
 
+# Firebase / Google (contains API keys — never commit)
+google-services.json
+GoogleService-Info.plist
+
+# local zip backups
+*.zip
+
 # typescript
 *.tsbuildinfo
 
