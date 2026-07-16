@@ -32,7 +32,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       {
         id: 'edit-profile',
         label: 'Edit Profile',
-        subtitle: 'Name, photo, bio',
+        subtitle: 'Name and email',
         emoji: '👤',
       },
       {
@@ -43,8 +43,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       },
       {
         id: 'notifications',
-        label: 'Notifications',
-        subtitle: 'Push, email, SMS',
+        label: 'Notification Preferences',
+        subtitle: 'Email, push, SMS, in-app',
         emoji: '🔔',
       },
       {

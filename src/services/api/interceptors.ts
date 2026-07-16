@@ -1,8 +1,9 @@
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 import { useAuthStore } from '@/stores/auth.store';
+import { getApiErrorMessage } from '@/utils/apiError';
 
-import { apiClient } from './client';
+import { apiClient, authClient } from './client';
 import { ENDPOINTS } from './endpoints';
 
 let isRefreshing = false;
@@ -43,14 +44,27 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
+authClient.interceptors.request.use(
+  (config) => {
+    // Auth API (/me, etc.) must use the login access token — not destin-token.
+    const { authAccessToken } = useAuthStore.getState();
+    if (authAccessToken && config.headers) {
+      config.headers.Authorization = `Bearer ${authAccessToken}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     devLog('↗ REQUEST:', config.url);
 
+    // Same as old dev-token flow: attach login access_token to every main API call.
     const { accessToken } = useAuthStore.getState();
     if (accessToken && config.headers) {
-      devLog('→ Attached Access Token');
       config.headers.Authorization = `Bearer ${accessToken}`;
+      devLog('→ Attached login access token');
     }
 
     if (config.params) {
@@ -102,12 +116,22 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      const { isLoggingOut } = useAuthStore.getState();
+      if (isLoggingOut) {
+        return Promise.reject({
+          message: 'Session expired. Please log in again.',
+          statusCode: 401,
+        });
+      }
+
       devLog('⚠️ 401 RECEIVED → Starting Refresh Flow');
 
       const isAuthEndpoint =
         originalRequest.url === ENDPOINTS.AUTH.DEV_TOKEN ||
+        originalRequest.url === ENDPOINTS.AUTH.SIGNUP ||
+        originalRequest.url === ENDPOINTS.AUTH.VERIFY_EMAIL ||
         originalRequest.url === ENDPOINTS.AUTH.LOGIN ||
-        originalRequest.url === ENDPOINTS.AUTH.REFRESH_TOKEN;
+        originalRequest.url === ENDPOINTS.AUTH.REFRESH;
 
       if (isAuthEndpoint) {
         devLog('❌ 401 from Auth Endpoint — Not Refreshing');
@@ -132,14 +156,19 @@ apiClient.interceptors.response.use(
       devLog('🔄 Refresh Token API Call');
 
       try {
-        const newToken = await useAuthStore.getState().ensureDevToken(true);
+        const newToken = await useAuthStore.getState().ensureAccessToken(true);
         processQueue(null, newToken);
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return apiClient(originalRequest);
       } catch (refreshError) {
-        devLog('❌ Dev token refresh FAILED:', refreshError);
+        devLog('❌ Token refresh FAILED:', refreshError);
         processQueue(refreshError, null);
-        useAuthStore.getState().logout();
+
+        const { isAuthenticated, isLoggingOut } = useAuthStore.getState();
+        if (isAuthenticated && !isLoggingOut) {
+          useAuthStore.getState().clearSession();
+        }
+
         return Promise.reject(refreshError);
       } finally {
         devLog('🔚 Refresh flow ended');
@@ -158,8 +187,12 @@ apiClient.interceptors.response.use(
     devLog('❌ API ERROR:', error.response.status, error.response.data);
 
     return Promise.reject({
-      message:
-        (error.response.data as { message?: string })?.message || 'An error occurred',
+      message: getApiErrorMessage(
+        error.response.data as {
+          message?: string;
+          detail?: string | Array<{ msg?: string }>;
+        },
+      ),
       statusCode: error.response.status,
       errors: (error.response.data as { errors?: unknown })?.errors,
     });

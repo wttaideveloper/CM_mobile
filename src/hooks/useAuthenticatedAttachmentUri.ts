@@ -60,18 +60,11 @@ export function useAuthenticatedAttachmentUri(
       return undefined;
     }
 
-    if (!accessToken) {
-      setUri(null);
-      setLoading(false);
-      setError(true);
-      return undefined;
-    }
-
     setUri(null);
     setLoading(true);
     setError(false);
 
-    void downloadAuthenticatedAttachment(remoteUri, accessToken, fileName)
+    void downloadAuthenticatedAttachment(remoteUri, undefined, fileName)
       .then((localUri) => {
         if (!cancelled) {
           setUri(localUri);

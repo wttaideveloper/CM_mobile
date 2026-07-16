@@ -323,7 +323,7 @@ export function ChatScreen() {
     (isLiveConversation && conversationIsClosed);
   const showFullFeatures = meta.mode === 'full';
 
-  const currentUserId = useAuthStore((state) => state.user?.id) ?? DEV_USER.user_id;
+  const currentUserId = DEV_USER.user_id;
 
   const [selectedEditMessage, setSelectedEditMessage] = useState<ChatMessage | null>(null);
   const [editMenuOpen, setEditMenuOpen] = useState(false);
@@ -573,7 +573,7 @@ export function ChatScreen() {
     setHasOlder(false);
     setNextCursor(null);
 
-    const currentUserId = useAuthStore.getState().user?.id ?? DEV_USER.user_id;
+    const currentUserId = DEV_USER.user_id;
 
     void fetchConversationMessages(conversationId, { limit: 50 })
       .then(async (response) => {
@@ -1083,7 +1083,8 @@ console.log("hydrated", hydrated);
     setIsSending(true);
 
     try {
-      const currentUserId = useAuthStore.getState().user?.id ?? DEV_USER.user_id;
+      // const currentUserId = useAuthStore.getState().user?.id ?? DEV_USER.user_id;
+      const currentUserId = DEV_USER.user_id;
       const sentMessage = await sendMessageViaSocket({
         content: text,
         conversation_id: conversationId,
@@ -1212,7 +1213,7 @@ console.log("hydrated", hydrated);
       if (!nextCursor || loadingOlder) return;
 
       setLoadingOlder(true);
-      const currentUserId = useAuthStore.getState().user?.id ?? DEV_USER.user_id;
+      const currentUserId = DEV_USER.user_id;
 
       void fetchConversationMessages(conversationId, { cursor: nextCursor, limit: 50 })
         .then(async (response) => {

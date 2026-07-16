@@ -1,7 +1,9 @@
 import type {
   NotificationHistoryQuery,
   NotificationHistoryResponse,
+  NotificationPreferences,
   NotificationUnreadCountResponse,
+  UpdateNotificationPreferencesRequest,
 } from '@/types/notification.types';
 
 import { apiClient } from './api/client';
@@ -42,6 +44,33 @@ export async function fetchNotificationUnreadCount(): Promise<NotificationUnread
       status: response.status,
       ...response.data,
     });
+  }
+
+  return response.data;
+}
+
+export async function fetchNotificationPreferences(): Promise<NotificationPreferences> {
+  const response = await apiClient.get<NotificationPreferences>(
+    ENDPOINTS.NOTIFICATIONS.PREFERENCES,
+  );
+
+  if (__DEV__) {
+    console.log('[NOTIFICATIONS] Preferences GET ← success', response.data);
+  }
+
+  return response.data;
+}
+
+export async function updateNotificationPreferences(
+  payload: UpdateNotificationPreferencesRequest,
+): Promise<NotificationPreferences> {
+  const response = await apiClient.put<NotificationPreferences>(
+    ENDPOINTS.NOTIFICATIONS.PREFERENCES,
+    payload,
+  );
+
+  if (__DEV__) {
+    console.log('[NOTIFICATIONS] Preferences PUT ← success', response.data);
   }
 
   return response.data;

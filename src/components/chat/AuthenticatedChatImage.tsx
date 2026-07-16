@@ -57,12 +57,7 @@ export function AuthenticatedChatImage({
     setDisplayUri(null);
     setFailed(false);
 
-    if (!accessToken) {
-      setFailed(true);
-      return undefined;
-    }
-
-    void downloadAuthenticatedImage(uri, accessToken)
+    void downloadAuthenticatedImage(uri)
       .then((localUri) => {
         if (!cancelled) setDisplayUri(localUri);
       })

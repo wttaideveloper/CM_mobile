@@ -173,7 +173,7 @@ export function EnterprisesScreen() {
     refetch,
     isRefetching,
   } = useInfiniteEnterprises(apiQuery);
-
+console.log('Enterprises', data);
   const enterprises = useMemo(
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data],

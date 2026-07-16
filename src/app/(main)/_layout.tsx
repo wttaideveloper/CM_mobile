@@ -26,6 +26,7 @@ export default function MainLayout() {
       <Stack.Screen name="event/[id]" />
       <Stack.Screen name="course/[id]" />
       <Stack.Screen name="notifications" />
+      <Stack.Screen name="notification-preferences" />
       <Stack.Screen name="search-data" />
       <Stack.Screen name="chat/[id]" />
       </Stack>

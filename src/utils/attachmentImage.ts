@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
 import { API_CONFIG } from '@/config';
+import { useAuthStore } from '@/stores/auth.store';
 
 const mediaCache = new Map<string, string>();
 
@@ -55,12 +56,29 @@ export function attachmentUrlRequiresAuth(uri: string): boolean {
   return uri.startsWith(API_CONFIG.BASE_URL);
 }
 
-export async function downloadAuthenticatedAttachment(
+async function resolveAttachmentAccessToken(forceRefresh = false): Promise<string> {
+  return useAuthStore.getState().ensureAccessToken(forceRefresh);
+}
+
+async function downloadToCache(
   uri: string,
   accessToken: string,
+  localPath: string,
+): Promise<FileSystem.FileSystemDownloadResult> {
+  return FileSystem.downloadAsync(uri, localPath, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+}
+
+export async function downloadAuthenticatedAttachment(
+  uri: string,
+  _accessToken?: string | null,
   fileName?: string,
 ): Promise<string> {
-  const key = cacheKey(uri, accessToken);
+  const token = await resolveAttachmentAccessToken();
+  const key = cacheKey(uri, token);
   const cached = mediaCache.get(key);
   if (cached) {
     const extension = extensionFromFileName(fileName, 'bin');
@@ -75,11 +93,15 @@ export async function downloadAuthenticatedAttachment(
   const extension = extensionFromFileName(fileName, 'm4a');
   const localPath = `${FileSystem.cacheDirectory}chat-attach-${Date.now()}.${extension}`;
 
-  const result = await FileSystem.downloadAsync(uri, localPath, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  let result = await downloadToCache(uri, token, localPath);
+
+  // Retry once with a freshly issued dev-token when auth is rejected.
+  if (result.status === 401 || result.status === 403 || result.status === 410) {
+    const refreshedToken = await resolveAttachmentAccessToken(true);
+    if (refreshedToken !== token) {
+      result = await downloadToCache(uri, refreshedToken, localPath);
+    }
+  }
 
   if (result.status !== 200) {
     throw new Error(`Attachment download failed with status ${result.status}`);
@@ -87,13 +109,10 @@ export async function downloadAuthenticatedAttachment(
 
   await assertValidDownloadedFile(result.uri, extension);
 
-  mediaCache.set(key, result.uri);
+  mediaCache.set(cacheKey(uri, token), result.uri);
   return result.uri;
 }
 
-export async function downloadAuthenticatedImage(
-  uri: string,
-  accessToken: string,
-): Promise<string> {
-  return downloadAuthenticatedAttachment(uri, accessToken, 'image.jpg');
+export async function downloadAuthenticatedImage(uri: string): Promise<string> {
+  return downloadAuthenticatedAttachment(uri, undefined, 'image.jpg');
 }

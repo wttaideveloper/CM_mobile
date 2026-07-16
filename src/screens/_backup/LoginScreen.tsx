@@ -87,7 +87,7 @@ export function LoginScreen() {
             </Pressable>
 
             <Pressable>
-              <Text style={styles.optionText}>Forgot Password</Text>
+              <Text style={styles.optionText}>Forgot Password?</Text>
             </Pressable>
           </View>
         </ScrollView>

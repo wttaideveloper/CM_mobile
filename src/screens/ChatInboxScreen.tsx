@@ -162,7 +162,8 @@ function FilterChip({
 export function ChatInboxScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const currentUserId = useAuthStore((state) => state.user?.id ?? DEV_USER.user_id);
+  // const currentUserId = useAuthStore((state) => state.user?.id ?? DEV_USER.user_id);
+  const currentUserId = DEV_USER.user_id;
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<InboxFilter>('All');

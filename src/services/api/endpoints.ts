@@ -1,8 +1,18 @@
 export const ENDPOINTS = {
   AUTH: {
     DEV_TOKEN: '/api/v1/auth/dev-token',
-    LOGIN: '/auth/login',
-    REFRESH_TOKEN: '/auth/refresh-token',
+    SIGNUP: '/api/v1/auth/signup',
+    LOGIN: '/api/v1/auth/login',
+    VERIFY_EMAIL: '/api/v1/auth/verify-email',
+    RESEND_VERIFICATION: '/api/v1/auth/resend-verification',
+    PASSWORD_REQUIREMENTS: '/api/v1/auth/password-requirements',
+    // GET /auth/me — used when session validation is re-enabled (pending sign-out API).
+    ME: '/api/v1/auth/me',
+    ME_PROFILE: '/api/v1/auth/me/profile',
+    REFRESH: '/api/v1/auth/refresh',
+    FORGOT_PASSWORD: '/api/v1/auth/forgot-password',
+    VERIFY_RESET_CODE: '/api/v1/auth/verify-reset-code',
+    RESET_PASSWORD: '/api/v1/auth/reset-password',
     LOGOUT: '/auth/logout',
   },
 
@@ -80,5 +90,6 @@ export const ENDPOINTS = {
   NOTIFICATIONS: {
     HISTORY: '/api/v1/notifications/history',
     UNREAD_COUNT: '/api/v1/notifications/unread-count',
+    PREFERENCES: '/api/v1/notifications/preferences',
   },
 } as const;
