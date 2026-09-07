@@ -1,0 +1,81 @@
+# =============================================================================
+# invigoratehealth — what NOT to push
+# =============================================================================
+# Keep this file committed. Rules below stop local/generated/secret files from
+# landing in git. Always commit: source under src/, package.json + lockfile,
+# app.json, eas.json, assets/, docs/, .env.example (template only).
+# Never commit: real .env values, node_modules, build caches, local zip dumps.
+# =============================================================================
+
+# --- Secrets / env (commit `.env.example` only; copy to `.env` locally) ---
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+*.pem
+*.p12
+*.mobileprovision
+*.keystore
+*.jks
+
+# --- Dependencies (install with `npm install`) ---
+node_modules/
+
+# --- Expo / Metro (generated locally) ---
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# --- Logs & debug ---
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.metro-health-check*
+
+# --- OS / editor junk ---
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+
+# --- Local backups (do not push zip dumps of src) ---
+*.zip
+src.zip
+src *.zip
+
+# --- Local screen backups (not for client repo) ---
+src/screens/_backup/
+
+# --- Android native build outputs (sources under android/ stay tracked) ---
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/local.properties
+android/*.hprof
+
+# --- iOS (when/if ios/ folder is generated) ---
+ios/Pods/
+ios/build/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+
+# --- Test / coverage ---
+coverage/
+.nyc_output/
+
+# --- Misc local ---
+*.orig
+*.bak
+.cache/
+tmp/
+temp/

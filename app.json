@@ -1,0 +1,99 @@
+{
+  "expo": {
+    "name": "InvigorateHealth",
+    "slug": "InvigorateHealth",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "invigoratehealth",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#FFFFFF",
+    "ios": {
+      "bundleIdentifier": "com.sureshinti.invigoratehealth",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "softwareKeyboardLayoutMode": "resize",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "backgroundColor": "#1F5D4E",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.suresh_inti.InvigorateHealth"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c4864951-033a-4106-a6e3-63b33f9251bc"
+      },
+      "router": {}
+    },
+    "owner": "suresh_inti",
+    "plugins": [
+      "expo-router",
+      "expo-image",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#f0fdf2",
+          "resizeMode": "contain"
+        }
+      ],
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-build-properties",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow InvigorateHealth to record voice messages."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow InvigorateHealth to take photos in chat.",
+          "photosPermission": "Allow InvigorateHealth to access your photos."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow InvigorateHealth to use the microphone for voice typing.",
+          "speechRecognitionPermission": "Allow InvigorateHealth to convert your speech to text."
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#1F5D4E",
+          "enableBackgroundRemoteNotifications": true
+        }
+      ],
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-localization"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
