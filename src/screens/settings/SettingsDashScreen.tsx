@@ -8,8 +8,10 @@ import {
   SETTINGS_BG,
   SETTINGS_GREEN,
 } from '@/components/settings/settingsDashData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function SettingsDashScreen() {
+  const scrollRef = useScrollToTopOnFocus();
   const [toggles, setToggles] = useState({
     push: true,
     digest: true,
@@ -22,6 +24,7 @@ export function SettingsDashScreen() {
       <AppStatusBar variant="light" backgroundColor={SETTINGS_GREEN} />
       <StatusBarFill lightColor={SETTINGS_GREEN} darkColor={SETTINGS_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

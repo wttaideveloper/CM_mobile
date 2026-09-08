@@ -4,9 +4,11 @@ import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
 import { AppointmentsBody } from '@/components/coach/AppointmentsBody';
 import { AppointmentsHeader } from '@/components/coach/AppointmentsHeader';
 import { APPT_BG, APPT_GREEN } from '@/components/coach/appointmentsData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 import { useAppointmentsStore } from '@/stores/appointments.store';
 
 export function AppointmentsScreen() {
+  const scrollRef = useScrollToTopOnFocus();
   const appointments = useAppointmentsStore((s) => s.appointments);
 
   return (
@@ -14,6 +16,7 @@ export function AppointmentsScreen() {
       <AppStatusBar variant="light" backgroundColor={APPT_GREEN} />
       <StatusBarFill lightColor={APPT_GREEN} darkColor={APPT_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

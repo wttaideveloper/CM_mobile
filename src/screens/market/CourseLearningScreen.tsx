@@ -5,15 +5,18 @@ import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
 import { CourseLearningBody } from '@/components/market/CourseLearningBody';
 import { CourseLearningHeader } from '@/components/market/CourseLearningHeader';
 import { COURSE_BG, COURSE_GREEN } from '@/components/market/courseLearningData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function CourseLearningScreen() {
   const insets = useSafeAreaInsets();
+  const scrollRef = useScrollToTopOnFocus();
 
   return (
     <View style={styles.screen}>
       <AppStatusBar variant="light" backgroundColor={COURSE_GREEN} />
       <StatusBarFill lightColor={COURSE_GREEN} darkColor={COURSE_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}

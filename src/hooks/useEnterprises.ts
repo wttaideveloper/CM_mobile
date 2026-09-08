@@ -40,6 +40,24 @@ export function useEnterprises(options?: UseEnterprisesOptions) {
   });
 }
 
+/** Market dashboard: latest active enterprises for Featured businesses. */
+export function useFeaturedMarketEnterprises(limit = 2) {
+  return useQuery({
+    queryKey: [...enterpriseKeys.all, 'market-featured', limit] as const,
+    queryFn: async () => {
+      const { items } = await enterpriseService.getList({
+        status: 'active',
+        page: 1,
+        page_size: limit,
+      });
+      return items;
+    },
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+}
+
 type UseInfiniteEnterprisesOptions = {
   enabled?: boolean;
 };

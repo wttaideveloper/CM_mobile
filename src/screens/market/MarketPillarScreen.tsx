@@ -10,9 +10,11 @@ import {
   PILLAR_GREEN,
   getPillarBrowseContent,
 } from '@/components/market/marketPillarData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function MarketPillarScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const scrollRef = useScrollToTopOnFocus();
   const pillar = getPillarBrowseContent(id);
   const [activeFilter, setActiveFilter] = useState('All');
 
@@ -25,6 +27,7 @@ export function MarketPillarScreen() {
       <AppStatusBar variant="light" backgroundColor={PILLAR_GREEN} />
       <StatusBarFill lightColor={PILLAR_GREEN} darkColor={PILLAR_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

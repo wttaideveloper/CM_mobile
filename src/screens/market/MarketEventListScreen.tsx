@@ -9,8 +9,10 @@ import {
   EVENT_LIST_GREEN,
   MARKET_EVENTS_ALL,
 } from '@/components/market/marketEventListData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function MarketEventListScreen() {
+  const scrollRef = useScrollToTopOnFocus();
   const [filter, setFilter] = useState('All');
   const count = useMemo(() => {
     if (filter === 'Events') {
@@ -27,6 +29,7 @@ export function MarketEventListScreen() {
       <AppStatusBar variant="light" backgroundColor={EVENT_LIST_GREEN} />
       <StatusBarFill lightColor={EVENT_LIST_GREEN} darkColor={EVENT_LIST_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

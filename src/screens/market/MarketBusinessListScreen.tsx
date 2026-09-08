@@ -9,8 +9,10 @@ import {
   BIZ_LIST_GREEN,
   FEATURED_BUSINESSES_ALL,
 } from '@/components/market/marketBusinessListData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function MarketBusinessListScreen() {
+  const scrollRef = useScrollToTopOnFocus();
   const [sort, setSort] = useState('Closest');
 
   return (
@@ -18,6 +20,7 @@ export function MarketBusinessListScreen() {
       <AppStatusBar variant="light" backgroundColor={BIZ_LIST_GREEN} />
       <StatusBarFill lightColor={BIZ_LIST_GREEN} darkColor={BIZ_LIST_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

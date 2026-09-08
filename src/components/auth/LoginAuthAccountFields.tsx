@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -26,6 +27,7 @@ type LoginAuthAccountFieldsProps = {
   isResending: boolean;
   onOpenForgotMode: () => void;
   onResendVerification: () => void;
+  onSignupNameFocus?: () => void;
 };
 
 export function LoginAuthAccountFields({
@@ -48,8 +50,20 @@ export function LoginAuthAccountFields({
   isResending,
   onOpenForgotMode,
   onResendVerification,
+  onSignupNameFocus,
 }: LoginAuthAccountFieldsProps) {
   const { t } = useTranslation();
+  const nameInputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (authMode !== 'signup') return undefined;
+
+    const timer = setTimeout(() => {
+      nameInputRef.current?.focus();
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [authMode]);
 
   return (
     <>
@@ -57,6 +71,7 @@ export function LoginAuthAccountFields({
         <>
           <Text style={styles.label}>{t('auth.enterName')}</Text>
           <TextInput
+            ref={nameInputRef}
             style={styles.input}
             value={name}
             onChangeText={setName}
@@ -64,6 +79,9 @@ export function LoginAuthAccountFields({
             placeholderTextColor={colors.brandLightGray}
             autoCapitalize="words"
             autoCorrect={false}
+            autoFocus
+            returnKeyType="next"
+            onFocus={onSignupNameFocus}
             accessibilityLabel={t('auth.fullName')}
           />
         </>

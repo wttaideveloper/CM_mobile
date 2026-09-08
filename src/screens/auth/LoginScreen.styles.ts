@@ -11,6 +11,14 @@ export const styles = StyleSheet.create({
     flexGrow: 1,
     paddingTop: getSpacing(2),
   },
+  /** Starts at hero edge; clips heading + form so both scroll under the photo. */
+  formViewport: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
   heading: {
     marginTop: isSmallDevice ? 0 : 4,
     marginBottom: getSpacing(8),

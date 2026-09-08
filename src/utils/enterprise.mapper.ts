@@ -157,6 +157,10 @@ export function mapEnterpriseApiToListItem(
     rating: formatRating(item.rating),
     heroImage: pickHeroImage(item),
     logoUrl: item.logo_url?.trim() || null,
+    website:
+      item.website_url?.trim() ||
+      item.website?.trim() ||
+      null,
     businessEmail: item.business_email,
     businessPhone: item.business_phone,
     yearFounded: item.year_founded ?? null,

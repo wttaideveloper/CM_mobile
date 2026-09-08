@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -11,17 +13,37 @@ import {
   LISTING_MUTED,
   LISTING_SOFT,
   LISTING_TEAL,
-  MARKET_LISTING,
 } from '@/components/market/marketListingData';
+import type { MarketListingView } from '@/utils/marketListing.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
-export function MarketListingBody() {
+type MarketListingBodyProps = {
+  listing: MarketListingView;
+};
+
+export function MarketListingBody({ listing }: MarketListingBodyProps) {
   const router = useRouter();
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(listing.imageUrl) && !imageFailed;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [listing.imageUrl, listing.id]);
 
   return (
     <View>
-      <View style={styles.media}>
-        <MarketBagIcon color={MARKET_LISTING.mediaIcon} size={56} />
+      <View style={[styles.media, { backgroundColor: listing.mediaBg }]}>
+        {showImage ? (
+          <Image
+            source={{ uri: listing.imageUrl! }}
+            style={styles.mediaImage}
+            contentFit="cover"
+            transition={0}
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <MarketBagIcon color={listing.mediaIcon} size={56} />
+        )}
         <View style={styles.dots}>
           <View style={styles.dotActive} />
           <View style={styles.dot} />
@@ -32,39 +54,46 @@ export function MarketListingBody() {
       <View style={styles.body}>
         <View style={styles.titleBlock}>
           <View style={styles.kindRow}>
-            <Text style={styles.kind}>{MARKET_LISTING.kind}</Text>
-            <Text style={styles.kindMeta}>{MARKET_LISTING.kindMeta}</Text>
+            <Text style={styles.kind}>{listing.kind}</Text>
+            <Text style={styles.kindMeta}>{listing.kindMeta}</Text>
           </View>
-          <Text style={styles.title}>{MARKET_LISTING.title}</Text>
+          <Text style={styles.title}>{listing.title}</Text>
           <View style={styles.priceRow}>
-            <Text style={styles.price}>{MARKET_LISTING.price}</Text>
-            <Text style={styles.priceMeta}>{MARKET_LISTING.priceMeta}</Text>
+            <Text style={styles.price}>{listing.price}</Text>
+            <Text style={styles.priceMeta}>{listing.priceMeta}</Text>
           </View>
         </View>
 
         <Pressable
           style={styles.vendor}
-          onPress={() => router.push('/(main)/market/business-profile')}
+          onPress={() =>
+            router.push(
+              listing.enterpriseId
+                ? {
+                    pathname: '/(main)/market/business-profile',
+                    params: { id: listing.enterpriseId },
+                  }
+                : '/(main)/market/business-profile',
+            )
+          }
           accessibilityRole="button"
         >
           <View style={styles.vendorAvatar}>
-            <Text style={styles.vendorInitials}>
-              {MARKET_LISTING.vendorInitials}
-            </Text>
+            <Text style={styles.vendorInitials}>{listing.vendorInitials}</Text>
           </View>
           <View style={styles.vendorCopy}>
-            <Text style={styles.vendorName}>{MARKET_LISTING.vendorName}</Text>
-            <Text style={styles.vendorMeta}>{MARKET_LISTING.vendorMeta}</Text>
+            <Text style={styles.vendorName}>{listing.vendorName}</Text>
+            <Text style={styles.vendorMeta}>{listing.vendorMeta}</Text>
           </View>
           <ListingChevronIcon />
         </Pressable>
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Description</Text>
-          <Text style={styles.description}>{MARKET_LISTING.description}</Text>
+          <Text style={styles.description}>{listing.description}</Text>
         </View>
 
-        <MarketListingSections />
+        <MarketListingSections listing={listing} />
       </View>
     </View>
   );
@@ -73,9 +102,12 @@ export function MarketListingBody() {
 const styles = StyleSheet.create({
   media: {
     height: c(230, 200),
-    backgroundColor: MARKET_LISTING.mediaBg,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  mediaImage: {
+    ...StyleSheet.absoluteFillObject,
   },
   dots: {
     position: 'absolute',
@@ -108,68 +140,65 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: c(8, 6),
+    flexWrap: 'wrap',
   },
   kind: {
-    fontSize: NU.label,
-    fontWeight: '700',
+    fontSize: c(11, 10),
+    fontWeight: '800',
+    letterSpacing: 1.1,
     color: LISTING_GREEN,
-    backgroundColor: '#e6f4e8',
-    paddingVertical: c(3, 2),
-    paddingHorizontal: c(8, 6),
-    borderRadius: c(4, 3),
-    overflow: 'hidden',
   },
   kindMeta: {
-    fontSize: c(11.5, 10.5),
-    color: LISTING_SOFT,
+    fontSize: c(12.5, 11.5),
+    color: LISTING_MUTED,
   },
   title: {
-    fontSize: c(23, 20),
+    fontSize: c(26, 22),
     fontWeight: '800',
     color: LISTING_TEAL,
     letterSpacing: -0.4,
-    lineHeight: c(28, 24),
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: c(8, 6),
+    flexWrap: 'wrap',
   },
   price: {
-    fontSize: NU.title,
+    fontSize: c(22, 19),
     fontWeight: '800',
     color: LISTING_TEAL,
   },
   priceMeta: {
-    fontSize: NU.body,
-    color: LISTING_MUTED,
+    fontSize: c(13, 12),
+    color: LISTING_SOFT,
   },
   vendor: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: NU.cardGap,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: LISTING_BORDER,
     borderRadius: NU.cardRadius,
-    paddingVertical: c(13, 11),
-    paddingHorizontal: NU.cardPadSm,
-    flexDirection: 'row',
-    gap: NU.cardGap,
-    alignItems: 'center',
+    padding: NU.cardPadSm,
   },
   vendorAvatar: {
     width: c(44, 40),
     height: c(44, 40),
-    borderRadius: NU.cardRadiusSm,
+    borderRadius: c(14, 12),
     backgroundColor: '#e6f4e8',
     alignItems: 'center',
     justifyContent: 'center',
   },
   vendorInitials: {
-    fontSize: NU.cardTitle,
+    fontSize: c(14, 13),
     fontWeight: '800',
     color: LISTING_GREEN,
   },
   vendorCopy: {
     flex: 1,
+    gap: c(2, 1),
   },
   vendorName: {
     fontSize: NU.link,
@@ -179,7 +208,6 @@ const styles = StyleSheet.create({
   vendorMeta: {
     fontSize: NU.bodySm,
     color: LISTING_MUTED,
-    marginTop: c(2, 1),
   },
   section: {
     gap: c(10, 8),

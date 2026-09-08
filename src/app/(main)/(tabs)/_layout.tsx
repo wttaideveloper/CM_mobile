@@ -1,4 +1,4 @@
-import { Tabs, usePathname, useSegments } from 'expo-router';
+import { Tabs, router, usePathname, useSegments } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -10,9 +10,8 @@ import { ScrollableMainTabBar } from '@/components/dashboard/ScrollableMainTabBa
 import { isNestedExploreRoute } from '@/hooks/useInsideTabLayout';
 
 const HOME_STATUS_BAR = '#257d3f';
-// TEMP: unused while Explore / Events tabs are hidden
-// const EVENTS_TAB_ROOT = '/(main)/(tabs)/events' as const;
-// const EXPLORE_TAB_ROOT = '/(main)/(tabs)/explore' as const;
+const EVENTS_TAB_ROOT = '/(main)/(tabs)/events' as const;
+const EXPLORE_TAB_ROOT = '/(main)/(tabs)/explore' as const;
 
 export default function MainTabLayout() {
   const segments = useSegments();
@@ -95,7 +94,6 @@ export default function MainTabLayout() {
             title: 'Coach',
           }}
         />
-        {/* TEMP: hide Explore / Shop / Events / Me from bottom tabs (keep routes)
         <Tabs.Screen
           name="explore"
           listeners={{
@@ -138,11 +136,6 @@ export default function MainTabLayout() {
             title: 'Me',
           }}
         />
-        */}
-        <Tabs.Screen name="explore" options={{ href: null }} />
-        <Tabs.Screen name="shop" options={{ href: null }} />
-        <Tabs.Screen name="events" options={{ href: null }} />
-        <Tabs.Screen name="profile" options={{ href: null }} />
       </Tabs>
     </View>
   );

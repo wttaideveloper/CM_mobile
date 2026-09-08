@@ -3,18 +3,19 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ListingListIcon } from '@/components/market/MarketListingIcons';
-import {
-  LISTING_BORDER,
-  LISTING_TEAL,
-  MARKET_LISTING,
-} from '@/components/market/marketListingData';
+import { LISTING_BORDER, LISTING_TEAL } from '@/components/market/marketListingData';
+import type { MarketListingView } from '@/utils/marketListing.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
 type MarketListingFooterProps = {
+  listing: MarketListingView;
   onAddToCart?: () => void;
 };
 
-export function MarketListingFooter({ onAddToCart }: MarketListingFooterProps) {
+export function MarketListingFooter({
+  listing,
+  onAddToCart,
+}: MarketListingFooterProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -33,7 +34,7 @@ export function MarketListingFooter({ onAddToCart }: MarketListingFooterProps) {
         onPress={onAddToCart ?? (() => router.push('/(main)/market/cart'))}
         accessibilityRole="button"
       >
-        <Text style={styles.addText}>{MARKET_LISTING.cartLabel}</Text>
+        <Text style={styles.addText}>{listing.cartLabel}</Text>
       </Pressable>
     </View>
   );

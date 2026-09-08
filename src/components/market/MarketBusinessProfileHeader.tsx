@@ -8,14 +8,21 @@ import {
   MarketHeartIcon,
   MarketSearchIcon,
 } from '@/components/market/MarketIcons';
-import { BIZ_PROFILE_GREEN, MARKET_BIZ_PROFILE } from '@/components/market/marketBusinessProfileData';
+import { BIZ_PROFILE_GREEN } from '@/components/market/marketBusinessProfileData';
+import type { MarketBizProfileView } from '@/utils/marketBizProfile.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
 const headerDeco = require('../../assets/images/market-header-deco.png');
 const { width: SCREEN_W } = Dimensions.get('window');
 const DESIGN_W = 430;
 
-export function MarketBusinessProfileHeader() {
+type MarketBusinessProfileHeaderProps = {
+  profile: MarketBizProfileView;
+};
+
+export function MarketBusinessProfileHeader({
+  profile,
+}: MarketBusinessProfileHeaderProps) {
   const router = useRouter();
   const scale = SCREEN_W / DESIGN_W;
 
@@ -44,8 +51,8 @@ export function MarketBusinessProfileHeader() {
           <MarketBackIcon />
         </Pressable>
         <View style={styles.titleBlock}>
-          <Text style={styles.eyebrow}>{MARKET_BIZ_PROFILE.eyebrow}</Text>
-          <Text style={styles.title}>{MARKET_BIZ_PROFILE.shortName}</Text>
+          <Text style={styles.eyebrow}>{profile.eyebrow}</Text>
+          <Text style={styles.title}>{profile.shortName}</Text>
         </View>
         <View style={styles.spacer} />
         <Pressable style={styles.iconBtn} accessibilityRole="button">

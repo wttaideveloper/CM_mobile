@@ -9,9 +9,11 @@ import {
   MARKET_CHECKOUT_BG,
   MARKET_CHECKOUT_GREEN,
 } from '@/components/market/marketCheckoutData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function MarketCheckoutScreen() {
   const router = useRouter();
+  const scrollRef = useScrollToTopOnFocus();
 
   return (
     <View style={styles.screen}>
@@ -21,6 +23,7 @@ export function MarketCheckoutScreen() {
         darkColor={MARKET_CHECKOUT_GREEN}
       />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

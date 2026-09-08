@@ -5,14 +5,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MarketBody } from '@/components/market/MarketBody';
 import { MarketHeader } from '@/components/market/MarketHeader';
 import { MARKET_BG } from '@/components/market/marketDashboardData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function MarketScreen() {
   const insets = useSafeAreaInsets();
+  const scrollRef = useScrollToTopOnFocus();
   const [filter, setFilter] = useState('All');
 
   return (
     <View style={styles.screen}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}

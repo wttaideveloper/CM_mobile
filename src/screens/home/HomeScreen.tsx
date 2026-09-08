@@ -9,11 +9,13 @@ import { HomeDashboardPillars } from '@/components/home/HomeDashboardPillars';
 import { HomeDashboardStats } from '@/components/home/HomeDashboardStats';
 import { HomeDashboardStreak } from '@/components/home/HomeDashboardStreak';
 import { HOME_DASH_BG } from '@/components/home/homeDashboardData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 import { useAuthStore } from '@/stores/auth.store';
 import { c, NU } from '@/utils/newUiCompact';
 
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const scrollRef = useScrollToTopOnFocus();
   const fetchAndLogMe = useAuthStore((state) => state.fetchAndLogMe);
   const user = useAuthStore((state) => state.user);
   const displayName = user?.fullName?.trim() || 'Guest';
@@ -27,6 +29,7 @@ export function HomeScreen() {
   return (
     <View style={styles.screen}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + c(24, 20) }}

@@ -105,6 +105,8 @@ export type ServiceListItem = {
   maxParticipants: number | null;
   isAvailable: boolean;
   isActive: boolean;
+  /** virtual / in person / etc. from delivery_format */
+  format: string;
   /** ISO currency code from API (USD, INR, EUR, …). */
   currency: string;
 };

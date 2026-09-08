@@ -46,6 +46,9 @@ type LoginAuthFormFieldsProps = {
   onResendResetCode: () => void;
   onOpenLoginMode: () => void;
   onOpenSignupMode: () => void;
+  /** Signup: scroll heading under hero when Full Name is focused. */
+  onSignupNameFocus?: () => void;
+  onSocialLogin?: (provider: 'google' | 'facebook') => void;
 };
 
 export function LoginAuthFormFields(props: LoginAuthFormFieldsProps) {
@@ -91,6 +94,7 @@ export function LoginAuthFormFields(props: LoginAuthFormFieldsProps) {
         isResending={props.isResending}
         onOpenForgotMode={props.onOpenForgotMode}
         onResendVerification={props.onResendVerification}
+        onSignupNameFocus={props.onSignupNameFocus}
       />
 
       <LoginAuthFormActions
@@ -100,6 +104,7 @@ export function LoginAuthFormFields(props: LoginAuthFormFieldsProps) {
         onPrimaryAction={props.onPrimaryAction}
         onOpenLoginMode={props.onOpenLoginMode}
         onOpenSignupMode={props.onOpenSignupMode}
+        onSocialLogin={props.onSocialLogin}
       />
     </>
   );

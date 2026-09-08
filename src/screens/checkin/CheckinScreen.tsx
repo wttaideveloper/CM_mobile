@@ -8,6 +8,7 @@ import {
   CHECKIN_BG,
   CHECKIN_PRACTICES,
 } from '@/components/checkin/checkinData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 function initialValues() {
   return Object.fromEntries(
@@ -17,6 +18,7 @@ function initialValues() {
 
 export function CheckinScreen() {
   const router = useRouter();
+  const scrollRef = useScrollToTopOnFocus();
   const [values, setValues] = useState(initialValues);
 
   const goalsMet = useMemo(
@@ -28,6 +30,7 @@ export function CheckinScreen() {
   return (
     <View style={styles.screen}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
@@ -41,7 +44,7 @@ export function CheckinScreen() {
           onChange={(id, value) =>
             setValues((prev) => ({ ...prev, [id]: value }))
           }
-          onSave={() => router.push('/(main)/(tabs)/hwi')}
+          onSave={() => router.replace('/(main)/(tabs)/hwi')}
         />
       </ScrollView>
     </View>

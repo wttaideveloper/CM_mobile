@@ -31,6 +31,7 @@ export type MarketServiceDetail = {
     avatarColor: string;
     body: string;
   };
+  enterpriseId?: string;
 };
 
 export const MARKET_SERVICE_DETAILS: Record<string, MarketServiceDetail> = {

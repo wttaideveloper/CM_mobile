@@ -1,4 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { useEffect, useState } from 'react';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import {
@@ -16,27 +18,56 @@ import {
   BIZ_PROFILE_MUTED,
   BIZ_PROFILE_TEAL,
   BIZ_PROFILE_TRACK,
-  MARKET_BIZ_PROFILE,
 } from '@/components/market/marketBusinessProfileData';
+import type { MarketBizProfileView } from '@/utils/marketBizProfile.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
-export function MarketBusinessProfileBody() {
+type MarketBusinessProfileBodyProps = {
+  profile: MarketBizProfileView;
+  enterpriseId?: string;
+};
+
+export function MarketBusinessProfileBody({
+  profile,
+  enterpriseId = '',
+}: MarketBusinessProfileBodyProps) {
   const router = useRouter();
+  const [logoFailed, setLogoFailed] = useState(false);
+  const showLogo = Boolean(profile.logoUrl) && !logoFailed;
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [profile.logoUrl, enterpriseId]);
+
+  const openWebsite = () => {
+    if (!profile.websiteUrl) return;
+    void Linking.openURL(profile.websiteUrl);
+  };
 
   return (
     <View style={styles.body}>
       <View style={styles.identity}>
         <View style={styles.avatar}>
-          <Text style={styles.initials}>{MARKET_BIZ_PROFILE.initials}</Text>
+          {showLogo ? (
+            <Image
+              source={{ uri: profile.logoUrl! }}
+              style={styles.avatarImage}
+              contentFit="cover"
+              transition={0}
+              onError={() => setLogoFailed(true)}
+            />
+          ) : (
+            <Text style={styles.initials}>{profile.initials}</Text>
+          )}
         </View>
         <View style={styles.identityCopy}>
-          <Text style={styles.fullName}>{MARKET_BIZ_PROFILE.fullName}</Text>
+          <Text style={styles.fullName}>{profile.fullName}</Text>
           <View style={styles.metaRow}>
             <View style={styles.rating}>
               <MarketStarIcon />
-              <Text style={styles.ratingText}>{MARKET_BIZ_PROFILE.rating}</Text>
+              <Text style={styles.ratingText}>{profile.rating}</Text>
             </View>
-            <Text style={styles.metaMuted}>{MARKET_BIZ_PROFILE.reviewsMeta}</Text>
+            <Text style={styles.metaMuted}>{profile.reviewsMeta}</Text>
           </View>
         </View>
       </View>
@@ -49,43 +80,44 @@ export function MarketBusinessProfileBody() {
         >
           <Text style={styles.messageText}>Message</Text>
         </Pressable>
-        <Pressable style={styles.websiteBtn} accessibilityRole="button">
+        <Pressable
+          style={[styles.websiteBtn, !profile.websiteUrl && styles.websiteBtnDisabled]}
+          onPress={openWebsite}
+          disabled={!profile.websiteUrl}
+          accessibilityRole="button"
+        >
           <Text style={styles.websiteText}>Website</Text>
         </Pressable>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>About</Text>
-        <Text style={styles.about}>{MARKET_BIZ_PROFILE.about}</Text>
+        <Text style={styles.about}>{profile.about}</Text>
       </View>
 
       <View style={styles.contactCard}>
         <View style={[styles.contactRow, styles.contactBorder]}>
           <BizProfilePinIcon />
           <View style={styles.contactCopy}>
-            <Text style={styles.contactTitle}>
-              {MARKET_BIZ_PROFILE.addressLine}
-            </Text>
-            <Text style={styles.contactMeta}>
-              {MARKET_BIZ_PROFILE.addressMeta}
-            </Text>
+            <Text style={styles.contactTitle}>{profile.addressLine}</Text>
+            <Text style={styles.contactMeta}>{profile.addressMeta}</Text>
           </View>
         </View>
         <View style={[styles.contactRowCenter, styles.contactBorder]}>
           <BizProfileGlobeIcon />
-          <Text style={styles.websiteLink}>{MARKET_BIZ_PROFILE.website}</Text>
+          <Text style={styles.websiteLink}>{profile.website}</Text>
         </View>
         <View style={[styles.contactRowCenter, styles.contactBorder]}>
           <BizProfileMailIcon />
-          <Text style={styles.contactTitle}>{MARKET_BIZ_PROFILE.email}</Text>
+          <Text style={styles.contactTitle}>{profile.email}</Text>
         </View>
         <View style={styles.contactRowCenter}>
           <BizProfileClockIcon />
-          <Text style={styles.contactTitle}>{MARKET_BIZ_PROFILE.hours}</Text>
+          <Text style={styles.contactTitle}>{profile.hours}</Text>
         </View>
       </View>
 
-      <MarketBusinessProfileListings />
+      <MarketBusinessProfileListings enterpriseId={enterpriseId} />
     </View>
   );
 }
@@ -109,6 +141,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#e6f4e8',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   initials: {
     fontSize: NU.name,
@@ -172,6 +209,9 @@ const styles = StyleSheet.create({
     borderColor: '#c8e0cc',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  websiteBtnDisabled: {
+    opacity: 0.55,
   },
   websiteText: {
     fontSize: c(14.5, 13.5),

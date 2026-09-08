@@ -58,7 +58,6 @@ export function createLoginAuthAccountHandlers(deps: LoginAuthAccountHandlerDeps
         apiError?.message ||
         'Could not log in. Check your credentials and try again.';
 
-      // 403 + "Email not verified..." → offer verify; on confirm, resend OTP then open verify UI.
       if (deps.isEmailNotVerifiedMessage(message)) {
         Alert.alert(
           'Email not verified',
@@ -98,30 +97,27 @@ export function createLoginAuthAccountHandlers(deps: LoginAuthAccountHandlerDeps
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'facebook') => {
-    console.log(`[Social OAuth:${provider}] UI — icon tapped`, {
-      provider,
+  const handleSocialLogin = async (_provider: 'google' | 'facebook') => {
+    console.log(`[Social OAuth:${_provider}] UI — icon tapped`, {
+      provider: _provider,
       rememberMe: deps.rememberMe,
       isSubmitting: deps.isSubmitting,
     });
 
     if (deps.isSubmitting) {
-      console.log(`[Social OAuth:${provider}] UI — ignored (already submitting)`);
       return;
     }
 
     try {
-      await deps.loginWithSocial(provider, deps.rememberMe);
-      console.log(`[Social OAuth:${provider}] UI — loginWithSocial finished OK`);
+      await deps.loginWithSocial(_provider, deps.rememberMe);
     } catch (error) {
-      console.error(`[Social OAuth:${provider}] UI — loginWithSocial error`, error);
       const message =
         error && typeof error === 'object' && 'message' in error
           ? String((error as { message: string }).message)
-          : `Could not log in with ${provider}. Please try again.`;
+          : `Could not log in with ${_provider}. Please try again.`;
 
       Alert.alert(
-        `${provider === 'google' ? 'Google' : 'Facebook'} login failed`,
+        `${_provider === 'google' ? 'Google' : 'Facebook'} login failed`,
         message,
       );
     }

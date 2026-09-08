@@ -9,9 +9,11 @@ import {
   LIB_GREEN,
   getReadingContent,
 } from '@/components/library/libraryData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function ReadingScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const scrollRef = useScrollToTopOnFocus();
   const content = getReadingContent(id);
 
   return (
@@ -19,6 +21,7 @@ export function ReadingScreen() {
       <AppStatusBar variant="light" backgroundColor={LIB_GREEN} />
       <StatusBarFill lightColor={LIB_GREEN} darkColor={LIB_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

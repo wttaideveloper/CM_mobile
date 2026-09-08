@@ -10,8 +10,10 @@ import {
   STATIC_NOTIFICATIONS,
   type NotifFilter,
 } from '@/components/notifications/notificationsData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function NotificationsDashScreen() {
+  const scrollRef = useScrollToTopOnFocus();
   const [filter, setFilter] = useState<NotifFilter>('All');
   const [allRead, setAllRead] = useState(false);
 
@@ -35,6 +37,7 @@ export function NotificationsDashScreen() {
       <AppStatusBar variant="light" backgroundColor={NOTIF_GREEN} />
       <StatusBarFill lightColor={NOTIF_GREEN} darkColor={NOTIF_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

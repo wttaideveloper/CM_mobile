@@ -60,7 +60,16 @@ export function MarketServiceDetailBody({
 
         <Pressable
           style={styles.vendor}
-          onPress={() => router.push('/(main)/market/business-profile')}
+          onPress={() =>
+            router.push(
+              service.enterpriseId
+                ? {
+                    pathname: '/(main)/market/business-profile',
+                    params: { id: service.enterpriseId },
+                  }
+                : '/(main)/market/business-profile',
+            )
+          }
           accessibilityRole="button"
         >
           <View style={styles.vendorAvatar}>

@@ -8,13 +8,17 @@ import {
   MARKET_CART_BG,
   MARKET_CART_GREEN,
 } from '@/components/market/marketCartData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function MarketCartScreen() {
+  const scrollRef = useScrollToTopOnFocus();
+
   return (
     <View style={styles.screen}>
       <AppStatusBar variant="light" backgroundColor={MARKET_CART_GREEN} />
       <StatusBarFill lightColor={MARKET_CART_GREEN} darkColor={MARKET_CART_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

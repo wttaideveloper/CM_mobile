@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { BizProfileMonitorIcon } from '@/components/market/MarketBusinessProfileIcons';
@@ -10,53 +10,94 @@ import {
   BIZ_PROFILE_MUTED,
   BIZ_PROFILE_OFFERS,
   BIZ_PROFILE_TEAL,
-  MARKET_BIZ_PROFILE,
+  type BizProfileOffer,
 } from '@/components/market/marketBusinessProfileData';
+import { useEnterpriseProducts } from '@/hooks/useProducts';
+import { useEnterpriseServices } from '@/hooks/useServices';
+import { mapProductsAndServicesToBizOffers } from '@/utils/marketBizOffers.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
-export function MarketBusinessProfileListings() {
+type MarketBusinessProfileListingsProps = {
+  enterpriseId?: string;
+};
+
+export function MarketBusinessProfileListings({
+  enterpriseId = '',
+}: MarketBusinessProfileListingsProps) {
   const router = useRouter();
+  const {
+    data: products = [],
+    isLoading: productsLoading,
+  } = useEnterpriseProducts(enterpriseId, {
+    enabled: Boolean(enterpriseId),
+  });
+  const {
+    data: services = [],
+    isLoading: servicesLoading,
+  } = useEnterpriseServices(enterpriseId, {
+    enabled: Boolean(enterpriseId),
+  });
+
+  const isLoading = Boolean(enterpriseId) && (productsLoading || servicesLoading);
+  const apiOffers = mapProductsAndServicesToBizOffers(products, services);
+  const offers: BizProfileOffer[] =
+    enterpriseId && !isLoading
+      ? apiOffers
+      : enterpriseId
+        ? []
+        : BIZ_PROFILE_OFFERS;
 
   return (
     <>
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionLabel}>Products & services</Text>
-          <Text style={styles.count}>{MARKET_BIZ_PROFILE.offerCount}</Text>
+          <Text style={styles.count}>{String(offers.length)}</Text>
         </View>
-        <View style={styles.list}>
-          {BIZ_PROFILE_OFFERS.map((item) => (
-            <Pressable
-              key={item.id}
-              style={styles.itemCard}
-              onPress={() =>
-                router.push(
-                  item.kind === 'service'
-                    ? {
-                        pathname: '/(main)/market/service-detail',
-                        params: { id: item.id },
-                      }
-                    : '/(main)/market/listing',
-                )
-              }
-            >
-              <View style={[styles.itemIcon, { backgroundColor: item.iconBg }]}>
-                {item.icon === 'bag' ? (
-                  <MarketBagIcon color={item.iconColor} size={22} />
-                ) : item.icon === 'bowl' ? (
-                  <MarketBowlIcon color={item.iconColor} size={22} />
-                ) : (
-                  <BizProfileMonitorIcon color={item.iconColor} />
-                )}
-              </View>
-              <View style={styles.itemCopy}>
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
-              </View>
-              <Text style={styles.itemPrice}>{item.price}</Text>
-            </Pressable>
-          ))}
-        </View>
+        {isLoading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator color={BIZ_PROFILE_GREEN} />
+          </View>
+        ) : offers.length === 0 ? (
+          <Text style={styles.empty}>No products or services yet.</Text>
+        ) : (
+          <View style={styles.list}>
+            {offers.map((item) => (
+              <Pressable
+                key={`${item.kind}-${item.id}`}
+                style={styles.itemCard}
+                onPress={() =>
+                  router.push(
+                    item.kind === 'service'
+                      ? {
+                          pathname: '/(main)/market/service-detail',
+                          params: { id: item.id },
+                        }
+                      : {
+                          pathname: '/(main)/market/listing',
+                          params: { id: item.id },
+                        },
+                  )
+                }
+              >
+                <View style={[styles.itemIcon, { backgroundColor: item.iconBg }]}>
+                  {item.icon === 'bag' ? (
+                    <MarketBagIcon color={item.iconColor} size={22} />
+                  ) : item.icon === 'bowl' ? (
+                    <MarketBowlIcon color={item.iconColor} size={22} />
+                  ) : (
+                    <BizProfileMonitorIcon color={item.iconColor} />
+                  )}
+                </View>
+                <View style={styles.itemCopy}>
+                  <Text style={styles.itemTitle}>{item.title}</Text>
+                  <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
+                </View>
+                <Text style={styles.itemPrice}>{item.price}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -122,6 +163,15 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: c(11, 9),
+  },
+  loading: {
+    paddingVertical: c(16, 12),
+    alignItems: 'center',
+  },
+  empty: {
+    fontSize: c(13, 12),
+    color: BIZ_PROFILE_MUTED,
+    paddingVertical: c(6, 4),
   },
   itemCard: {
     backgroundColor: '#FFFFFF',

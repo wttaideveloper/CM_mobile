@@ -10,9 +10,11 @@ import {
   ORDERS_GREEN,
   type OrdersTab,
 } from '@/components/market/marketOrdersData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function MarketOrdersScreen() {
   const insets = useSafeAreaInsets();
+  const scrollRef = useScrollToTopOnFocus();
   const [tab, setTab] = useState<OrdersTab>('Subscriptions');
 
   return (
@@ -20,6 +22,7 @@ export function MarketOrdersScreen() {
       <AppStatusBar variant="light" backgroundColor={ORDERS_GREEN} />
       <StatusBarFill lightColor={ORDERS_GREEN} darkColor={ORDERS_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}

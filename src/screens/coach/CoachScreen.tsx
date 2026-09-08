@@ -4,13 +4,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CoachBody } from '@/components/coach/CoachBody';
 import { CoachHeader } from '@/components/coach/CoachHeader';
 import { COACH_BG } from '@/components/coach/coachData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function CoachScreen() {
   const insets = useSafeAreaInsets();
+  const scrollRef = useScrollToTopOnFocus();
 
   return (
     <View style={styles.screen}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}

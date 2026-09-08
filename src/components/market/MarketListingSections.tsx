@@ -3,21 +3,24 @@ import { StyleSheet, Text, View } from 'react-native';
 import { MarketStarIcon } from '@/components/market/MarketIcons';
 import {
   LISTING_BORDER,
-  LISTING_DETAILS,
   LISTING_MUTED,
   LISTING_REVIEW,
-  LISTING_REVIEW_ITEM,
   LISTING_TEAL,
 } from '@/components/market/marketListingData';
+import type { MarketListingView } from '@/utils/marketListing.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
-export function MarketListingSections() {
+type MarketListingSectionsProps = {
+  listing: MarketListingView;
+};
+
+export function MarketListingSections({ listing }: MarketListingSectionsProps) {
   return (
     <>
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Details</Text>
         <View style={styles.detailsGrid}>
-          {LISTING_DETAILS.map((item) => (
+          {listing.details.map((item) => (
             <View key={item.id} style={styles.detailCard}>
               <Text style={styles.detailLabel}>{item.label}</Text>
               <Text style={styles.detailValue}>{item.value}</Text>
@@ -30,18 +33,28 @@ export function MarketListingSections() {
         <Text style={styles.sectionLabel}>Reviews</Text>
         <View style={styles.reviewCard}>
           <View style={styles.reviewHeader}>
-            <View style={styles.reviewAvatar}>
-              <Text style={styles.reviewInitials}>
-                {LISTING_REVIEW_ITEM.initials}
+            <View
+              style={[
+                styles.reviewAvatar,
+                { backgroundColor: listing.review.avatarBg },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.reviewInitials,
+                  { color: listing.review.avatarColor },
+                ]}
+              >
+                {listing.review.initials}
               </Text>
             </View>
-            <Text style={styles.reviewName}>{LISTING_REVIEW_ITEM.name}</Text>
+            <Text style={styles.reviewName}>{listing.review.name}</Text>
             <View style={styles.reviewRating}>
               <MarketStarIcon size={11} />
-              <Text style={styles.reviewScore}>{LISTING_REVIEW_ITEM.rating}</Text>
+              <Text style={styles.reviewScore}>{listing.review.rating}</Text>
             </View>
           </View>
-          <Text style={styles.reviewBody}>{LISTING_REVIEW_ITEM.body}</Text>
+          <Text style={styles.reviewBody}>{listing.review.body}</Text>
         </View>
       </View>
     </>
@@ -103,14 +116,12 @@ const styles = StyleSheet.create({
     width: c(32, 28),
     height: c(32, 28),
     borderRadius: c(16, 14),
-    backgroundColor: LISTING_REVIEW_ITEM.avatarBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   reviewInitials: {
     fontSize: NU.bodySm,
     fontWeight: '700',
-    color: LISTING_REVIEW_ITEM.avatarColor,
   },
   reviewName: {
     flex: 1,

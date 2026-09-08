@@ -10,10 +10,12 @@ import {
   CONSULT_GREEN,
   CONSULT_PROVIDERS,
 } from '@/components/coach/consultData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 import { useAppointmentsStore } from '@/stores/appointments.store';
 
 export function ConsultScreen() {
   const router = useRouter();
+  const scrollRef = useScrollToTopOnFocus();
   const addAppointment = useAppointmentsStore((s) => s.addAppointment);
   const [selectedSlot, setSelectedSlot] = useState('Mon · 09:00');
 
@@ -41,6 +43,7 @@ export function ConsultScreen() {
       <AppStatusBar variant="light" backgroundColor={CONSULT_GREEN} />
       <StatusBarFill lightColor={CONSULT_GREEN} darkColor={CONSULT_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

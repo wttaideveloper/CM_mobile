@@ -225,6 +225,7 @@ export function mapServiceApiToListItem(item: ServiceApiResponse): ServiceListIt
     maxParticipants: item.max_participants ?? item.maxParticipants ?? null,
     isAvailable: item.availability_status ?? item.isAvailable ?? true,
     isActive: Boolean(isActive),
+    format: pickFormat(item),
     currency: normalizeCurrencyCode(item.currency),
   };
 }

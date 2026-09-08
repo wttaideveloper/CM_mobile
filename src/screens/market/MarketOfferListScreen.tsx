@@ -9,8 +9,10 @@ import {
   OFFER_LIST_BG,
   OFFER_LIST_GREEN,
 } from '@/components/market/marketOfferListData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function MarketOfferListScreen() {
+  const scrollRef = useScrollToTopOnFocus();
   const [filter, setFilter] = useState('All');
   const count = useMemo(() => {
     if (filter === 'Products') {
@@ -27,6 +29,7 @@ export function MarketOfferListScreen() {
       <AppStatusBar variant="light" backgroundColor={OFFER_LIST_GREEN} />
       <StatusBarFill lightColor={OFFER_LIST_GREEN} darkColor={OFFER_LIST_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

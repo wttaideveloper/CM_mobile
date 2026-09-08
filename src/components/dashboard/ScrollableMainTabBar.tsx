@@ -18,9 +18,6 @@ const TAB_ICON_SIZE = 22;
 /** First viewport shows exactly these many tabs edge-to-edge */
 const VISIBLE_TABS = 5;
 
-/** TEMP: hidden from bottom bar (Explore / Shop / Events / Me) */
-const HIDDEN_TAB_ROUTES = new Set(['explore', 'shop', 'events', 'profile']);
-
 type TabName =
   | 'home'
   | 'hwi'
@@ -98,19 +95,13 @@ export function ScrollableMainTabBar({
   const paddingBottom = Math.max(bottom, 8);
 
   useEffect(() => {
-    const visibleRoutes = state.routes.filter(
-      (route) => !HIDDEN_TAB_ROUTES.has(route.name),
-    );
-    const visibleIndex = visibleRoutes.findIndex(
-      (route) => route.key === state.routes[state.index]?.key,
-    );
-    const index = visibleIndex >= 0 ? visibleIndex : 0;
+    const index = state.index;
     if (index < VISIBLE_TABS) {
       scrollRef.current?.scrollTo({ x: 0, animated: true });
       return;
     }
     // Keep the focused tab in view when it's past the first five.
-    const maxOffset = Math.max(0, (visibleRoutes.length - VISIBLE_TABS) * tabWidth);
+    const maxOffset = Math.max(0, (state.routes.length - VISIBLE_TABS) * tabWidth);
     const target = Math.min(index * tabWidth - tabWidth * 2, maxOffset);
     scrollRef.current?.scrollTo({ x: Math.max(0, target), animated: true });
   }, [state.index, state.routes, tabWidth]);
@@ -128,9 +119,7 @@ export function ScrollableMainTabBar({
         disableIntervalMomentum
         contentContainerStyle={styles.scrollContent}
       >
-        {state.routes
-          .filter((route) => !HIDDEN_TAB_ROUTES.has(route.name))
-          .map((route: TabRoute) => {
+        {state.routes.map((route: TabRoute) => {
           const index = state.routes.findIndex((r) => r.key === route.key);
           const focused = state.index === index;
           const { options } = descriptors[route.key];

@@ -49,6 +49,9 @@ Thumbs.db
 src.zip
 src *.zip
 
+# --- Local PDFs (standards live in docs/*.md; do not push handbook PDFs) ---
+*.pdf
+
 # --- Local screen backups (not for client repo) ---
 src/screens/_backup/
 

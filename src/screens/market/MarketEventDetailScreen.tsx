@@ -9,9 +9,11 @@ import {
   EVENT_DETAIL_BG,
   EVENT_DETAIL_GREEN,
 } from '@/components/market/marketEventDetailData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function MarketEventDetailScreen() {
   const router = useRouter();
+  const scrollRef = useScrollToTopOnFocus();
 
   return (
     <View style={styles.screen}>
@@ -21,6 +23,7 @@ export function MarketEventDetailScreen() {
         darkColor={EVENT_DETAIL_GREEN}
       />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

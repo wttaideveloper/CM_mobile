@@ -4,13 +4,17 @@ import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
 import { LibraryBody } from '@/components/library/LibraryBody';
 import { LibraryHeader } from '@/components/library/LibraryHeader';
 import { LIB_BG, LIB_GREEN } from '@/components/library/libraryData';
+import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function LibraryScreen() {
+  const scrollRef = useScrollToTopOnFocus();
+
   return (
     <View style={styles.screen}>
       <AppStatusBar variant="light" backgroundColor={LIB_GREEN} />
       <StatusBarFill lightColor={LIB_GREEN} darkColor={LIB_GREEN} />
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

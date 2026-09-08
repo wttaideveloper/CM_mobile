@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import {
@@ -22,8 +22,11 @@ import {
   MARKET_PILLARS,
   MARKET_SOFT,
   MARKET_TEAL,
+  type MarketBusiness,
   type MarketPillar,
 } from '@/components/market/marketDashboardData';
+import { useFeaturedMarketEnterprises } from '@/hooks/useEnterprises';
+import { mapEnterprisesToFeaturedBusinesses } from '@/utils/marketBusiness.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
 function PillarIcon({ pillar }: { pillar: MarketPillar }) {
@@ -61,8 +64,52 @@ function SectionLabel({
   );
 }
 
+function FeaturedBusinessCard({ biz }: { biz: MarketBusiness }) {
+  const router = useRouter();
+
+  return (
+    <Pressable
+      style={styles.bizCard}
+      onPress={() =>
+        router.push({
+          pathname: '/(main)/market/business-profile',
+          params: { id: biz.id },
+        })
+      }
+    >
+      <View style={[styles.bizAvatar, { backgroundColor: biz.avatarBg }]}>
+        <Text style={[styles.bizInitials, { color: biz.avatarColor }]}>
+          {biz.initials}
+        </Text>
+      </View>
+      <View style={styles.bizCopy}>
+        <View style={styles.bizNameRow}>
+          <Text style={styles.bizName}>{biz.name}</Text>
+          {biz.verified ? <MarketVerifiedIcon /> : null}
+        </View>
+        <Text style={styles.bizSubtitle}>{biz.subtitle}</Text>
+        <View style={styles.bizMeta}>
+          <View style={styles.rating}>
+            <MarketStarIcon />
+            <Text style={styles.ratingText}>{biz.rating}</Text>
+          </View>
+          <Text style={styles.metaDot}>· {biz.reviews}</Text>
+          <Text style={styles.metaDot}>· {biz.meta}</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 export function MarketBody() {
   const router = useRouter();
+  const { data, isLoading } = useFeaturedMarketEnterprises(2);
+  const featuredBusinesses =
+    data && data.length > 0
+      ? mapEnterprisesToFeaturedBusinesses(data, 2)
+      : isLoading
+        ? []
+        : MARKET_BUSINESSES;
 
   return (
     <View style={styles.body}>
@@ -95,36 +142,17 @@ export function MarketBody() {
           action="See all"
           onActionPress={() => router.push('/(main)/market/businesses')}
         />
-        {MARKET_BUSINESSES.map((biz) => (
-          <Pressable
-            key={biz.id}
-            style={styles.bizCard}
-            onPress={() => router.push('/(main)/market/business-profile')}
-          >
-            <View
-              style={[styles.bizAvatar, { backgroundColor: biz.avatarBg }]}
-            >
-              <Text style={[styles.bizInitials, { color: biz.avatarColor }]}>
-                {biz.initials}
-              </Text>
-            </View>
-            <View style={styles.bizCopy}>
-              <View style={styles.bizNameRow}>
-                <Text style={styles.bizName}>{biz.name}</Text>
-                {biz.verified ? <MarketVerifiedIcon /> : null}
-              </View>
-              <Text style={styles.bizSubtitle}>{biz.subtitle}</Text>
-              <View style={styles.bizMeta}>
-                <View style={styles.rating}>
-                  <MarketStarIcon />
-                  <Text style={styles.ratingText}>{biz.rating}</Text>
-                </View>
-                <Text style={styles.metaDot}>· {biz.reviews}</Text>
-                <Text style={styles.metaDot}>· {biz.meta}</Text>
-              </View>
-            </View>
-          </Pressable>
-        ))}
+        {isLoading ? (
+          <View style={styles.bizLoading}>
+            <ActivityIndicator color={MARKET_GREEN} />
+          </View>
+        ) : featuredBusinesses.length === 0 ? (
+          <Text style={styles.bizEmpty}>No businesses available yet.</Text>
+        ) : (
+          featuredBusinesses.map((biz) => (
+            <FeaturedBusinessCard key={biz.id} biz={biz} />
+          ))
+        )}
       </View>
 
       <View style={styles.section}>
@@ -290,6 +318,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: MARKET_TEAL,
     textAlign: 'center',
+  },
+  bizLoading: {
+    paddingVertical: c(20, 16),
+    alignItems: 'center',
+  },
+  bizEmpty: {
+    fontSize: c(13, 12),
+    color: MARKET_MUTED,
+    paddingVertical: c(8, 6),
   },
   bizCard: {
     backgroundColor: '#FFFFFF',

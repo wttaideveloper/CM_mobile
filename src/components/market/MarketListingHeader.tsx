@@ -6,17 +6,19 @@ import {
   MarketBackIcon,
   MarketHeartIcon,
 } from '@/components/market/MarketIcons';
-import {
-  LISTING_GREEN,
-  MARKET_LISTING,
-} from '@/components/market/marketListingData';
+import { LISTING_GREEN } from '@/components/market/marketListingData';
+import type { MarketListingView } from '@/utils/marketListing.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
 const headerDeco = require('../../assets/images/market-header-deco.png');
 const { width: SCREEN_W } = Dimensions.get('window');
 const DESIGN_W = 430;
 
-export function MarketListingHeader() {
+type MarketListingHeaderProps = {
+  listing: MarketListingView;
+};
+
+export function MarketListingHeader({ listing }: MarketListingHeaderProps) {
   const router = useRouter();
   const scale = SCREEN_W / DESIGN_W;
 
@@ -45,7 +47,7 @@ export function MarketListingHeader() {
           <MarketBackIcon />
         </Pressable>
         <Text style={styles.title} numberOfLines={1}>
-          {MARKET_LISTING.title}
+          {listing.title}
         </Text>
         <Pressable style={styles.iconBtn} accessibilityRole="button">
           <MarketHeartIcon color="#fff" size={18} />

@@ -51,6 +51,7 @@ export type EnterpriseListItem = {
   rating: string;
   heroImage: string;
   logoUrl: string | null;
+  website: string | null;
   businessEmail: string | null;
   businessPhone: string | null;
   yearFounded: number | null;
