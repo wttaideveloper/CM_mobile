@@ -1,11 +1,23 @@
+import { requireOptionalNativeModule } from 'expo';
+import type * as SpeechRecognition from 'expo-speech-recognition';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
-import {
-  ExpoSpeechRecognitionModule,
-  useSpeechRecognitionEvent,
-} from 'expo-speech-recognition';
 
 import { playSttTing } from '@/utils/playSttTing';
+
+/**
+ * expo-speech-recognition is a custom native module that Expo Go doesn't ship.
+ * Importing the package there throws at module load — only require it when the native side exists.
+ */
+const speech: typeof SpeechRecognition | null = requireOptionalNativeModule('ExpoSpeechRecognition')
+  ? require('expo-speech-recognition')
+  : null;
+
+export const isSpeechToTextSupported = speech !== null;
+
+// Availability is fixed for the app's lifetime, so hook call order stays stable.
+const useSpeechRecognitionEvent: typeof SpeechRecognition.useSpeechRecognitionEvent =
+  speech?.useSpeechRecognitionEvent ?? (() => {});
 
 const SILENCE_AUTO_STOP_MS = 4000;
 
@@ -39,7 +51,7 @@ export function useSpeechToText({ onTranscript, lang = 'en-US' }: UseSpeechToTex
       baseDraftRef.current = '';
 
       try {
-        ExpoSpeechRecognitionModule.stop();
+        speech?.ExpoSpeechRecognitionModule.stop();
       } catch {
         // already stopped
       }
@@ -111,6 +123,16 @@ export function useSpeechToText({ onTranscript, lang = 'en-US' }: UseSpeechToTex
 
   const startListening = useCallback(
     async (currentDraft: string) => {
+      if (!speech) {
+        Alert.alert(
+          'Speech recognition unavailable',
+          'Voice typing requires a development build.',
+        );
+        return;
+      }
+
+      const { ExpoSpeechRecognitionModule } = speech;
+
       if (!ExpoSpeechRecognitionModule.isRecognitionAvailable()) {
         Alert.alert(
           'Speech recognition unavailable',
@@ -154,6 +176,7 @@ export function useSpeechToText({ onTranscript, lang = 'en-US' }: UseSpeechToTex
   useEffect(() => () => stopListening(), [stopListening]);
 
   return {
+    isSupported: isSpeechToTextSupported,
     isListening,
     startListening,
     stopListening,

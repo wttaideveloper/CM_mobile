@@ -243,7 +243,8 @@ export function ChatComposer({
   const hasText = draft.trim().length > 0;
   const { state, formatTime } = voice;
   const speechToText = useSpeechToText({ onTranscript: onChangeDraft });
-  const { isListening, toggleListening, stopListening } = speechToText;
+  const { isSupported: isSpeechSupported, isListening, toggleListening, stopListening } =
+    speechToText;
 
   useEffect(() => {
     if (state.phase !== 'idle') {
@@ -394,14 +395,16 @@ export function ChatComposer({
               accessibilityLabel="Edit message"
             />
 
-            <SpeechMicButton
-              isListening={isListening}
-              idleColor="rgba(255,255,255,0.72)"
-              onPress={() => {
-                setEmojiOpen(false);
-                void toggleListening(draft);
-              }}
-            />
+            {isSpeechSupported ? (
+              <SpeechMicButton
+                isListening={isListening}
+                idleColor="rgba(255,255,255,0.72)"
+                onPress={() => {
+                  setEmojiOpen(false);
+                  void toggleListening(draft);
+                }}
+              />
+            ) : null}
           </View>
 
           {hasText ? (
@@ -438,14 +441,16 @@ export function ChatComposer({
             accessibilityLabel="Message"
           />
 
-          <SpeechMicButton
-            isListening={isListening}
-            idleColor={TEXT_MUTED}
-            onPress={() => {
-              setEmojiOpen(false);
-              void toggleListening(draft);
-            }}
-          />
+          {isSpeechSupported ? (
+            <SpeechMicButton
+              isListening={isListening}
+              idleColor={TEXT_MUTED}
+              onPress={() => {
+                setEmojiOpen(false);
+                void toggleListening(draft);
+              }}
+            />
+          ) : null}
           <Pressable
             onPress={onAttach}
             style={styles.pillIconBtn}

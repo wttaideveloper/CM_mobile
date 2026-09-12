@@ -1,4 +1,3 @@
-import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 
@@ -9,16 +8,10 @@ import {
 import { registerDevicePushToken } from '@/services/pushRegistration.service';
 import type { PushNotificationData } from '@/types/push.types';
 import { chatHref } from '@/utils/chatNavigation';
+import { isRemotePushSupported } from '@/utils/isRemotePushSupported';
 import { pushLog, pushWarn } from '@/utils/pushLog';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+type NotificationResponse = import('expo-notifications').NotificationResponse;
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -71,7 +64,7 @@ export function parsePushNotificationData(
   };
 }
 
-function getResponseKey(response: Notifications.NotificationResponse): string {
+function getResponseKey(response: NotificationResponse): string {
   return [
     response.notification.request.identifier,
     response.actionIdentifier,
@@ -103,7 +96,7 @@ export function usePushNotifications(isAuthenticated: boolean) {
   );
 
   const handleNotificationResponse = useCallback(
-    (response: Notifications.NotificationResponse, source: string) => {
+    (response: NotificationResponse, source: string) => {
       const responseKey = getResponseKey(response);
       if (lastHandledResponseKeyRef.current === responseKey) {
         return;
@@ -150,42 +143,68 @@ export function usePushNotifications(isAuthenticated: boolean) {
   }, [isAuthenticated, openChatFromPush]);
 
   useEffect(() => {
-    const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
-      const data = parsePushNotificationData(
-        notification.request.content.data as Record<string, unknown> | undefined,
+    if (!isRemotePushSupported()) {
+      pushWarn('Push listeners skipped — remote push unavailable in Expo Go on Android');
+      return;
+    }
+
+    let cancelled = false;
+    const subscriptions: { remove: () => void }[] = [];
+
+    void (async () => {
+      const Notifications = await import('expo-notifications');
+      if (cancelled) return;
+
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowBanner: true,
+          shouldShowList: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+        }),
+      });
+
+      subscriptions.push(
+        Notifications.addNotificationReceivedListener((notification) => {
+          const data = parsePushNotificationData(
+            notification.request.content.data as Record<string, unknown> | undefined,
+          );
+
+          pushLog('Notification received (foreground/background)', {
+            title: notification.request.content.title,
+            body: notification.request.content.body,
+            data,
+          });
+        }),
       );
 
-      pushLog('Notification received (foreground/background)', {
-        title: notification.request.content.title,
-        body: notification.request.content.body,
-        data,
-      });
-    });
+      subscriptions.push(
+        Notifications.addNotificationResponseReceivedListener((response) => {
+          handleNotificationResponse(response, 'tap-listener');
+        }),
+      );
 
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        handleNotificationResponse(response, 'tap-listener');
-      },
-    );
+      subscriptions.push(
+        Notifications.addPushTokenListener((token) => {
+          if (!isAuthenticated) return;
 
-    const pushTokenSubscription = Notifications.addPushTokenListener((token) => {
-      if (!isAuthenticated) return;
+          pushLog('Push token refreshed by OS', { token: token.data });
+          void registerDevicePushToken(token.data);
+        }),
+      );
 
-      pushLog('Push token refreshed by OS', { token: token.data });
-      void registerDevicePushToken(token.data);
-    });
-
-    // Cold start / killed app: user opened app by tapping a notification.
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) {
+      // Cold start / killed app: user opened app by tapping a notification.
+      const response = await Notifications.getLastNotificationResponseAsync();
+      if (!cancelled && response) {
         handleNotificationResponse(response, 'cold-start');
       }
-    });
+    })();
 
     return () => {
-      receivedSubscription.remove();
-      responseSubscription.remove();
-      pushTokenSubscription.remove();
+      cancelled = true;
+      for (const subscription of subscriptions) {
+        subscription.remove();
+      }
     };
   }, [handleNotificationResponse, isAuthenticated]);
 }
