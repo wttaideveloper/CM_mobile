@@ -1,29 +1,26 @@
-import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Pressable,
-  SectionList,
-  Text,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppStatusBar, StatusBarFill } from "@/components/AppStatusBar";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pressable, SectionList, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { NotificationSkeletonList } from '@/components/ui/Skeleton.screens';
-import { useScreenPrivacy } from '@/hooks/useScreenPrivacy';
-import { styles } from '@/screens/notifications/NotificationsScreen.styles';
+import { EmptyState } from "@/components/EmptyState";
+import { AppButton } from "@/components/ui/AppButton";
+import { NotificationSkeletonList } from "@/components/ui/Skeleton.screens";
+import { useScreenPrivacy } from "@/hooks/useScreenPrivacy";
+import { styles } from "@/screens/notifications/NotificationsScreen.styles";
 import {
   fetchMyNotifications,
   markAllNotificationsRead,
   markNotificationRead,
-} from '@/services/notification.service';
-import type { NotificationListItem } from '@/utils/notification.mapper';
+} from "@/services/notification.service";
+import type { NotificationListItem } from "@/utils/notification.mapper";
 import {
   getNotificationTypeIcon,
   mapUserNotificationItems,
-} from '@/utils/notification.mapper';
-import { chatHref } from '@/utils/chatNavigation';
-import { isSmallDevice } from '@/utils/responsive';
+} from "@/utils/notification.mapper";
+import { chatHref } from "@/utils/chatNavigation";
+import { isSmallDevice } from "@/utils/responsive";
 
 const ITEM_GAP = isSmallDevice ? 8 : 10;
 const SECTION_GAP = isSmallDevice ? 14 : 18;
@@ -32,7 +29,9 @@ function NotificationIcon({ notificationType }: { notificationType: string }) {
   const config = getNotificationTypeIcon(notificationType);
 
   return (
-    <View style={[styles.iconWrap, { backgroundColor: config.backgroundColor }]}>
+    <View
+      style={[styles.iconWrap, { backgroundColor: config.backgroundColor }]}
+    >
       <Text style={styles.iconEmoji}>{config.emoji}</Text>
     </View>
   );
@@ -49,8 +48,11 @@ function NotificationCard({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${item.title}${!item.read ? ', unread' : ''}`}
-      style={({ pressed }) => [styles.notificationCard, pressed && styles.pressed]}
+      accessibilityLabel={`${item.title}${!item.read ? ", unread" : ""}`}
+      style={({ pressed }) => [
+        styles.notificationCard,
+        pressed && styles.pressed,
+      ]}
     >
       <NotificationIcon notificationType={item.notificationType} />
       <View style={styles.notificationContent}>
@@ -70,10 +72,12 @@ function SectionHeader({ label }: { label: string }) {
 }
 
 export function NotificationsScreen() {
-  useScreenPrivacy('notifications');
+  useScreenPrivacy("notifications");
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [notifications, setNotifications] = useState<NotificationListItem[]>([]);
+  const [notifications, setNotifications] = useState<NotificationListItem[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -86,14 +90,14 @@ export function NotificationsScreen() {
       setNotifications(mapUserNotificationItems(response.items));
     } catch (error) {
       const message =
-        error && typeof error === 'object' && 'message' in error
+        error && typeof error === "object" && "message" in error
           ? String((error as { message: string }).message)
-          : 'Could not load notifications.';
+          : "Could not load notifications.";
 
       setErrorMessage(message);
 
       if (__DEV__) {
-        console.error('[NOTIFICATIONS] List API ← failed', error);
+        console.error("[NOTIFICATIONS] List API ← failed", error);
       }
     } finally {
       setIsLoading(false);
@@ -116,10 +120,10 @@ export function NotificationsScreen() {
   const sections = useMemo(() => {
     const next: { title: string; data: NotificationListItem[] }[] = [];
     if (newNotifications.length > 0) {
-      next.push({ title: 'NEW', data: newNotifications });
+      next.push({ title: "NEW", data: newNotifications });
     }
     if (earlierNotifications.length > 0) {
-      next.push({ title: 'EARLIER', data: earlierNotifications });
+      next.push({ title: "EARLIER", data: earlierNotifications });
     }
     return next;
   }, [earlierNotifications, newNotifications]);
@@ -133,7 +137,7 @@ export function NotificationsScreen() {
     } catch (error) {
       setNotifications(previous);
       if (__DEV__) {
-        console.error('[NOTIFICATIONS] Mark all read API ← failed', error);
+        console.error("[NOTIFICATIONS] Mark all read API ← failed", error);
       }
     }
   }, [notifications]);
@@ -147,7 +151,9 @@ export function NotificationsScreen() {
 
       if (wasUnread) {
         setNotifications((items) =>
-          items.map((entry) => (entry.id === item.id ? { ...entry, read: true } : entry)),
+          items.map((entry) =>
+            entry.id === item.id ? { ...entry, read: true } : entry,
+          ),
         );
       }
 
@@ -162,7 +168,7 @@ export function NotificationsScreen() {
           );
         }
         if (__DEV__) {
-          console.error('[NOTIFICATIONS] Mark read API ← failed', {
+          console.error("[NOTIFICATIONS] Mark read API ← failed", {
             markReadId,
             error,
           });
@@ -175,7 +181,10 @@ export function NotificationsScreen() {
       }
 
       if (__DEV__) {
-        console.log('[NOTIFICATIONS] Tapped notification without chat route', item);
+        console.log(
+          "[NOTIFICATIONS] Tapped notification without chat route",
+          item,
+        );
       }
     },
     [router],
@@ -192,7 +201,10 @@ export function NotificationsScreen() {
           onPress={() => void markAllRead()}
           accessibilityRole="button"
           accessibilityLabel="Mark all read"
-          style={({ pressed }) => [styles.markAllReadBtn, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.markAllReadBtn,
+            pressed && styles.pressed,
+          ]}
           hitSlop={8}
         >
           <Text style={styles.markAllReadText}>Mark all read</Text>
@@ -202,21 +214,19 @@ export function NotificationsScreen() {
       {isLoading ? (
         <NotificationSkeletonList />
       ) : errorMessage ? (
-        <View style={styles.centerState}>
-          <Text style={styles.errorText}>{errorMessage}</Text>
-          <Pressable
-            onPress={() => void loadNotifications()}
-            accessibilityRole="button"
-            accessibilityLabel="Retry"
-            style={({ pressed }) => [styles.retryBtn, pressed && styles.pressed]}
-          >
-            <Text style={styles.retryText}>Retry</Text>
-          </Pressable>
-        </View>
+        <EmptyState
+          variant="error"
+          title="Unable to load notifications"
+          description={errorMessage}
+          onAction={() => void loadNotifications()}
+          actionLabel="Retry"
+        />
       ) : notifications.length === 0 ? (
-        <View style={styles.centerState}>
-          <Text style={styles.emptyText}>No notifications yet</Text>
-        </View>
+        <EmptyState
+          variant="empty"
+          title="No notifications yet"
+          description="You’ll see your updates here when new activity arrives."
+        />
       ) : (
         <SectionList
           sections={sections}
@@ -228,7 +238,9 @@ export function NotificationsScreen() {
             { paddingBottom: insets.bottom + (isSmallDevice ? 20 : 24) },
           ]}
           stickySectionHeadersEnabled={false}
-          renderSectionHeader={({ section }) => <SectionHeader label={section.title} />}
+          renderSectionHeader={({ section }) => (
+            <SectionHeader label={section.title} />
+          )}
           renderItem={({ item }) => (
             <NotificationCard
               item={item}
@@ -236,7 +248,9 @@ export function NotificationsScreen() {
             />
           )}
           ItemSeparatorComponent={() => <View style={{ height: ITEM_GAP }} />}
-          SectionSeparatorComponent={() => <View style={{ height: SECTION_GAP }} />}
+          SectionSeparatorComponent={() => (
+            <View style={{ height: SECTION_GAP }} />
+          )}
         />
       )}
     </View>

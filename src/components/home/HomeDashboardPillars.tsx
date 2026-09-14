@@ -1,5 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 
 import {
   HomeDropIcon,
@@ -8,7 +8,7 @@ import {
   HomeMoonIcon,
   HomeSunIcon,
   HomeWindIcon,
-} from '@/components/home/HomeDashboardIcons';
+} from "@/components/home/HomeDashboardIcons";
 import {
   HOME_DASH_BORDER,
   HOME_DASH_GREEN,
@@ -18,35 +18,44 @@ import {
   HOME_DASH_TRACK,
   HOME_PILLARS,
   type HomePillar,
-} from '@/components/home/homeDashboardData';
-import { c, NU } from '@/utils/newUiCompact';
+} from "@/components/home/homeDashboardData";
+import { c, NU } from "@/utils/newUiCompact";
 
 function PillarIcon({ pillar }: { pillar: HomePillar }) {
   const props = { color: pillar.color, size: 16 };
   switch (pillar.icon) {
-    case 'leaf':
+    case "leaf":
       return <HomeLeafIcon {...props} />;
-    case 'drop':
+    case "drop":
       return <HomeDropIcon {...props} />;
-    case 'sun':
+    case "sun":
       return <HomeSunIcon {...props} />;
-    case 'wind':
+    case "wind":
       return <HomeWindIcon {...props} />;
-    case 'moon':
+    case "moon":
       return <HomeMoonIcon {...props} />;
-    case 'dumbbell':
+    case "dumbbell":
       return <HomeDumbbellIcon {...props} />;
   }
 }
 
 function PillarCard({ pillar }: { pillar: HomePillar }) {
+  const router = useRouter();
+
   return (
-    <Pressable style={styles.card} accessibilityRole="button">
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      onPress={() => router.push("/(main)/(tabs)/check-in")}
+      accessibilityRole="button"
+      accessibilityLabel={`${pillar.title}, ${pillar.score} percent, ${pillar.detail}, ${pillar.delta}`}
+    >
       <View style={[styles.iconWrap, { backgroundColor: pillar.iconBg }]}>
         <PillarIcon pillar={pillar} />
       </View>
       <Text style={styles.title}>{pillar.title}</Text>
-      <Text style={[styles.score, { color: pillar.color }]}>{pillar.score}</Text>
+      <Text style={[styles.score, { color: pillar.color }]}>
+        {pillar.score}
+      </Text>
       <View style={styles.track}>
         <View
           style={[
@@ -59,7 +68,7 @@ function PillarCard({ pillar }: { pillar: HomePillar }) {
       <Text
         style={[
           styles.delta,
-          { color: pillar.deltaPositive ? HOME_DASH_GREEN : '#d94848' },
+          { color: pillar.deltaPositive ? HOME_DASH_GREEN : "#d94848" },
         ]}
       >
         {pillar.delta}
@@ -76,7 +85,7 @@ export function HomeDashboardPillars() {
       <View style={styles.header}>
         <Text style={styles.heading}>Today&apos;s Pillars</Text>
         <Pressable
-          onPress={() => router.push('/(main)/(tabs)/check-in')}
+          onPress={() => router.push("/(main)/(tabs)/check-in")}
           accessibilityRole="button"
           accessibilityLabel="Open check-in"
         >
@@ -99,59 +108,65 @@ const styles = StyleSheet.create({
     gap: NU.groupGap,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   heading: {
     fontSize: NU.heading,
-    fontWeight: '800',
+    fontWeight: "800",
     color: HOME_DASH_TEAL,
   },
   link: {
     fontSize: NU.link,
-    fontWeight: '600',
+    fontWeight: "600",
     color: HOME_DASH_LINK,
+    minHeight: 44,
+    textAlignVertical: "center",
   },
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     rowGap: NU.cardGap,
   },
   cell: {
-    width: '31.5%',
+    width: "31.5%",
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: HOME_DASH_BORDER,
     borderRadius: NU.cardRadiusMd,
     padding: NU.cardPadXs,
     gap: c(8, 6),
+    minHeight: c(178, 164),
+  },
+  pressed: {
+    opacity: 0.9,
   },
   iconWrap: {
     width: c(30, 26),
     height: c(30, 26),
     borderRadius: c(15, 13),
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   title: {
     fontSize: NU.eyebrow,
-    fontWeight: '700',
+    fontWeight: "700",
     color: HOME_DASH_TEAL,
   },
   score: {
     fontSize: NU.name,
-    fontWeight: '800',
+    fontWeight: "800",
     lineHeight: c(24, 20),
   },
   track: {
     height: 5,
     borderRadius: 99,
     backgroundColor: HOME_DASH_TRACK,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   fill: {
     height: 5,
@@ -163,6 +178,6 @@ const styles = StyleSheet.create({
   },
   delta: {
     fontSize: c(10, 9),
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });

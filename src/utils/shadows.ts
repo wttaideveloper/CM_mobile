@@ -11,13 +11,17 @@ function iosShadow(offsetY: number, opacity: number, radius: number): ViewStyle 
   };
 }
 
-/** Subtle card shadow — matches Android elevation 1 */
-export const shadowSm: ViewStyle =
+export const shadowNone: ViewStyle = { shadowOpacity: 0, elevation: 0 };
+
+export const shadowSubtle: ViewStyle =
   Platform.select({
     ios: iosShadow(1, 0.04, 3),
     android: { elevation: 0.5 },
     default: {},
   }) ?? {};
+
+/** Subtle card shadow — matches Android elevation 1 */
+export const shadowSm: ViewStyle = shadowSubtle;
 
 /** Standard card shadow — matches Android elevation 2 */
 export const shadowMd: ViewStyle =
@@ -34,6 +38,8 @@ export const shadowLg: ViewStyle =
     android: { elevation: 3 },
     default: {},
   }) ?? {};
+
+export const shadowStrong: ViewStyle = shadowLg;
 
 /** Small control shadow — matches Android elevation 2, lighter on iOS */
 export const shadowSoft: ViewStyle =

@@ -1,18 +1,19 @@
 import { StyleSheet } from 'react-native';
 
+import { appColors, appRadius, appSpacing } from '@/constants/designTokens';
 import { shadowSm } from '@/utils/shadows';
 import { isSmallDevice } from '@/utils/responsive';
 
-export const PRIMARY = '#1F5D4E';
-export const PAGE_BG = '#FFFFFF';
-export const BODY_BG = '#F7F8F9';
-export const TEXT_MUTED = '#9CA3AF';
-export const TEXT_BLACK = '#111111';
-export const ICON_BG = '#F5F7F6';
+export const PRIMARY = appColors.primary;
+export const PAGE_BG = appColors.surface;
+export const BODY_BG = appColors.background;
+export const TEXT_MUTED = appColors.textMuted;
+export const TEXT_BLACK = appColors.textPrimary;
+export const ICON_BG = appColors.primarySoft;
 export const SIGN_OUT_BG = '#FEF2F2';
 export const SIGN_OUT_BORDER = '#FECACA';
-export const SIGN_OUT_RED = '#DC2626';
-export const H_PAD = isSmallDevice ? 16 : 20;
+export const SIGN_OUT_RED = appColors.error;
+export const H_PAD = isSmallDevice ? appSpacing.lg : appSpacing.xl;
 export const AVATAR_SIZE = isSmallDevice ? 44 : 50;
 export const AVATAR_RADIUS = isSmallDevice ? 12 : 14;
 export const ICON_SIZE = isSmallDevice ? 28 : 30;
