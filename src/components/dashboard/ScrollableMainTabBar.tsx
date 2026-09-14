@@ -157,9 +157,10 @@ export function ScrollableMainTabBar({
                 { width: tabWidth },
                 focused ? styles.itemActive : styles.itemInactive,
               ]}
-              accessibilityRole="button"
+              accessibilityRole="tab"
               accessibilityState={{ selected: focused }}
               accessibilityLabel={label}
+              accessibilityHint={`Navigate to ${label}`}
             >
               <TabIcon
                 name={tabName}

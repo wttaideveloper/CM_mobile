@@ -74,6 +74,11 @@ export function HomeDashboardHeader({ displayName }: HomeDashboardHeaderProps) {
             onPress={() => router.push("/(main)/notifications")}
             accessibilityRole="button"
             accessibilityLabel="Notifications"
+            accessibilityHint={
+              unread > 0
+                ? `${unread} unread notification${unread === 1 ? '' : 's'}`
+                : 'No unread notifications'
+            }
           >
             <HomeBellOutlineIcon color={appColors.white} />
             {unread > 0 ? <View style={styles.dot} /> : null}
@@ -83,6 +88,7 @@ export function HomeDashboardHeader({ displayName }: HomeDashboardHeaderProps) {
             onPress={() => router.push("/(main)/settings")}
             accessibilityRole="button"
             accessibilityLabel="Settings"
+            accessibilityHint="Open app settings"
           >
             <HomeSettingsSunIcon color={appColors.white} />
           </Pressable>
@@ -109,16 +115,18 @@ export function HomeDashboardHeader({ displayName }: HomeDashboardHeaderProps) {
             style={styles.primaryAction}
             onPress={() => router.push("/(main)/(tabs)/check-in")}
             accessibilityRole="button"
-            accessibilityLabel="Log today’s pillars"
+            accessibilityLabel="Log today's pillars"
+            accessibilityHint="Opens the daily check-in screen"
           >
             <Text style={styles.primaryActionText}>
-              Log today&apos;s pillars
+              Log today’s pillars
             </Text>
           </Pressable>
           <Pressable
             style={styles.breakdownAction}
             accessibilityRole="button"
-            accessibilityLabel="Open full HWI breakdown"
+            accessibilityLabel="Full HWI breakdown"
+            accessibilityHint="Opens detailed HWI score analysis"
             onPress={() => router.push("/(main)/(tabs)/hwi")}
           >
             <Text style={styles.breakdownText}>Full breakdown ›</Text>
@@ -171,21 +179,21 @@ const styles = StyleSheet.create({
   iconBtn: {
     width: NU.iconBtn,
     height: NU.iconBtn,
-    borderRadius: appRadius.lg,
+    borderRadius: NU.iconBtnRadius,
     backgroundColor: "rgba(255,255,255,0.14)",
     alignItems: "center",
     justifyContent: "center",
   },
   dot: {
     position: "absolute",
-    top: 8,
+    top: 9,
     right: 9,
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: "#ff7a45",
     borderWidth: 2,
-    borderColor: "rgb(37, 125, 63)",
+    borderColor: appColors.primary,
   },
   hwiCard: {
     marginTop: NU.sectionGap,
@@ -193,12 +201,13 @@ const styles = StyleSheet.create({
     borderRadius: appRadius.lg,
     padding: appSpacing.lg,
     flexDirection: "row",
-    gap: appSpacing.lg,
+    gap: c(14, 12),
     alignItems: "center",
     zIndex: 1,
   },
   hwiCopy: {
     flex: 1,
+    flexShrink: 1,
     gap: c(6, 4),
   },
   trendRow: {
@@ -219,7 +228,7 @@ const styles = StyleSheet.create({
   primaryAction: {
     alignSelf: "flex-start",
     marginTop: 2,
-    minHeight: 42,
+    minHeight: 44,
     paddingVertical: appSpacing.sm,
     paddingHorizontal: appSpacing.md,
     borderRadius: appRadius.md,
@@ -232,7 +241,7 @@ const styles = StyleSheet.create({
   },
   breakdownAction: {
     alignSelf: "flex-start",
-    minHeight: 36,
+    minHeight: 44,
     justifyContent: "center",
   },
   breakdownText: {

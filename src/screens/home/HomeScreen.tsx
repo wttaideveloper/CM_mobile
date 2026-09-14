@@ -32,7 +32,7 @@ export function HomeScreen() {
         ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + c(24, 20) }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + c(32, 28) }}
       >
         <HomeDashboardHeader displayName={displayName} />
 

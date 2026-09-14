@@ -10,14 +10,18 @@ import { c, NU } from '@/utils/newUiCompact';
 
 export function HomeDashboardStreak() {
   return (
-    <View style={styles.card}>
+    <View
+      style={styles.card}
+      accessibilityRole="text"
+      accessibilityLabel="Active streak: 80 days. Weekly progress: Monday through Sunday logged."
+    >
       <View style={styles.blob} />
       <View style={styles.iconWrap}>
         <HomeFlameIcon color={HOME_DASH_GREEN} size={20} />
       </View>
       <View style={styles.content}>
         <Text style={styles.title}>80 Days Streak</Text>
-        <Text style={styles.subtitle}>Keep going — your best is 21 days</Text>
+        <Text style={styles.subtitle}>Keep it up — you’re on a roll!</Text>
         <View style={styles.days}>
           {HOME_STREAK_DAYS.map((day, index) => {
             const isToday = index === HOME_STREAK_DAYS.length - 1;
@@ -25,6 +29,8 @@ export function HomeDashboardStreak() {
               <View
                 key={`${day}-${index}`}
                 style={[styles.day, isToday && styles.dayToday]}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
               >
                 <Text style={[styles.dayText, isToday && styles.dayTextToday]}>
                   {day}
@@ -85,8 +91,8 @@ const styles = StyleSheet.create({
   },
   days: {
     flexDirection: 'row',
-    gap: c(8, 6),
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: c(4, 2),
   },
   day: {
     width: c(30, 26),

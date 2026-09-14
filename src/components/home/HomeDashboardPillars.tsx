@@ -64,15 +64,17 @@ function PillarCard({ pillar }: { pillar: HomePillar }) {
           ]}
         />
       </View>
-      <Text style={styles.detail}>{pillar.detail}</Text>
-      <Text
-        style={[
-          styles.delta,
-          { color: pillar.deltaPositive ? HOME_DASH_GREEN : "#d94848" },
-        ]}
-      >
-        {pillar.delta}
-      </Text>
+      <View style={styles.footer}>
+        <Text style={styles.detail}>{pillar.detail}</Text>
+        <Text
+          style={[
+            styles.delta,
+            { color: pillar.deltaPositive ? HOME_DASH_GREEN : "#d94848" },
+          ]}
+        >
+          {pillar.delta}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -83,11 +85,13 @@ export function HomeDashboardPillars() {
   return (
     <View style={styles.section}>
       <View style={styles.header}>
-        <Text style={styles.heading}>Today&apos;s Pillars</Text>
+        <Text style={styles.heading}>Today’s Pillars</Text>
         <Pressable
           onPress={() => router.push("/(main)/(tabs)/check-in")}
           accessibilityRole="button"
-          accessibilityLabel="Open check-in"
+          accessibilityLabel="View pillar details"
+          accessibilityHint="Opens the daily check-in screen"
+          style={styles.detailsLink}
         >
           <Text style={styles.link}>Details ›</Text>
         </Pressable>
@@ -117,12 +121,15 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: HOME_DASH_TEAL,
   },
+  detailsLink: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingLeft: c(8, 6),
+  },
   link: {
     fontSize: NU.link,
     fontWeight: "600",
     color: HOME_DASH_LINK,
-    minHeight: 44,
-    textAlignVertical: "center",
   },
   grid: {
     flexDirection: "row",
@@ -139,11 +146,11 @@ const styles = StyleSheet.create({
     borderColor: HOME_DASH_BORDER,
     borderRadius: NU.cardRadiusMd,
     padding: NU.cardPadXs,
-    gap: c(8, 6),
-    minHeight: c(178, 164),
+    gap: c(7, 5),
+    flex: 1,
   },
   pressed: {
-    opacity: 0.9,
+    opacity: 0.85,
   },
   iconWrap: {
     width: c(30, 26),
@@ -163,21 +170,27 @@ const styles = StyleSheet.create({
     lineHeight: c(24, 20),
   },
   track: {
-    height: 5,
+    height: 6,
     borderRadius: 99,
     backgroundColor: HOME_DASH_TRACK,
     overflow: "hidden",
   },
   fill: {
-    height: 5,
+    height: 6,
     borderRadius: 99,
   },
   detail: {
-    fontSize: c(10, 9),
+    fontSize: c(11, 10),
     color: HOME_DASH_MUTED,
+    lineHeight: c(15, 13),
   },
   delta: {
-    fontSize: c(10, 9),
+    fontSize: c(11, 10),
     fontWeight: "700",
+    lineHeight: c(15, 13),
+  },
+  footer: {
+    marginTop: "auto",
+    gap: 2,
   },
 });
