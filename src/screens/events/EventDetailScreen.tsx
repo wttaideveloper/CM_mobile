@@ -1,10 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
 import { EmptyState } from '@/components/EmptyState';
-import { getEventById } from '@/constants/events';
+import { useEvent } from '@/hooks/useEvents';
 import { useDetailBack } from '@/hooks/useDetailBack';
 import {
   EventDetailContent,
@@ -12,19 +12,31 @@ import {
   EventDetailHero,
   getEventRegisterLabel,
 } from '@/screens/events/EventDetailScreenParts';
-import { styles } from '@/screens/events/EventDetailScreen.styles';
+import { PRIMARY, styles } from '@/screens/events/EventDetailScreen.styles';
 
 export function EventDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: rawId } = useLocalSearchParams<{ id: string }>();
+  const id = Array.isArray(rawId) ? rawId[0] : rawId ?? '';
   const router = useRouter();
   const goBack = useDetailBack();
   const insets = useSafeAreaInsets();
   const statusBarFill = useStatusBarBackground();
   const [isFavorite, setIsFavorite] = useState(false);
 
-  const event = id ? getEventById(id) : undefined;
+  const { event, isLoading, isError } = useEvent(id, { enabled: Boolean(id) });
 
-  if (!event) {
+  if (isLoading) {
+    return (
+      <View style={styles.screen}>
+        <AppStatusBar />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={PRIMARY} size="large" />
+        </View>
+      </View>
+    );
+  }
+
+  if (!event || isError) {
     return (
       <View style={styles.screen}>
         <AppStatusBar />
@@ -38,7 +50,8 @@ export function EventDetailScreen() {
     );
   }
 
-  const fillPercent = Math.round((event.registered / event.capacity) * 100);
+  const fillPercent =
+    event.capacity > 0 ? Math.round((event.registered / event.capacity) * 100) : 0;
   const spotsRemaining = event.capacity - event.registered;
   const registerLabel = getEventRegisterLabel(event);
 
