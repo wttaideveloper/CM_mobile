@@ -11,6 +11,7 @@ export const MARKET_FILTERS = [
   'Products',
   'Services',
   'Events',
+  'Trainings',
 ] as const;
 
 export type MarketPillar = {
@@ -63,6 +64,8 @@ export type MarketBusiness = {
   meta: string;
   avatarBg: string;
   avatarColor: string;
+  /** banner_url (or logo_url) from enterprise API — show image when set. */
+  imageUrl?: string | null;
 };
 
 export const MARKET_BUSINESSES: MarketBusiness[] = [
@@ -103,6 +106,8 @@ export type MarketOffer = {
   mediaBg: string;
   iconColor: string;
   icon: 'bag' | 'user';
+  /** Product image_urls / product_images, or service banner_image. */
+  imageUrl?: string | null;
 };
 
 export const MARKET_OFFERS: MarketOffer[] = [
@@ -148,6 +153,7 @@ export type MarketEventItem = {
   sideBottomColor: string;
 };
 
+/** Home section cards (same UI as former Events & courses). */
 export const MARKET_EVENTS: MarketEventItem[] = [
   {
     id: 'sunrise',

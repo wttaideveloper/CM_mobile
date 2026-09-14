@@ -76,7 +76,7 @@ export function HomeDashboardPillars() {
       <View style={styles.header}>
         <Text style={styles.heading}>Today&apos;s Pillars</Text>
         <Pressable
-          onPress={() => router.push('/(main)/(tabs)/check-in')}
+          onPress={() => router.push('/(main)/check-in')}
           accessibilityRole="button"
           accessibilityLabel="Open check-in"
         >

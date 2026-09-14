@@ -37,6 +37,40 @@ function buildSubtitle(item: EnterpriseListItem, fallback: string): string {
   return fallback;
 }
 
+function buildReviewsLabel(
+  reviewsCount: number,
+  fallback: string,
+): string {
+  if (reviewsCount > 0) {
+    return `(${reviewsCount})`;
+  }
+  return fallback;
+}
+
+function buildMetaLabel(
+  item: EnterpriseListItem,
+  fallback: string,
+): string {
+  if (item.isOnline) {
+    return 'Online';
+  }
+  if (item.distanceMiles != null && Number.isFinite(item.distanceMiles)) {
+    return `${item.distanceMiles.toFixed(1)} mi`;
+  }
+  return fallback;
+}
+
+/** Prefer banner_url, then logo_url; otherwise null so UI can show initials. */
+export function pickEnterpriseAvatarUrl(
+  item: EnterpriseListItem,
+): string | null {
+  const banner = item.bannerUrl?.trim();
+  if (banner) return banner;
+  const logo = item.logoUrl?.trim();
+  if (logo) return logo;
+  return null;
+}
+
 /** Map enterprises API item → Market featured card, filling gaps with static copy. */
 export function mapEnterpriseToMarketBusiness(
   item: EnterpriseListItem,
@@ -47,17 +81,17 @@ export function mapEnterpriseToMarketBusiness(
 
   return {
     id: item.id || fallback.id,
-    // e.g. "Tester Shop" → "TS" when no logo is shown on the card
+    // e.g. "Tester Shop" → "TS" when no logo/banner is shown on the card
     initials: initialsFromName(name),
     name,
     verified: item.isVerified,
     subtitle: buildSubtitle(item, fallback.subtitle),
     rating: formatMarketRating(item.rating),
-    // Not on enterprises list yet — keep static label from design mock.
-    reviews: fallback.reviews,
-    meta: fallback.meta,
+    reviews: buildReviewsLabel(item.reviewsCount, fallback.reviews),
+    meta: buildMetaLabel(item, fallback.meta),
     avatarBg: fallback.avatarBg,
     avatarColor: fallback.avatarColor,
+    imageUrl: pickEnterpriseAvatarUrl(item),
   };
 }
 
@@ -71,4 +105,41 @@ export function mapEnterprisesToFeaturedBusinesses(
       MARKET_BUSINESSES[index] ?? MARKET_BUSINESSES[0],
     ),
   );
+}
+
+/** Market businesses See all: map full enterprises list with cycling static style fallbacks. */
+export function mapEnterprisesToMarketBusinessList(
+  items: EnterpriseListItem[],
+  styleFallbacks: MarketBusiness[],
+): MarketBusiness[] {
+  if (items.length === 0) return [];
+  const fallbacks =
+    styleFallbacks.length > 0 ? styleFallbacks : MARKET_BUSINESSES;
+
+  return items.map((item, index) =>
+    mapEnterpriseToMarketBusiness(
+      item,
+      fallbacks[index % fallbacks.length] ?? fallbacks[0],
+    ),
+  );
+}
+
+export function sortMarketBusinesses(
+  list: MarketBusiness[],
+  sort: string,
+): MarketBusiness[] {
+  const sorted = [...list];
+  if (sort === 'Top rated') {
+    return sorted.sort((a, b) => Number(b.rating) - Number(a.rating));
+  }
+  if (sort === 'Verified') {
+    return sorted.sort((a, b) => Number(!!b.verified) - Number(!!a.verified));
+  }
+  // Closest — Online last, otherwise keep API order
+  return sorted.sort((a, b) => {
+    const aOnline = a.meta === 'Online' ? 1 : 0;
+    const bOnline = b.meta === 'Online' ? 1 : 0;
+    if (aOnline !== bOnline) return aOnline - bOnline;
+    return 0;
+  });
 }

@@ -33,6 +33,21 @@ function textOrFallback(value: string | null | undefined, fallback: string): str
   return trimmed;
 }
 
+/** Prefer real product_images / image_urls; ignore mapper placeholder. */
+function pickProductListingImageUrl(item: ProductDetailItem): string | null {
+  const placeholderId = 'photo-1571019613454-1cb2f99b2d8b';
+  const candidates = [...(item.images ?? []), item.image];
+
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim();
+    if (!trimmed || trimmed === 'NA') continue;
+    if (trimmed.includes(placeholderId)) continue;
+    return trimmed;
+  }
+
+  return null;
+}
+
 function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return 'BZ';
@@ -60,7 +75,7 @@ export function mapProductDetailToMarketListing(
     : item.price ?? 0;
   const price = formatMoney(displayPrice, item.currency);
   const vendorName = textOrFallback(item.enterpriseName, fallback.vendorName);
-  const imageUrl = item.images.find((url) => url.trim())?.trim() || null;
+  const imageUrl = pickProductListingImageUrl(item);
 
   return {
     id: item.id || fallback.id,

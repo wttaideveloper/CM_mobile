@@ -32,6 +32,9 @@ export type EnterpriseApiResponse = {
   revenue: number | null;
   joined_date?: string | null;
   rating: number | null;
+  reviews_count?: number | null;
+  distance_miles?: number | null;
+  is_online?: boolean | null;
 };
 
 export type EnterpriseListItem = {
@@ -49,7 +52,12 @@ export type EnterpriseListItem = {
   isVerified: boolean;
   products: number;
   rating: string;
+  reviewsCount: number;
+  distanceMiles: number | null;
+  isOnline: boolean;
   heroImage: string;
+  /** Raw banner_url from API (null when empty — do not use hero placeholder). */
+  bannerUrl: string | null;
   logoUrl: string | null;
   website: string | null;
   businessEmail: string | null;

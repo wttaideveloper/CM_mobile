@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 
 import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
@@ -10,13 +10,30 @@ import {
   PILLAR_GREEN,
   getPillarBrowseContent,
 } from '@/components/market/marketPillarData';
+import { usePillarSearch } from '@/hooks/useSearch';
 import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
+import { mapPillarSearchToBrowseContent } from '@/utils/marketPillar.mapper';
 
 export function MarketPillarScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const scrollRef = useScrollToTopOnFocus();
-  const pillar = getPillarBrowseContent(id);
+  const staticPillar = getPillarBrowseContent(id);
   const [activeFilter, setActiveFilter] = useState('All');
+
+  const { enterprises, products, services, isLoading } = usePillarSearch(
+    staticPillar.title,
+  );
+
+  const pillar = useMemo(
+    () =>
+      mapPillarSearchToBrowseContent(
+        staticPillar,
+        enterprises,
+        products,
+        services,
+      ),
+    [staticPillar, enterprises, products, services],
+  );
 
   useEffect(() => {
     setActiveFilter('All');
@@ -33,11 +50,17 @@ export function MarketPillarScreen() {
         contentContainerStyle={styles.content}
       >
         <MarketPillarHeader pillar={pillar} />
-        <MarketPillarBody
-          pillar={pillar}
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-        />
+        {isLoading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator color={PILLAR_GREEN} size="large" />
+          </View>
+        ) : (
+          <MarketPillarBody
+            pillar={pillar}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+          />
+        )}
       </ScrollView>
     </View>
   );
@@ -53,5 +76,10 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: 12,
+  },
+  loading: {
+    paddingVertical: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

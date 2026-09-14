@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
 import { CheckinBody } from '@/components/checkin/CheckinBody';
 import { CheckinHeader } from '@/components/checkin/CheckinHeader';
 import {
   CHECKIN_BG,
+  CHECKIN_GREEN,
   CHECKIN_PRACTICES,
 } from '@/components/checkin/checkinData';
 import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
@@ -29,6 +31,8 @@ export function CheckinScreen() {
 
   return (
     <View style={styles.screen}>
+      <AppStatusBar variant="light" backgroundColor={CHECKIN_GREEN} />
+      <StatusBarFill lightColor={CHECKIN_GREEN} darkColor={CHECKIN_GREEN} />
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
@@ -44,7 +48,7 @@ export function CheckinScreen() {
           onChange={(id, value) =>
             setValues((prev) => ({ ...prev, [id]: value }))
           }
-          onSave={() => router.replace('/(main)/(tabs)/hwi')}
+          onSave={() => router.replace('/(main)/hwi')}
         />
       </ScrollView>
     </View>

@@ -155,7 +155,14 @@ export function mapEnterpriseApiToListItem(
     isVerified: pickIsVerified(item),
     products: 0,
     rating: formatRating(item.rating),
+    reviewsCount: numberOrZero(item.reviews_count),
+    distanceMiles:
+      item.distance_miles == null || !Number.isFinite(item.distance_miles)
+        ? null
+        : item.distance_miles,
+    isOnline: Boolean(item.is_online),
     heroImage: pickHeroImage(item),
+    bannerUrl: item.banner_url?.trim() || null,
     logoUrl: item.logo_url?.trim() || null,
     website:
       item.website_url?.trim() ||

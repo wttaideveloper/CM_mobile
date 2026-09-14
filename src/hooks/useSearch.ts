@@ -12,9 +12,20 @@ export const searchKeys = {
   enterprises: (query: string) => [...searchKeys.all, 'enterprises', query] as const,
   products: (query: string) => [...searchKeys.all, 'products', query] as const,
   services: (query: string) => [...searchKeys.all, 'services', query] as const,
+  pillar: (category: string) => [...searchKeys.all, 'pillar', category] as const,
+  pillarEnterprises: (category: string) =>
+    [...searchKeys.pillar(category), 'enterprises'] as const,
+  pillarProducts: (category: string) =>
+    [...searchKeys.pillar(category), 'products'] as const,
+  pillarServices: (category: string) =>
+    [...searchKeys.pillar(category), 'services'] as const,
 };
 
 type UseGlobalSearchOptions = {
+  enabled?: boolean;
+};
+
+type UsePillarSearchOptions = {
   enabled?: boolean;
 };
 
@@ -51,6 +62,78 @@ export function useGlobalSearch(searchQuery: string, options?: UseGlobalSearchOp
     queryFn: () =>
       searchService.searchServices({
         query: normalizedQuery || undefined,
+      }),
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+    enabled,
+  });
+
+  const isLoading =
+    (enterprisesQuery.isLoading && !enterprisesQuery.data) ||
+    (productsQuery.isLoading && !productsQuery.data) ||
+    (servicesQuery.isLoading && !servicesQuery.data);
+
+  const isFetching =
+    enterprisesQuery.isFetching ||
+    productsQuery.isFetching ||
+    servicesQuery.isFetching;
+
+  return {
+    enterprises: enterprisesQuery.data ?? [],
+    products: productsQuery.data ?? [],
+    services: servicesQuery.data ?? [],
+    isLoading,
+    isFetching,
+    isError:
+      enterprisesQuery.isError ||
+      productsQuery.isError ||
+      servicesQuery.isError,
+    refetch: () => {
+      void enterprisesQuery.refetch();
+      void productsQuery.refetch();
+      void servicesQuery.refetch();
+    },
+  };
+}
+
+/** Market pillar browse: search by category = pillar title (e.g. Nutrition). */
+export function usePillarSearch(
+  category: string,
+  options?: UsePillarSearchOptions,
+) {
+  const normalizedCategory = useMemo(() => category.trim(), [category]);
+  const enabled = (options?.enabled ?? true) && Boolean(normalizedCategory);
+
+  const enterprisesQuery = useQuery<EnterpriseListItem[], ApiError>({
+    queryKey: searchKeys.pillarEnterprises(normalizedCategory),
+    queryFn: () =>
+      searchService.searchEnterprises({
+        category: normalizedCategory,
+      }),
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+    enabled,
+  });
+
+  const productsQuery = useQuery<ProductListItem[], ApiError>({
+    queryKey: searchKeys.pillarProducts(normalizedCategory),
+    queryFn: () =>
+      searchService.searchProducts({
+        category: normalizedCategory,
+      }),
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+    enabled,
+  });
+
+  const servicesQuery = useQuery<ServiceListItem[], ApiError>({
+    queryKey: searchKeys.pillarServices(normalizedCategory),
+    queryFn: () =>
+      searchService.searchServices({
+        category: normalizedCategory,
       }),
     staleTime: 30_000,
     gcTime: 5 * 60_000,

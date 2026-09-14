@@ -41,6 +41,42 @@ export function useServices(options?: UseServicesOptions) {
   });
 }
 
+/** Market dashboard: first active service for Products & services preview. */
+export function useFeaturedMarketService() {
+  return useQuery({
+    queryKey: [...serviceKeys.all, 'market-featured'] as const,
+    queryFn: async () => {
+      const { items } = await serviceService.getList({
+        status: 'active',
+        page: 1,
+        page_size: 1,
+      });
+      return items[0] ?? null;
+    },
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+}
+
+/** Market offers See all: active services list. */
+export function useMarketServicesList(pageSize = 100) {
+  return useQuery({
+    queryKey: [...serviceKeys.all, 'market-offers', pageSize] as const,
+    queryFn: async () => {
+      const { items } = await serviceService.getList({
+        status: 'active',
+        page: 1,
+        page_size: pageSize,
+      });
+      return items;
+    },
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+}
+
 type UseInfiniteServicesOptions = {
   enabled?: boolean;
 };

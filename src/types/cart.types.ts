@@ -53,3 +53,25 @@ export type Cart = {
   subtotal: number;
   currency: string;
 };
+
+export type CartCheckoutShippingAddress = {
+  full_name: string;
+  phone: string;
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+};
+
+export type CartCheckoutPayload = {
+  shipping_address: CartCheckoutShippingAddress;
+};
+
+export type CartCheckoutResult = {
+  id?: string;
+  orderId?: string;
+  status?: string;
+  raw: unknown;
+};

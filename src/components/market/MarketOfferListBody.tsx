@@ -1,4 +1,13 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 
 import { BizProfileMonitorIcon } from '@/components/market/MarketBusinessProfileIcons';
@@ -8,14 +17,17 @@ import {
   MarketUserIcon,
 } from '@/components/market/MarketIcons';
 import {
-  MARKET_OFFERS_ALL,
   OFFER_LIST_BORDER,
   OFFER_LIST_FILTERS,
+  OFFER_LIST_GREEN,
   OFFER_LIST_MUTED,
   OFFER_LIST_SOFT,
   OFFER_LIST_TEAL,
   type OfferListItem,
 } from '@/components/market/marketOfferListData';
+import { useMarketProductsList } from '@/hooks/useProducts';
+import { useMarketServicesList } from '@/hooks/useServices';
+import { mapProductsAndServicesToOfferList } from '@/utils/marketOffers.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
 type MarketOfferListBodyProps = {
@@ -49,11 +61,29 @@ export function MarketOfferListBody({
   onFilterChange,
 }: MarketOfferListBodyProps) {
   const router = useRouter();
-  const offers = MARKET_OFFERS_ALL.filter((offer) => {
-    if (filter === 'Products') return offer.kind === 'PRODUCT';
-    if (filter === 'Services') return offer.kind === 'SERVICE';
-    return true;
-  });
+  const { data: products = [], isLoading: productsLoading } =
+    useMarketProductsList();
+  const { data: services = [], isLoading: servicesLoading } =
+    useMarketServicesList();
+
+  const isLoading = productsLoading || servicesLoading;
+  const allOffers = useMemo(
+    () =>
+      isLoading
+        ? []
+        : mapProductsAndServicesToOfferList(products, services),
+    [isLoading, products, services],
+  );
+
+  const offers = useMemo(
+    () =>
+      allOffers.filter((offer) => {
+        if (filter === 'Products') return offer.kind === 'PRODUCT';
+        if (filter === 'Services') return offer.kind === 'SERVICE';
+        return true;
+      }),
+    [allOffers, filter],
+  );
   const rows = chunkPairs(offers);
 
   return (
@@ -82,55 +112,75 @@ export function MarketOfferListBody({
         </ScrollView>
       </View>
 
-      <View style={styles.grid}>
-        {rows.map((row) => (
-          <View key={row.map((item) => item.id).join('-')} style={styles.row}>
-            {row.map((offer) => (
-              <Pressable
-                key={offer.id}
-                style={styles.card}
-                onPress={() =>
-                  router.push(
-                    offer.route === 'service'
-                      ? {
-                          pathname: '/(main)/market/service-detail',
-                          params: { id: offer.id },
-                        }
-                      : '/(main)/market/listing',
-                  )
-                }
-                accessibilityRole="button"
-              >
-                <View style={[styles.media, { backgroundColor: offer.mediaBg }]}>
-                  <OfferGlyph item={offer} />
-                </View>
-                <View style={styles.copy}>
-                  <Text
-                    style={[
-                      styles.kind,
-                      {
-                        color: offer.kindColor,
-                        backgroundColor: offer.kindBg,
-                      },
-                    ]}
-                  >
-                    {offer.kind}
-                  </Text>
-                  <Text style={styles.title}>{offer.title}</Text>
-                  <Text style={styles.vendor}>{offer.vendor}</Text>
-                  <Text style={styles.price}>
-                    {offer.price}
-                    {offer.priceSuffix ? (
-                      <Text style={styles.suffix}>{offer.priceSuffix}</Text>
-                    ) : null}
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
-            {row.length === 1 ? <View style={styles.cardSpacer} /> : null}
-          </View>
-        ))}
-      </View>
+      {isLoading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={OFFER_LIST_GREEN} />
+        </View>
+      ) : offers.length === 0 ? (
+        <Text style={styles.empty}>No products or services yet.</Text>
+      ) : (
+        <View style={styles.grid}>
+          {rows.map((row) => (
+            <View key={row.map((item) => item.id).join('-')} style={styles.row}>
+              {row.map((offer) => (
+                <Pressable
+                  key={`${offer.kind}-${offer.id}`}
+                  style={styles.card}
+                  onPress={() =>
+                    router.push(
+                      offer.route === 'service'
+                        ? {
+                            pathname: '/(main)/market/service-detail',
+                            params: { id: offer.id },
+                          }
+                        : {
+                            pathname: '/(main)/market/listing',
+                            params: { id: offer.id },
+                          },
+                    )
+                  }
+                  accessibilityRole="button"
+                >
+                  <View style={[styles.media, { backgroundColor: offer.mediaBg }]}>
+                    {offer.imageUrl ? (
+                      <Image
+                        source={{ uri: offer.imageUrl }}
+                        style={styles.mediaImage}
+                        contentFit="cover"
+                        transition={0}
+                      />
+                    ) : (
+                      <OfferGlyph item={offer} />
+                    )}
+                  </View>
+                  <View style={styles.copy}>
+                    <Text
+                      style={[
+                        styles.kind,
+                        {
+                          color: offer.kindColor,
+                          backgroundColor: offer.kindBg,
+                        },
+                      ]}
+                    >
+                      {offer.kind}
+                    </Text>
+                    <Text style={styles.title}>{offer.title}</Text>
+                    <Text style={styles.vendor}>{offer.vendor}</Text>
+                    <Text style={styles.price}>
+                      {offer.price}
+                      {offer.priceSuffix ? (
+                        <Text style={styles.suffix}>{offer.priceSuffix}</Text>
+                      ) : null}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+              {row.length === 1 ? <View style={styles.cardSpacer} /> : null}
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -175,6 +225,15 @@ const styles = StyleSheet.create({
   chipTextActive: {
     color: '#FFFFFF',
   },
+  loading: {
+    paddingVertical: c(32, 28),
+    alignItems: 'center',
+  },
+  empty: {
+    fontSize: c(13, 12),
+    color: OFFER_LIST_MUTED,
+    paddingVertical: c(12, 10),
+  },
   grid: {
     gap: NU.cardGap,
   },
@@ -197,6 +256,11 @@ const styles = StyleSheet.create({
     height: c(96, 84),
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  mediaImage: {
+    width: '100%',
+    height: '100%',
   },
   copy: {
     paddingTop: c(11, 9),

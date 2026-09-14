@@ -1,5 +1,5 @@
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
 import { MarketListingBody } from '@/components/market/MarketListingBody';
@@ -10,6 +10,7 @@ import {
   LISTING_GREEN,
   LISTING_MUTED,
 } from '@/components/market/marketListingData';
+import { useAddToCart } from '@/hooks/useCart';
 import { useProduct } from '@/hooks/useProducts';
 import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 import {
@@ -20,11 +21,13 @@ import { c } from '@/utils/newUiCompact';
 
 export function MarketListingScreen() {
   const scrollRef = useScrollToTopOnFocus();
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const productId = typeof id === 'string' ? id : Array.isArray(id) ? id[0] : '';
   const { product, isLoading, isError } = useProduct(productId, {
     enabled: Boolean(productId),
   });
+  const addToCart = useAddToCart();
 
   const listing =
     product != null
@@ -32,6 +35,28 @@ export function MarketListingScreen() {
       : !productId || isError
         ? STATIC_MARKET_LISTING_VIEW
         : null;
+
+  const handleAddToCart = () => {
+    if (!productId) {
+      router.push('/(main)/market/cart');
+      return;
+    }
+
+    addToCart.mutate(
+      { product_id: productId, quantity: 1 },
+      {
+        onSuccess: () => {
+          router.push('/(main)/market/cart');
+        },
+        onError: (err) => {
+          Alert.alert(
+            'Add to cart',
+            err.message || 'Could not add this product. Please try again.',
+          );
+        },
+      },
+    );
+  };
 
   return (
     <View style={styles.screen}>
@@ -53,7 +78,11 @@ export function MarketListingScreen() {
             <MarketListingHeader listing={listing} />
             <MarketListingBody listing={listing} />
           </ScrollView>
-          <MarketListingFooter listing={listing} />
+          <MarketListingFooter
+            listing={listing}
+            onAddToCart={handleAddToCart}
+            isAdding={addToCart.isPending}
+          />
         </>
       ) : null}
     </View>

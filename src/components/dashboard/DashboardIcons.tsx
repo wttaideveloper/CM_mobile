@@ -425,7 +425,19 @@ export function TabIcon({
   color,
   size = 20,
 }: {
-  name: 'home' | 'hwi' | 'market' | 'check-in' | 'coach' | 'explore' | 'shop' | 'events' | 'profile';
+  name:
+    | 'home'
+    | 'enterprises'
+    | 'hwi'
+    | 'market'
+    | 'events-training'
+    | 'me'
+    | 'check-in'
+    | 'coach'
+    | 'explore'
+    | 'shop'
+    | 'events'
+    | 'profile';
   color: string;
   size?: number;
 }) {
@@ -433,6 +445,8 @@ export function TabIcon({
   switch (name) {
     case 'home':
       return <HouseIcon size={size} color={color} strokeWidth={strokeWidth} />;
+    case 'enterprises':
+      return <Building2Icon size={size} color={color} />;
     case 'hwi':
       return (
         <ChartColumnsIcon size={size} color={color} strokeWidth={strokeWidth} />
@@ -441,6 +455,10 @@ export function TabIcon({
       return (
         <ShoppingBagIcon size={size} color={color} strokeWidth={strokeWidth} />
       );
+    case 'events-training':
+      return <CalendarDaysIcon size={size} color={color} />;
+    case 'me':
+      return <UserIcon size={size} color={color} />;
     case 'check-in':
       return (
         <CheckinTabIcon size={size} color={color} strokeWidth={strokeWidth} />

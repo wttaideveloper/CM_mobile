@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
@@ -9,11 +9,46 @@ import {
   MARKET_CHECKOUT_BG,
   MARKET_CHECKOUT_GREEN,
 } from '@/components/market/marketCheckoutData';
+import { useAddresses } from '@/hooks/useAddresses';
+import { useCheckoutCart } from '@/hooks/useCart';
 import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
+import { useMarketCheckoutAddressStore } from '@/stores/marketCheckoutAddress.store';
+import { savedAddressToCheckoutShipping } from '@/utils/address.mapper';
 
 export function MarketCheckoutScreen() {
   const router = useRouter();
   const scrollRef = useScrollToTopOnFocus();
+  const { isLoading: isAddressesLoading } = useAddresses();
+  const checkoutCart = useCheckoutCart();
+  const address = useMarketCheckoutAddressStore((s) => {
+    return (
+      s.savedAddresses.find((item) => item.id === s.selectedAddressId) ??
+      s.savedAddresses[0]
+    );
+  });
+
+  const handlePay = async () => {
+    if (!address) {
+      Alert.alert(
+        'Address required',
+        'Please add or select a delivery address before paying.',
+      );
+      return;
+    }
+
+    try {
+      await checkoutCart.mutateAsync({
+        shipping_address: savedAddressToCheckoutShipping(address),
+      });
+      router.replace('/(main)/market/order-confirmed');
+    } catch (err) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : 'Checkout failed. Please try again.';
+      Alert.alert('Checkout failed', message);
+    }
+  };
 
   return (
     <View style={styles.screen}>
@@ -32,7 +67,9 @@ export function MarketCheckoutScreen() {
         <MarketCheckoutBody />
       </ScrollView>
       <MarketCheckoutFooter
-        onPay={() => router.push('/(main)/market/order-confirmed')}
+        onPay={() => void handlePay()}
+        isPaying={checkoutCart.isPending}
+        disabled={isAddressesLoading && !address}
       />
     </View>
   );

@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { BizProfileMonitorIcon } from '@/components/market/MarketBusinessProfileIcons';
+import { MarketBusinessAvatar } from '@/components/market/MarketBusinessAvatar';
 import {
   MarketBagIcon,
   MarketBowlIcon,
@@ -58,15 +59,22 @@ export function MarketPillarListings({
             <Pressable
               key={biz.id}
               style={styles.bizCard}
-              onPress={() => router.push('/(main)/market/business-profile')}
+              onPress={() =>
+                router.push({
+                  pathname: '/(main)/market/business-profile',
+                  params: { id: biz.id },
+                })
+              }
             >
-              <View
-                style={[styles.bizAvatar, { backgroundColor: biz.avatarBg }]}
-              >
-                <Text style={[styles.bizInitials, { color: biz.avatarColor }]}>
-                  {biz.initials}
-                </Text>
-              </View>
+              <MarketBusinessAvatar
+                imageUrl={biz.imageUrl}
+                initials={biz.initials}
+                avatarBg={biz.avatarBg}
+                avatarColor={biz.avatarColor}
+                size={c(48, 42)}
+                borderRadius={NU.cardRadiusMd}
+                initialsFontSize={NU.cardTitle}
+              />
               <View style={styles.bizCopy}>
                 <View style={styles.bizNameRow}>
                   <Text style={styles.bizName}>{biz.name}</Text>
@@ -98,7 +106,10 @@ export function MarketPillarListings({
                         pathname: '/(main)/market/service-detail',
                         params: { id: offer.id },
                       }
-                    : '/(main)/market/listing',
+                    : {
+                        pathname: '/(main)/market/listing',
+                        params: { id: offer.id },
+                      },
                 )
               }
             >
@@ -205,17 +216,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: NU.cardGap,
     alignItems: 'center',
-  },
-  bizAvatar: {
-    width: c(48, 42),
-    height: c(48, 42),
-    borderRadius: NU.cardRadiusMd,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bizInitials: {
-    fontSize: NU.cardTitle,
-    fontWeight: '800',
   },
   bizCopy: {
     flex: 1,

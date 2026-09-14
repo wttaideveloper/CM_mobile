@@ -2,7 +2,11 @@ import Svg, { Circle, Path } from 'react-native-svg';
 
 type IconProps = { color?: string; size?: number };
 
-export function MarketHeartIcon({ color, size = 24 }: IconProps) {
+export function MarketHeartIcon({
+  color,
+  size = 24,
+  filled = false,
+}: IconProps & { filled?: boolean }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -10,6 +14,7 @@ export function MarketHeartIcon({ color, size = 24 }: IconProps) {
         stroke={color}
         strokeWidth={1.7}
         strokeLinecap="round"
+        fill={filled ? color : 'none'}
       />
     </Svg>
   );

@@ -1,12 +1,12 @@
+import { useMemo } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 
 import { MarketBackIcon } from '@/components/market/MarketIcons';
-import {
-  MARKET_CART_GREEN,
-  MARKET_CART_SUMMARY,
-} from '@/components/market/marketCartData';
+import { MARKET_CART_GREEN } from '@/components/market/marketCartData';
+import { useCart } from '@/hooks/useCart';
+import { buildMarketCartSummary } from '@/utils/marketCart.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
 const headerDeco = require('../../assets/images/market-header-deco.png');
@@ -16,6 +16,8 @@ const DESIGN_W = 430;
 export function MarketCartHeader() {
   const router = useRouter();
   const scale = SCREEN_W / DESIGN_W;
+  const { cart } = useCart();
+  const summary = useMemo(() => buildMarketCartSummary(cart), [cart]);
 
   return (
     <View style={styles.header}>
@@ -43,8 +45,7 @@ export function MarketCartHeader() {
         </Pressable>
         <View style={styles.titleBlock}>
           <Text style={styles.eyebrow}>
-            {MARKET_CART_SUMMARY.businesses} businesses ·{' '}
-            {MARKET_CART_SUMMARY.items} items
+            {summary.businesses} businesses · {summary.items} items
           </Text>
           <Text style={styles.title}>Your cart</Text>
         </View>

@@ -7,6 +7,8 @@ export const MARKET_CART_TRACK = '#eef4ee';
 
 export type MarketCartItem = {
   id: string;
+  /** Present for API cart lines — used for quantity updates. */
+  productId?: string;
   title: string;
   subtitle: string;
   price: string;
@@ -14,6 +16,9 @@ export type MarketCartItem = {
   iconBg: string;
   iconColor: string;
   icon: 'bag' | 'bowl' | 'pulse';
+  /** product_images from cart API when available. */
+  imageUrl?: string | null;
+  isApiItem?: boolean;
 };
 
 export type MarketCartGroup = {

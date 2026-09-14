@@ -12,6 +12,8 @@ import type { ApiError } from '@/types/api.types';
 import type {
   AddToCartPayload,
   Cart,
+  CartCheckoutPayload,
+  CartCheckoutResult,
   UpdateCartItemPayload,
 } from '@/types/cart.types';
 
@@ -98,5 +100,24 @@ export function useClearCart() {
   return useMutation<Cart, ApiError, void>({
     mutationFn: cartService.clearCart,
     onSuccess: (cart) => applyCartSuccess(queryClient, cart),
+  });
+}
+
+export function useCheckoutCart() {
+  const queryClient = useQueryClient();
+
+  return useMutation<CartCheckoutResult, ApiError, CartCheckoutPayload>({
+    mutationFn: cartService.checkout,
+    onSuccess: () => {
+      const emptyCart: Cart = {
+        id: '',
+        status: 'empty',
+        items: [],
+        subtotal: 0,
+        currency: 'USD',
+      };
+      applyCartSuccess(queryClient, emptyCart);
+      void queryClient.invalidateQueries({ queryKey: cartKeys.mine() });
+    },
   });
 }

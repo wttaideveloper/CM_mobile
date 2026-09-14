@@ -80,8 +80,16 @@ export function mapEnterpriseToBizProfile(
     // e.g. "Tester Shop" → "TS"
     initials: initialsFromName(fullName),
     rating: formatRating(item.rating),
-    // reviews_count / distance not on API yet
-    reviewsMeta: MARKET_BIZ_PROFILE.reviewsMeta,
+    reviewsMeta:
+      item.reviewsCount > 0
+        ? `${item.reviewsCount} review${item.reviewsCount === 1 ? '' : 's'}${
+            item.distanceMiles != null && Number.isFinite(item.distanceMiles)
+              ? ` · ${item.distanceMiles.toFixed(1)} mi`
+              : item.isOnline
+                ? ' · Online'
+                : ''
+          }`
+        : MARKET_BIZ_PROFILE.reviewsMeta,
     about: textOrFallback(item.description, MARKET_BIZ_PROFILE.about),
     addressLine: textOrFallback(item.location, MARKET_BIZ_PROFILE.addressLine),
     addressMeta: MARKET_BIZ_PROFILE.addressMeta,
@@ -91,7 +99,8 @@ export function mapEnterpriseToBizProfile(
     // business hours not on API yet
     hours: MARKET_BIZ_PROFILE.hours,
     offerCount: MARKET_BIZ_PROFILE.offerCount,
-    logoUrl: pickLogoUrl(item.logoUrl),
+    // Prefer banner_url, then logo_url — initials when neither is set.
+    logoUrl: pickLogoUrl(item.bannerUrl) ?? pickLogoUrl(item.logoUrl),
   };
 }
 

@@ -4,6 +4,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -30,15 +31,22 @@ const DESIGN_W = 430;
 type MarketHeaderProps = {
   activeFilter: string;
   onFilterChange: (filter: string) => void;
+  search: string;
+  onSearchChange: (text: string) => void;
 };
 
-export function MarketHeader({ activeFilter, onFilterChange }: MarketHeaderProps) {
+export function MarketHeader({
+  activeFilter,
+  onFilterChange,
+  search,
+  onSearchChange,
+}: MarketHeaderProps) {
   const router = useRouter();
   const scale = SCREEN_W / DESIGN_W;
   const cartCount = useCartStore((s) =>
     s.items.reduce((sum, item) => sum + item.quantity, 0),
   );
-  const badge = cartCount > 0 ? cartCount : 2;
+  const badge = cartCount;
 
   return (
     <View style={styles.header}>
@@ -88,20 +96,29 @@ export function MarketHeader({ activeFilter, onFilterChange }: MarketHeaderProps
           accessibilityLabel="Cart"
         >
           <MarketCartIcon />
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-          </View>
+          {badge > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+            </View>
+          ) : null}
         </Pressable>
       </View>
 
-      <Pressable
-        style={styles.search}
-        onPress={() => router.push('/(main)/search-data')}
-        accessibilityRole="button"
-      >
+      <View style={styles.search}>
         <MarketSearchIcon />
-        <Text style={styles.searchText}>Businesses, products or services</Text>
-      </Pressable>
+        <TextInput
+          style={styles.searchInput}
+          value={search}
+          onChangeText={onSearchChange}
+          placeholder="Businesses, products or services"
+          placeholderTextColor="rgba(255,255,255,0.55)"
+          returnKeyType="search"
+          autoCorrect={false}
+          autoCapitalize="none"
+          clearButtonMode="while-editing"
+          accessibilityLabel="Search marketplace"
+        />
+      </View>
 
       <View style={styles.filtersRow}>
         <ScrollView
@@ -198,9 +215,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: NU.cardPad,
     zIndex: 1,
   },
-  searchText: {
+  searchInput: {
+    flex: 1,
     fontSize: NU.link,
-    color: 'rgba(255,255,255,0.8)',
+    color: '#FFFFFF',
+    paddingVertical: 0,
   },
   filtersRow: {
     marginTop: NU.cardGap,

@@ -38,6 +38,8 @@ export type PillarBrowseContent = {
     avatarBg: string;
     avatarColor: string;
     verified?: boolean;
+    /** banner_url / logo_url from enterprise API. */
+    imageUrl?: string | null;
   }[];
   offers: {
     id: string;

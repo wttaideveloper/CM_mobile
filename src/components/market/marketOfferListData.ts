@@ -21,6 +21,8 @@ export type OfferListItem = {
   iconColor: string;
   icon: 'bag' | 'bowl' | 'user' | 'monitor';
   route: 'listing' | 'service';
+  /** Product image_urls / product_images, or service banner_image. */
+  imageUrl?: string | null;
 };
 
 export const MARKET_OFFERS_ALL: OfferListItem[] = [

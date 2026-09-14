@@ -1,4 +1,13 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 
 import {
   MarketCartChevronIcon,
@@ -7,32 +16,77 @@ import {
 import {
   MarketCheckoutCheckIcon,
   MarketCheckoutPinIcon,
-  MarketCheckoutShieldIcon,
 } from '@/components/market/MarketCheckoutIcons';
+import { formatMarketAddressLine } from '@/components/market/marketAddressData';
 import {
   MARKET_CHECKOUT,
   MARKET_CHECKOUT_BORDER,
   MARKET_CHECKOUT_GREEN,
-  MARKET_CHECKOUT_LINES,
   MARKET_CHECKOUT_MUTED,
   MARKET_CHECKOUT_TEAL,
   MARKET_CHECKOUT_TRACK,
 } from '@/components/market/marketCheckoutData';
+import { useAddresses } from '@/hooks/useAddresses';
+import { useCart } from '@/hooks/useCart';
+import { useMarketCheckoutAddressStore } from '@/stores/marketCheckoutAddress.store';
+import { formatMoney } from '@/utils/currency';
+import {
+  buildMarketCartSummary,
+  mapCartItemToMarketCartItem,
+} from '@/utils/marketCart.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
 export function MarketCheckoutBody() {
+  const router = useRouter();
+  const { isLoading: isAddressesLoading } = useAddresses();
+  const { cart, isLoading: isCartLoading, isError, refetch } = useCart();
+  const address = useMarketCheckoutAddressStore((s) => {
+    return (
+      s.savedAddresses.find((item) => item.id === s.selectedAddressId) ??
+      s.savedAddresses[0]
+    );
+  });
+
+  const lines = useMemo(
+    () => (cart?.items ?? []).map(mapCartItemToMarketCartItem),
+    [cart],
+  );
+  const summary = useMemo(() => buildMarketCartSummary(cart), [cart]);
+
   return (
     <View style={styles.body}>
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Deliver to</Text>
-        <View style={styles.card}>
+        <Pressable
+          style={styles.card}
+          onPress={() => router.push('/(main)/market/address')}
+          accessibilityRole="button"
+          accessibilityLabel={
+            address ? 'Change delivery address' : 'Add delivery address'
+          }
+        >
           <MarketCheckoutPinIcon />
           <View style={styles.cardCopy}>
-            <Text style={styles.cardTitle}>{MARKET_CHECKOUT.addressLabel}</Text>
-            <Text style={styles.cardMeta}>{MARKET_CHECKOUT.addressLine}</Text>
+            {isAddressesLoading && !address ? (
+              <ActivityIndicator color={MARKET_CHECKOUT_GREEN} />
+            ) : address ? (
+              <>
+                <Text style={styles.cardTitle}>{address.label}</Text>
+                <Text style={styles.cardMeta}>
+                  {formatMarketAddressLine(address)}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.cardTitle}>Add delivery address</Text>
+                <Text style={styles.cardMeta}>
+                  Choose a saved address or add a new one
+                </Text>
+              </>
+            )}
           </View>
-          <Text style={styles.link}>Change</Text>
-        </View>
+          <Text style={styles.link}>{address ? 'Change' : 'Add'}</Text>
+        </Pressable>
       </View>
 
       <View style={styles.section}>
@@ -61,32 +115,76 @@ export function MarketCheckoutBody() {
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Order summary</Text>
         <View style={styles.summaryCard}>
-          {MARKET_CHECKOUT_LINES.map((line) => (
-            <View key={line.id} style={styles.lineRow}>
-              <View style={[styles.swatch, { backgroundColor: line.swatch }]} />
-              <Text style={styles.lineTitle}>{line.title}</Text>
-              <Text style={styles.linePrice}>{line.price}</Text>
+          {isCartLoading && lines.length === 0 ? (
+            <View style={styles.stateBox}>
+              <ActivityIndicator color={MARKET_CHECKOUT_GREEN} />
             </View>
-          ))}
-          <View style={styles.divider} />
-          <View style={styles.feeRow}>
-            <Text style={styles.feeLabel}>Delivery</Text>
-            <Text style={styles.feeFree}>{MARKET_CHECKOUT.delivery}</Text>
-          </View>
-          <View style={styles.feeRow}>
-            <Text style={styles.feeLabel}>Tax</Text>
-            <Text style={styles.feeValue}>{MARKET_CHECKOUT.tax}</Text>
-          </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total due today</Text>
-            <Text style={styles.totalValue}>{MARKET_CHECKOUT.total}</Text>
-          </View>
-        </View>
-      </View>
+          ) : null}
 
-      <View style={styles.note}>
-        <MarketCheckoutShieldIcon />
-        <Text style={styles.noteText}>{MARKET_CHECKOUT.renewNote}</Text>
+          {isError && lines.length === 0 ? (
+            <View style={styles.stateBox}>
+              <Text style={styles.stateText}>Could not load cart items.</Text>
+              <Pressable
+                style={styles.retryBtn}
+                onPress={() => refetch()}
+                accessibilityRole="button"
+              >
+                <Text style={styles.retryText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {!isCartLoading && !isError && lines.length === 0 ? (
+            <Text style={styles.stateText}>Your cart is empty.</Text>
+          ) : null}
+
+          {lines.map((line) => {
+            const cartItem = cart?.items.find((item) => item.id === line.id);
+            const linePrice = cartItem
+              ? formatMoney(cartItem.lineTotal, cartItem.currency)
+              : line.price;
+
+            return (
+              <View key={line.id} style={styles.lineRow}>
+                <View style={[styles.swatch, { backgroundColor: line.iconBg }]}>
+                  {line.imageUrl ? (
+                    <Image
+                      source={{ uri: line.imageUrl }}
+                      style={styles.swatchImage}
+                      contentFit="cover"
+                      transition={0}
+                    />
+                  ) : null}
+                </View>
+                <View style={styles.lineCopy}>
+                  <Text style={styles.lineTitle} numberOfLines={2}>
+                    {line.title}
+                  </Text>
+                  <Text style={styles.lineMeta}>Qty {line.qty}</Text>
+                </View>
+                <Text style={styles.linePrice}>{linePrice}</Text>
+              </View>
+            );
+          })}
+
+          {lines.length > 0 ? (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.feeRow}>
+                <Text style={styles.feeLabel}>Subtotal</Text>
+                <Text style={styles.feeValue}>{summary.subtotal}</Text>
+              </View>
+              <View style={styles.feeRow}>
+                <Text style={styles.feeLabel}>Delivery</Text>
+                <Text style={styles.feeFree}>{summary.delivery}</Text>
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total due today</Text>
+                <Text style={styles.totalValue}>{summary.total}</Text>
+              </View>
+            </>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -193,6 +291,27 @@ const styles = StyleSheet.create({
     padding: c(15, 12),
     gap: NU.cardGap,
   },
+  stateBox: {
+    alignItems: 'center',
+    gap: c(10, 8),
+    paddingVertical: c(8, 6),
+  },
+  stateText: {
+    fontSize: NU.body,
+    color: MARKET_CHECKOUT_MUTED,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    paddingHorizontal: c(14, 12),
+    paddingVertical: c(8, 7),
+    borderRadius: 99,
+    backgroundColor: MARKET_CHECKOUT_TEAL,
+  },
+  retryText: {
+    fontSize: NU.body,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
   lineRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -202,12 +321,24 @@ const styles = StyleSheet.create({
     width: c(38, 32),
     height: c(38, 32),
     borderRadius: c(10, 8),
+    overflow: 'hidden',
+  },
+  swatchImage: {
+    width: '100%',
+    height: '100%',
+  },
+  lineCopy: {
+    flex: 1,
+    gap: c(2, 1),
   },
   lineTitle: {
-    flex: 1,
     fontSize: c(13.5, 12.5),
     fontWeight: '600',
     color: MARKET_CHECKOUT_TEAL,
+  },
+  lineMeta: {
+    fontSize: c(12, 11),
+    color: MARKET_CHECKOUT_MUTED,
   },
   linePrice: {
     fontSize: c(13.5, 12.5),
@@ -250,19 +381,5 @@ const styles = StyleSheet.create({
     fontSize: NU.heading,
     fontWeight: '800',
     color: MARKET_CHECKOUT_TEAL,
-  },
-  note: {
-    backgroundColor: '#e6f4e8',
-    borderRadius: NU.cardRadius,
-    padding: NU.cardPadSm,
-    flexDirection: 'row',
-    gap: NU.cardGap,
-    alignItems: 'flex-start',
-  },
-  noteText: {
-    flex: 1,
-    fontSize: c(12.5, 11.5),
-    lineHeight: c(19, 17),
-    color: '#3c6b47',
   },
 });

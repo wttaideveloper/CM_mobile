@@ -37,6 +37,42 @@ export function useProducts(options?: UseProductsOptions) {
   });
 }
 
+/** Market dashboard: first active product for Products & services preview. */
+export function useFeaturedMarketProduct() {
+  return useQuery({
+    queryKey: [...productKeys.all, 'market-featured'] as const,
+    queryFn: async () => {
+      const { items } = await productService.getList({
+        status: 'active',
+        page: 1,
+        page_size: 1,
+      });
+      return items[0] ?? null;
+    },
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+}
+
+/** Market offers See all: active products list. */
+export function useMarketProductsList(pageSize = 100) {
+  return useQuery({
+    queryKey: [...productKeys.all, 'market-offers', pageSize] as const,
+    queryFn: async () => {
+      const { items } = await productService.getList({
+        status: 'active',
+        page: 1,
+        page_size: pageSize,
+      });
+      return items;
+    },
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+}
+
 type UseInfiniteProductsOptions = {
   enabled?: boolean;
 };

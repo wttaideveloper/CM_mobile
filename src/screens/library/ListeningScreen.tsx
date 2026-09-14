@@ -69,7 +69,7 @@ export function ListeningScreen() {
           </View>
           <Pressable
             style={styles.cta}
-            onPress={() => router.push('/(main)/(tabs)/check-in')}
+            onPress={() => router.push('/(main)/check-in')}
           >
             <Text style={styles.ctaText}>Log air</Text>
           </Pressable>

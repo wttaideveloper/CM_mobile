@@ -35,13 +35,37 @@ export const ENDPOINTS = {
     GET: '/api/v1/cart/',
     ADD: '/api/v1/cart/',
     CLEAR: '/api/v1/cart/',
+    CHECKOUT: '/api/v1/cart/checkout',
     UPDATE_ITEM: (itemId: string) => `/api/v1/cart/items/${itemId}`,
     REMOVE_ITEM: (itemId: string) => `/api/v1/cart/items/${itemId}`,
+  },
+
+  ADDRESSES: {
+    GET_ALL: '/api/v1/addresses/',
+    CREATE: '/api/v1/addresses/',
   },
 
   SERVICES: {
     GET_ALL: '/api/v1/services/',
     GET_BY_ID: (id: string) => `/api/v1/services/${id}`,
+  },
+
+  TRAININGS: {
+    GET_ALL: '/api/v1/trainings/',
+    GET_BY_ID: (id: string) => `/api/v1/trainings/${id}`,
+    ENROLL: (id: string) => `/api/v1/trainings/${id}/enroll`,
+    ENROL: (id: string) => `/api/v1/trainings/${id}/enrol`,
+    MY_ENROLMENTS: '/api/v1/trainings/my/enrolments',
+    REVIEWS: (id: string) => `/api/v1/trainings/${id}/reviews`,
+    MY_WISHLIST: '/api/v1/trainings/my/wishlist',
+    ADD_WISHLIST: (id: string) => `/api/v1/trainings/${id}/wishlist`,
+    REMOVE_WISHLIST: (id: string) => `/api/v1/trainings/${id}/wishlist`,
+    DOWNLOADABLE_LESSONS: (id: string) =>
+      `/api/v1/trainings/${id}/lessons/downloadable`,
+    DOWNLOAD_LESSON: (id: string, lessonId: string) =>
+      `/api/v1/trainings/${id}/lessons/${lessonId}/download`,
+    NOTES_PDF: (id: string) => `/api/v1/trainings/${id}/notes.pdf`,
+    CONTENT: (id: string) => `/api/v1/trainings/${id}/content`,
   },
 
   SEARCH: {

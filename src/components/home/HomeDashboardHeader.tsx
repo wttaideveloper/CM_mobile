@@ -102,10 +102,28 @@ export function HomeDashboardHeader({ displayName }: HomeDashboardHeaderProps) {
           <Pressable
             style={styles.breakdownBtn}
             accessibilityRole="button"
-            onPress={() => router.push('/(main)/(tabs)/hwi')}
+            onPress={() => router.push('/(main)/hwi')}
           >
             <Text style={styles.breakdownText}>Full breakdown ›</Text>
           </Pressable>
+          <View style={styles.actionRow}>
+            <Pressable
+              style={styles.actionBtn}
+              accessibilityRole="button"
+              accessibilityLabel="HWI"
+              onPress={() => router.push('/(main)/hwi')}
+            >
+              <Text style={styles.breakdownText}>HWI™ ›</Text>
+            </Pressable>
+            <Pressable
+              style={styles.actionBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Check In"
+              onPress={() => router.push('/(main)/check-in')}
+            >
+              <Text style={styles.breakdownText}>Check In ›</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </View>
@@ -202,6 +220,20 @@ const styles = StyleSheet.create({
   breakdownBtn: {
     alignSelf: 'flex-start',
     marginTop: 2,
+    paddingVertical: c(7, 5),
+    paddingHorizontal: c(12, 10),
+    borderRadius: 99,
+    backgroundColor: HOME_DASH_TEAL,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: c(8, 6),
+    marginTop: 2,
+  },
+  actionBtn: {
+    alignSelf: 'flex-start',
     paddingVertical: c(7, 5),
     paddingHorizontal: c(12, 10),
     borderRadius: 99,

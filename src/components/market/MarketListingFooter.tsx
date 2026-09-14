@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,11 +10,13 @@ import { c, NU } from '@/utils/newUiCompact';
 type MarketListingFooterProps = {
   listing: MarketListingView;
   onAddToCart?: () => void;
+  isAdding?: boolean;
 };
 
 export function MarketListingFooter({
   listing,
   onAddToCart,
+  isAdding = false,
 }: MarketListingFooterProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -30,11 +32,16 @@ export function MarketListingFooter({
         <ListingListIcon />
       </Pressable>
       <Pressable
-        style={styles.addBtn}
+        style={[styles.addBtn, isAdding && styles.addBtnDisabled]}
         onPress={onAddToCart ?? (() => router.push('/(main)/market/cart'))}
+        disabled={isAdding}
         accessibilityRole="button"
       >
-        <Text style={styles.addText}>{listing.cartLabel}</Text>
+        {isAdding ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.addText}>{listing.cartLabel}</Text>
+        )}
       </Pressable>
     </View>
   );
@@ -67,6 +74,9 @@ const styles = StyleSheet.create({
     backgroundColor: LISTING_TEAL,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  addBtnDisabled: {
+    opacity: 0.7,
   },
   addText: {
     fontSize: NU.cardTitle,

@@ -1,48 +1,44 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 
 import {
   MarketStarIcon,
   MarketVerifiedIcon,
 } from '@/components/market/MarketIcons';
+import { MarketBusinessAvatar } from '@/components/market/MarketBusinessAvatar';
 import {
   BIZ_LIST_BORDER,
+  BIZ_LIST_GREEN,
   BIZ_LIST_MUTED,
   BIZ_LIST_SOFT,
   BIZ_LIST_SORTS,
   BIZ_LIST_TEAL,
-  FEATURED_BUSINESSES_ALL,
 } from '@/components/market/marketBusinessListData';
+import type { MarketBusiness } from '@/components/market/marketDashboardData';
 import { c, NU } from '@/utils/newUiCompact';
 
 type MarketBusinessListBodyProps = {
+  businesses: MarketBusiness[];
+  isLoading?: boolean;
   sort: string;
   onSortChange: (sort: string) => void;
 };
 
-function sortedBusinesses(sort: string) {
-  const list = [...FEATURED_BUSINESSES_ALL];
-  if (sort === 'Top rated') {
-    return list.sort((a, b) => Number(b.rating) - Number(a.rating));
-  }
-  if (sort === 'Verified') {
-    return list.sort((a, b) => Number(!!b.verified) - Number(!!a.verified));
-  }
-  // Closest — keep Online last, otherwise leave mock order
-  return list.sort((a, b) => {
-    const aOnline = a.meta === 'Online' ? 1 : 0;
-    const bOnline = b.meta === 'Online' ? 1 : 0;
-    if (aOnline !== bOnline) return aOnline - bOnline;
-    return 0;
-  });
-}
-
+/** Kept for reuse; primary list UI now lives in MarketBusinessListScreen FlatList. */
 export function MarketBusinessListBody({
+  businesses,
+  isLoading = false,
   sort,
   onSortChange,
 }: MarketBusinessListBodyProps) {
   const router = useRouter();
-  const businesses = sortedBusinesses(sort);
 
   return (
     <View style={styles.body}>
@@ -70,35 +66,52 @@ export function MarketBusinessListBody({
         </ScrollView>
       </View>
 
-      <View style={styles.list}>
-        {businesses.map((biz) => (
-          <Pressable
-            key={biz.id}
-            style={styles.card}
-            onPress={() => router.push('/(main)/market/business-profile')}
-            accessibilityRole="button"
-          >
-            <View style={[styles.avatar, { backgroundColor: biz.avatarBg }]}>
-              <Text style={[styles.initials, { color: biz.avatarColor }]}>
-                {biz.initials}
-              </Text>
-            </View>
-            <View style={styles.copy}>
-              <View style={styles.nameRow}>
-                <Text style={styles.name}>{biz.name}</Text>
-                {biz.verified ? <MarketVerifiedIcon /> : null}
+      {isLoading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={BIZ_LIST_GREEN} />
+        </View>
+      ) : businesses.length === 0 ? (
+        <Text style={styles.empty}>No businesses available yet.</Text>
+      ) : (
+        <View style={styles.list}>
+          {businesses.map((biz) => (
+            <Pressable
+              key={biz.id}
+              style={styles.card}
+              onPress={() =>
+                router.push({
+                  pathname: '/(main)/market/business-profile',
+                  params: { id: biz.id },
+                })
+              }
+              accessibilityRole="button"
+            >
+              <MarketBusinessAvatar
+                imageUrl={biz.imageUrl}
+                initials={biz.initials}
+                avatarBg={biz.avatarBg}
+                avatarColor={biz.avatarColor}
+                size={c(56, 48)}
+                borderRadius={NU.cardRadiusMd}
+                initialsFontSize={c(19, 16)}
+              />
+              <View style={styles.copy}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.name}>{biz.name}</Text>
+                  {biz.verified ? <MarketVerifiedIcon /> : null}
+                </View>
+                <Text style={styles.subtitle}>{biz.subtitle}</Text>
+                <View style={styles.meta}>
+                  <MarketStarIcon />
+                  <Text style={styles.rating}>{biz.rating}</Text>
+                  <Text style={styles.metaDot}>· {biz.reviews}</Text>
+                  <Text style={styles.metaDot}>· {biz.meta}</Text>
+                </View>
               </View>
-              <Text style={styles.subtitle}>{biz.subtitle}</Text>
-              <View style={styles.meta}>
-                <MarketStarIcon />
-                <Text style={styles.rating}>{biz.rating}</Text>
-                <Text style={styles.metaDot}>· {biz.reviews}</Text>
-                <Text style={styles.metaDot}>· {biz.meta}</Text>
-              </View>
-            </View>
-          </Pressable>
-        ))}
-      </View>
+            </Pressable>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -143,6 +156,15 @@ const styles = StyleSheet.create({
   chipTextActive: {
     color: '#FFFFFF',
   },
+  loading: {
+    paddingVertical: c(28, 24),
+    alignItems: 'center',
+  },
+  empty: {
+    fontSize: c(13, 12),
+    color: BIZ_LIST_MUTED,
+    paddingVertical: c(12, 10),
+  },
   list: {
     gap: NU.cardGap,
   },
@@ -155,17 +177,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: c(13, 11),
     alignItems: 'center',
-  },
-  avatar: {
-    width: c(56, 48),
-    height: c(56, 48),
-    borderRadius: NU.cardRadiusMd,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initials: {
-    fontSize: c(19, 16),
-    fontWeight: '800',
   },
   copy: {
     flex: 1,

@@ -17,8 +17,10 @@ import {
   ORDERS_TEAL,
   ORDERS_TRACK,
   PAST_ORDERS,
+  type OrdersTab,
   type PastOrder,
 } from '@/components/market/marketOrdersData';
+import { MY_ENROLLED_TRAININGS } from '@/components/market/marketTrainingMyEnrollData';
 import { c, NU } from '@/utils/newUiCompact';
 
 function PastOrderIcon({ order }: { order: PastOrder }) {
@@ -33,11 +35,11 @@ function PastOrderIcon({ order }: { order: PastOrder }) {
   }
 }
 
-export function MarketOrdersBody() {
+function SubscriptionsBody() {
   const router = useRouter();
 
   return (
-    <View style={styles.body}>
+    <>
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Active subscriptions</Text>
 
@@ -98,33 +100,100 @@ export function MarketOrdersBody() {
           </View>
         </Pressable>
       </View>
+    </>
+  );
+}
 
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Past orders</Text>
-        <View style={styles.pastCard}>
-          {PAST_ORDERS.map((order, index) => (
-            <View
-              key={order.id}
-              style={[
-                styles.pastRow,
-                index < PAST_ORDERS.length - 1 && styles.pastRowBorder,
-              ]}
-            >
-              <View style={[styles.pastIcon, { backgroundColor: order.iconBg }]}>
-                <PastOrderIcon order={order} />
-              </View>
-              <View style={styles.pastCopy}>
-                <Text style={styles.pastTitle}>{order.title}</Text>
-                <Text style={styles.pastDetail}>{order.detail}</Text>
-              </View>
-              <View style={styles.pastRight}>
-                <Text style={styles.pastPrice}>{order.price}</Text>
-                <Text style={styles.pastAction}>{order.action}</Text>
-              </View>
+function TrainingsBody() {
+  const router = useRouter();
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>My enrolled trainings</Text>
+      <Text style={styles.helper}>
+        Static preview · tap a training to attend (QR pass or day-wise links)
+      </Text>
+      <Pressable
+        onPress={() => router.push('/(main)/market/training-wishlist')}
+        accessibilityRole="button"
+      >
+        <Text style={styles.wishlistLink}>Open wishlist ›</Text>
+      </Pressable>
+
+      {MY_ENROLLED_TRAININGS.map((item) => (
+        <Pressable
+          key={item.id}
+          style={styles.trainingCard}
+          accessibilityRole="button"
+          onPress={() =>
+            router.push({
+              pathname: '/(main)/market/my-training-progress',
+              params: { id: item.id },
+            })
+          }
+        >
+          <View style={styles.trainingTop}>
+            <View style={[styles.modePill, { backgroundColor: item.badgeBg }]}>
+              <Text style={[styles.modePillText, { color: item.badgeColor }]}>
+                {item.mode.toUpperCase()}
+              </Text>
             </View>
-          ))}
-        </View>
+            <Text style={styles.enrollCode}>{item.enrollmentCode}</Text>
+          </View>
+          <Text style={styles.subTitle}>{item.title}</Text>
+          <Text style={styles.subVendor}>
+            {item.vendor} · {item.progressLabel}
+          </Text>
+          <View style={styles.detailBox}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.detailLabel}>Next session</Text>
+              <Text style={styles.detailValue}>{item.nextSession}</Text>
+            </View>
+            <Text style={[styles.attendCta, { color: item.accent }]}>Open ›</Text>
+          </View>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function PastOrdersBody() {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>Past orders</Text>
+      <View style={styles.pastCard}>
+        {PAST_ORDERS.map((order, index) => (
+          <View
+            key={order.id}
+            style={[
+              styles.pastRow,
+              index < PAST_ORDERS.length - 1 && styles.pastRowBorder,
+            ]}
+          >
+            <View style={[styles.pastIcon, { backgroundColor: order.iconBg }]}>
+              <PastOrderIcon order={order} />
+            </View>
+            <View style={styles.pastCopy}>
+              <Text style={styles.pastTitle}>{order.title}</Text>
+              <Text style={styles.pastDetail}>{order.detail}</Text>
+            </View>
+            <View style={styles.pastRight}>
+              <Text style={styles.pastPrice}>{order.price}</Text>
+              <Text style={styles.pastAction}>{order.action}</Text>
+            </View>
+          </View>
+        ))}
       </View>
+    </View>
+  );
+}
+
+export function MarketOrdersBody({ activeTab }: { activeTab: OrdersTab }) {
+  return (
+    <View style={styles.body}>
+      {activeTab === 'Subscriptions' ? <SubscriptionsBody /> : null}
+      {activeTab === 'Trainings' ? <TrainingsBody /> : null}
+      {activeTab === 'Past orders' ? <PastOrdersBody /> : null}
     </View>
   );
 }
@@ -146,6 +215,17 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: ORDERS_MUTED,
   },
+  helper: {
+    marginTop: -c(4, 2),
+    fontSize: c(12.5, 11.5),
+    color: ORDERS_MUTED,
+    lineHeight: c(18, 16),
+  },
+  wishlistLink: {
+    fontSize: NU.link,
+    fontWeight: '700',
+    color: ORDERS_GREEN,
+  },
   subCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -153,6 +233,37 @@ const styles = StyleSheet.create({
     borderRadius: NU.cardRadius,
     padding: c(15, 12),
     gap: c(13, 11),
+  },
+  trainingCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: ORDERS_BORDER,
+    borderRadius: NU.cardRadius,
+    padding: c(15, 12),
+    gap: c(8, 6),
+  },
+  trainingTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modePill: {
+    paddingVertical: c(4, 3),
+    paddingHorizontal: c(8, 6),
+    borderRadius: c(5, 4),
+  },
+  modePillText: {
+    fontSize: NU.label,
+    fontWeight: '700',
+  },
+  enrollCode: {
+    fontSize: c(11.5, 10.5),
+    fontWeight: '700',
+    color: ORDERS_MUTED,
+  },
+  attendCta: {
+    fontSize: NU.link,
+    fontWeight: '800',
   },
   subTop: {
     flexDirection: 'row',
@@ -206,6 +317,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: c(10, 8),
   },
   detailLabel: {
     fontSize: c(11.5, 10.5),

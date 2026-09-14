@@ -1,5 +1,13 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Image } from 'expo-image';
 
 import {
   MarketCartChevronIcon,
@@ -15,13 +23,19 @@ import {
 import {
   MARKET_CART_BORDER,
   MARKET_CART_GREEN,
-  MARKET_CART_GROUPS,
   MARKET_CART_MUTED,
-  MARKET_CART_SUMMARY,
   MARKET_CART_TEAL,
   MARKET_CART_TRACK,
   type MarketCartItem,
 } from '@/components/market/marketCartData';
+import {
+  useCart,
+  useUpdateCartItem,
+} from '@/hooks/useCart';
+import {
+  buildMarketCartSummary,
+  mergeMarketCartGroups,
+} from '@/utils/marketCart.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
 function ItemIcon({ item }: { item: MarketCartItem }) {
@@ -36,18 +50,46 @@ function ItemIcon({ item }: { item: MarketCartItem }) {
   }
 }
 
+function ItemThumb({ item }: { item: MarketCartItem }) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(item.imageUrl) && !failed;
+
+  useEffect(() => {
+    setFailed(false);
+  }, [item.imageUrl]);
+
+  return (
+    <View style={[styles.itemIcon, { backgroundColor: item.iconBg }]}>
+      {showImage ? (
+        <Image
+          source={{ uri: item.imageUrl! }}
+          style={styles.itemImage}
+          contentFit="cover"
+          transition={0}
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <ItemIcon item={item} />
+      )}
+    </View>
+  );
+}
+
 function QtyStepper({
   qty,
+  disabled,
   onChange,
 }: {
   qty: number;
+  disabled?: boolean;
   onChange: (next: number) => void;
 }) {
   return (
-    <View style={styles.qty}>
+    <View style={[styles.qty, disabled && styles.qtyDisabled]}>
       <Pressable
-        onPress={() => onChange(Math.max(1, qty - 1))}
+        onPress={() => !disabled && onChange(Math.max(1, qty - 1))}
         hitSlop={8}
+        disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel="Decrease quantity"
       >
@@ -55,8 +97,9 @@ function QtyStepper({
       </Pressable>
       <Text style={styles.qtyText}>{qty}</Text>
       <Pressable
-        onPress={() => onChange(qty + 1)}
+        onPress={() => !disabled && onChange(qty + 1)}
         hitSlop={8}
+        disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel="Increase quantity"
       >
@@ -67,19 +110,65 @@ function QtyStepper({
 }
 
 export function MarketCartBody() {
-  const [qtyById, setQtyById] = useState<Record<string, number>>(() => {
-    const initial: Record<string, number> = {};
-    MARKET_CART_GROUPS.forEach((group) => {
+  const { cart, isLoading, isError, error, refetch } = useCart();
+  const updateItem = useUpdateCartItem();
+
+  const groups = useMemo(() => mergeMarketCartGroups(cart), [cart]);
+  const summary = useMemo(() => buildMarketCartSummary(cart), [cart]);
+
+  const [qtyById, setQtyById] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const next: Record<string, number> = {};
+    groups.forEach((group) => {
       group.items.forEach((item) => {
-        initial[item.id] = item.qty;
+        next[item.id] = item.qty;
       });
     });
-    return initial;
-  });
+    setQtyById(next);
+  }, [groups]);
+
+  const handleQtyChange = (item: MarketCartItem, next: number) => {
+    setQtyById((prev) => ({ ...prev, [item.id]: next }));
+
+    if (!item.isApiItem) return;
+
+    updateItem.mutate(
+      { itemId: item.id, quantity: next },
+      {
+        onError: (err) => {
+          setQtyById((prev) => ({ ...prev, [item.id]: item.qty }));
+          Alert.alert(
+            'Cart',
+            err.message || 'Could not update quantity. Please try again.',
+          );
+        },
+      },
+    );
+  };
 
   return (
     <View style={styles.body}>
-      {MARKET_CART_GROUPS.map((group) => (
+      {isLoading && !cart ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={MARKET_CART_GREEN} />
+          <Text style={styles.loadingText}>Loading cart…</Text>
+        </View>
+      ) : null}
+
+      {isError ? (
+        <Pressable
+          style={styles.errorBanner}
+          onPress={() => void refetch()}
+          accessibilityRole="button"
+        >
+          <Text style={styles.errorText}>
+            {error?.message || 'Could not load cart. Tap to retry.'}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {groups.map((group) => (
         <View key={group.id} style={styles.group}>
           <View style={styles.bizRow}>
             <View style={[styles.avatar, { backgroundColor: group.avatarBg }]}>
@@ -99,9 +188,7 @@ export function MarketCartBody() {
                   index < group.items.length - 1 && styles.itemBorder,
                 ]}
               >
-                <View style={[styles.itemIcon, { backgroundColor: item.iconBg }]}>
-                  <ItemIcon item={item} />
-                </View>
+                <ItemThumb item={item} />
                 <View style={styles.itemCopy}>
                   <Text style={styles.itemTitle}>{item.title}</Text>
                   <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
@@ -109,9 +196,8 @@ export function MarketCartBody() {
                 </View>
                 <QtyStepper
                   qty={qtyById[item.id] ?? item.qty}
-                  onChange={(next) =>
-                    setQtyById((prev) => ({ ...prev, [item.id]: next }))
-                  }
+                  disabled={item.isApiItem && updateItem.isPending}
+                  onChange={(next) => handleQtyChange(item, next)}
                 />
               </View>
             ))}
@@ -128,20 +214,20 @@ export function MarketCartBody() {
       <View style={styles.summary}>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Subtotal</Text>
-          <Text style={styles.summaryValue}>{MARKET_CART_SUMMARY.subtotal}</Text>
+          <Text style={styles.summaryValue}>{summary.subtotal}</Text>
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Delivery</Text>
-          <Text style={styles.summaryFree}>{MARKET_CART_SUMMARY.delivery}</Text>
+          <Text style={styles.summaryFree}>{summary.delivery}</Text>
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Tax</Text>
-          <Text style={styles.summaryValue}>{MARKET_CART_SUMMARY.tax}</Text>
+          <Text style={styles.summaryValue}>{summary.tax}</Text>
         </View>
         <View style={styles.divider} />
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>{MARKET_CART_SUMMARY.total}</Text>
+          <Text style={styles.totalValue}>{summary.total}</Text>
         </View>
       </View>
     </View>
@@ -154,6 +240,25 @@ const styles = StyleSheet.create({
     paddingTop: NU.bodyPadTop,
     paddingBottom: NU.bodyPadBottom,
     gap: c(20, 16),
+  },
+  loading: {
+    paddingVertical: c(16, 12),
+    alignItems: 'center',
+    gap: c(8, 6),
+  },
+  loadingText: {
+    fontSize: c(13, 12),
+    color: MARKET_CART_MUTED,
+  },
+  errorBanner: {
+    backgroundColor: '#fdf0e3',
+    borderRadius: NU.cardRadiusSm,
+    padding: NU.cardPadSm,
+  },
+  errorText: {
+    fontSize: c(13, 12),
+    color: '#8a5c17',
+    fontWeight: '600',
   },
   group: {
     gap: c(11, 9),
@@ -203,6 +308,11 @@ const styles = StyleSheet.create({
     borderRadius: NU.cardRadiusSm,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  itemImage: {
+    width: '100%',
+    height: '100%',
   },
   itemCopy: {
     flex: 1,
@@ -232,6 +342,9 @@ const styles = StyleSheet.create({
     borderRadius: 99,
     paddingVertical: c(5, 4),
     paddingHorizontal: c(9, 7),
+  },
+  qtyDisabled: {
+    opacity: 0.55,
   },
   qtyText: {
     fontSize: c(13.5, 12.5),

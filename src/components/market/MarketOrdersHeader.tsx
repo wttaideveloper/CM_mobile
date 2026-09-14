@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { MarketBackIcon } from '@/components/market/MarketIcons';
 import {
   ORDERS_GREEN,
+  ORDERS_TABS,
   ORDERS_TEAL,
   type OrdersTab,
 } from '@/components/market/marketOrdersData';
@@ -58,7 +59,7 @@ export function MarketOrdersHeader({
       </View>
 
       <View style={styles.tabs}>
-        {(['Subscriptions', 'Past orders'] as const).map((tab) => {
+        {ORDERS_TABS.map((tab) => {
           const active = tab === activeTab;
           return (
             <Pressable
@@ -120,12 +121,13 @@ const styles = StyleSheet.create({
   tabs: {
     marginTop: NU.sectionGap,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: c(8, 6),
     zIndex: 1,
   },
   tab: {
     paddingVertical: c(8, 6),
-    paddingHorizontal: c(15, 12),
+    paddingHorizontal: c(13, 11),
     borderRadius: 99,
     backgroundColor: 'rgba(255,255,255,0.16)',
   },

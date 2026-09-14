@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   mediaImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   dots: {
     position: 'absolute',

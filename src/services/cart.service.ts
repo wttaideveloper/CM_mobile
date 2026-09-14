@@ -2,12 +2,35 @@ import type {
   AddToCartPayload,
   Cart,
   CartApiResponse,
+  CartCheckoutPayload,
+  CartCheckoutResult,
   UpdateCartItemPayload,
 } from '@/types/cart.types';
 import { mapCartApi } from '@/utils/cart.mapper';
 
 import { apiClient } from './api/client';
 import { ENDPOINTS } from './api/endpoints';
+
+function mapCheckoutResult(data: unknown): CartCheckoutResult {
+  if (!data || typeof data !== 'object') {
+    return { raw: data };
+  }
+
+  const record = data as Record<string, unknown>;
+  const id =
+    typeof record.id === 'string'
+      ? record.id
+      : typeof record.order_id === 'string'
+        ? record.order_id
+        : undefined;
+
+  return {
+    id,
+    orderId: typeof record.order_id === 'string' ? record.order_id : id,
+    status: typeof record.status === 'string' ? record.status : undefined,
+    raw: data,
+  };
+}
 
 export const cartService = {
   getMyCart: async (): Promise<Cart> => {
@@ -75,5 +98,14 @@ export const cartService = {
         currency: 'USD',
       };
     }
+  },
+
+  checkout: async (payload: CartCheckoutPayload): Promise<CartCheckoutResult> => {
+    if (__DEV__) {
+      console.log('[Cart API] POST checkout', payload);
+    }
+
+    const response = await apiClient.post(ENDPOINTS.CART.CHECKOUT, payload);
+    return mapCheckoutResult(response.data);
   },
 };

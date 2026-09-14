@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -20,8 +20,11 @@ const VISIBLE_TABS = 5;
 
 type TabName =
   | 'home'
+  | 'enterprises'
   | 'hwi'
   | 'market'
+  | 'events-training'
+  | 'me'
   | 'check-in'
   | 'coach'
   | 'explore'
@@ -42,7 +45,7 @@ type ScrollableMainTabBarProps = {
     routes: TabRoute[];
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  descriptors: Record<string, { options: { title?: string; [key: string]: any } }>;
+  descriptors: Record<string, { options: { title?: string; href?: string | null; [key: string]: any } }>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   navigation: any;
   insets?: unknown;
@@ -52,10 +55,16 @@ function routeToTabName(routeName: string): TabName {
   switch (routeName) {
     case 'index':
       return 'home';
+    case 'enterprises':
+      return 'enterprises';
     case 'hwi':
       return 'hwi';
     case 'market':
       return 'market';
+    case 'events-training':
+      return 'events-training';
+    case 'me':
+      return 'me';
     case 'check-in':
       return 'check-in';
     case 'coach':
@@ -74,6 +83,9 @@ function routeToTabName(routeName: string): TabName {
 }
 
 function labelForRoute(routeName: string, fallback: string): string {
+  if (routeName === 'enterprises') return 'Enterprise';
+  if (routeName === 'events-training') return 'Events & Training';
+  if (routeName === 'me') return 'Me';
   if (routeName === 'hwi') return 'HWI™';
   if (routeName === 'market') return 'Market';
   if (routeName === 'check-in') return 'Check-in';
@@ -91,20 +103,34 @@ export function ScrollableMainTabBar({
   const { bottom } = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
+  const visibleRoutes = useMemo(
+    () =>
+      state.routes.filter((route) => {
+        const href = descriptors[route.key]?.options?.href;
+        return href !== null;
+      }),
+    [descriptors, state.routes],
+  );
   const tabWidth = screenWidth / VISIBLE_TABS;
   const paddingBottom = Math.max(bottom, 8);
 
   useEffect(() => {
-    const index = state.index;
-    if (index < VISIBLE_TABS) {
+    const focusedRoute = state.routes[state.index];
+    const visibleIndex = visibleRoutes.findIndex(
+      (route) => route.key === focusedRoute?.key,
+    );
+    if (visibleIndex < 0) return;
+    if (visibleIndex < VISIBLE_TABS) {
       scrollRef.current?.scrollTo({ x: 0, animated: true });
       return;
     }
-    // Keep the focused tab in view when it's past the first five.
-    const maxOffset = Math.max(0, (state.routes.length - VISIBLE_TABS) * tabWidth);
-    const target = Math.min(index * tabWidth - tabWidth * 2, maxOffset);
+    const maxOffset = Math.max(
+      0,
+      (visibleRoutes.length - VISIBLE_TABS) * tabWidth,
+    );
+    const target = Math.min(visibleIndex * tabWidth - tabWidth * 2, maxOffset);
     scrollRef.current?.scrollTo({ x: Math.max(0, target), animated: true });
-  }, [state.index, state.routes, tabWidth]);
+  }, [state.index, state.routes, tabWidth, visibleRoutes]);
 
   return (
     <View style={[styles.bar, { paddingBottom }]}>
@@ -119,7 +145,7 @@ export function ScrollableMainTabBar({
         disableIntervalMomentum
         contentContainerStyle={styles.scrollContent}
       >
-        {state.routes.map((route: TabRoute) => {
+        {visibleRoutes.map((route: TabRoute) => {
           const index = state.routes.findIndex((r) => r.key === route.key);
           const focused = state.index === index;
           const { options } = descriptors[route.key];

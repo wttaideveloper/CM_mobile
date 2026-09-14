@@ -18,6 +18,9 @@ export type SettingsIconKind =
   | 'user'
   | 'lock'
   | 'bag'
+  | 'cart'
+  | 'heart'
+  | 'calendar'
   | 'chart'
   | 'target'
   | 'clock'
@@ -61,6 +64,52 @@ export type SettingsGroup = {
 /** Only items tied to current new-UI features (Home, HWI, Market, Check-in, Coach, Library). */
 export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
+    id: 'activity',
+    label: 'My activity',
+    rows: [
+      {
+        id: 'my-cart',
+        title: 'My Cart',
+        subtitle: 'Items ready to checkout',
+        icon: 'cart',
+        kind: 'link',
+        href: '/(main)/market/cart',
+      },
+      {
+        id: 'my-wishlist',
+        title: 'My Wishlist',
+        subtitle: 'Saved trainings for later',
+        icon: 'heart',
+        kind: 'link',
+        href: '/(main)/market/training-wishlist',
+      },
+      {
+        id: 'my-orders',
+        title: 'My Orders',
+        subtitle: 'Subscriptions and past orders',
+        icon: 'bag',
+        kind: 'link',
+        href: '/(main)/market/orders?tab=Subscriptions',
+      },
+      {
+        id: 'my-trainings',
+        title: 'My Trainings',
+        subtitle: 'Enrolled courses and sessions',
+        icon: 'book',
+        kind: 'link',
+        href: '/(main)/market/my-trainings',
+      },
+      {
+        id: 'my-events',
+        title: 'My Events',
+        subtitle: 'Registered events and RSVPs',
+        icon: 'calendar',
+        kind: 'link',
+        href: '/(main)/market/my-events',
+      },
+    ],
+  },
+  {
     id: 'account',
     label: 'Account',
     rows: [
@@ -78,14 +127,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         icon: 'lock',
         kind: 'link',
       },
-      {
-        id: 'orders',
-        title: 'Orders & Subscriptions',
-        subtitle: 'Marketplace purchases and deliveries',
-        icon: 'bag',
-        kind: 'link',
-        href: '/(main)/market/orders',
-      },
     ],
   },
   {
@@ -98,7 +139,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         subtitle: 'Retake or update your assessment',
         icon: 'chart',
         kind: 'link',
-        href: '/(main)/(tabs)/hwi',
+        href: '/(main)/hwi',
       },
       {
         id: 'goals',

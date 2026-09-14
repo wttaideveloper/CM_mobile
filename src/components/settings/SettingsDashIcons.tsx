@@ -86,6 +86,51 @@ export function SettingsDashIcon({
           />
         </Base>
       );
+    case 'cart':
+      return (
+        <Base size={size}>
+          <Path
+            d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.2a2 2 0 0 0 2-1.5L21 8H7"
+            stroke={color}
+            strokeWidth={1.7}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Circle cx={10} cy={20} r={1.2} fill={color} />
+          <Circle cx={18} cy={20} r={1.2} fill={color} />
+        </Base>
+      );
+    case 'heart':
+      return (
+        <Base size={size}>
+          <Path
+            d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"
+            stroke={color}
+            strokeWidth={1.7}
+            strokeLinejoin="round"
+          />
+        </Base>
+      );
+    case 'calendar':
+      return (
+        <Base size={size}>
+          <Rect
+            x={4}
+            y={5}
+            width={16}
+            height={15}
+            rx={2}
+            stroke={color}
+            strokeWidth={1.7}
+          />
+          <Path
+            d="M8 3v4M16 3v4M4 10h16"
+            stroke={color}
+            strokeWidth={1.7}
+            strokeLinecap="round"
+          />
+        </Base>
+      );
     case 'chart':
       return (
         <Base size={size}>

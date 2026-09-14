@@ -20,12 +20,14 @@ export default function MainTabLayout() {
   const hideTabBar = isNestedExploreRoute(segments);
   const isGreenHeroTab =
     pathname === '/' ||
-    pathname === '/hwi' ||
-    pathname.endsWith('/hwi') ||
+    pathname === '/enterprises' ||
+    pathname.endsWith('/enterprises') ||
     pathname === '/market' ||
     pathname.endsWith('/market') ||
-    pathname === '/check-in' ||
-    pathname.endsWith('/check-in') ||
+    pathname === '/events-training' ||
+    pathname.endsWith('/events-training') ||
+    pathname === '/me' ||
+    pathname.endsWith('/me') ||
     pathname === '/coach' ||
     pathname.endsWith('/coach');
   const heroStatusBar = HOME_STATUS_BAR;
@@ -71,9 +73,9 @@ export default function MainTabLayout() {
           }}
         />
         <Tabs.Screen
-          name="hwi"
+          name="enterprises"
           options={{
-            title: 'HWI™',
+            title: 'Enterprise',
           }}
         />
         <Tabs.Screen
@@ -83,9 +85,15 @@ export default function MainTabLayout() {
           }}
         />
         <Tabs.Screen
-          name="check-in"
+          name="events-training"
           options={{
-            title: 'Check-in',
+            title: 'Events & Training',
+          }}
+        />
+        <Tabs.Screen
+          name="me"
+          options={{
+            title: 'Me',
           }}
         />
         <Tabs.Screen
@@ -134,6 +142,7 @@ export default function MainTabLayout() {
           name="profile"
           options={{
             title: 'Me',
+            href: null,
           }}
         />
       </Tabs>

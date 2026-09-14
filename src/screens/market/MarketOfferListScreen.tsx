@@ -5,24 +5,40 @@ import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
 import { MarketOfferListBody } from '@/components/market/MarketOfferListBody';
 import { MarketOfferListHeader } from '@/components/market/MarketOfferListHeader';
 import {
-  MARKET_OFFERS_ALL,
   OFFER_LIST_BG,
   OFFER_LIST_GREEN,
 } from '@/components/market/marketOfferListData';
+import { useMarketProductsList } from '@/hooks/useProducts';
+import { useMarketServicesList } from '@/hooks/useServices';
 import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
+import { mapProductsAndServicesToOfferList } from '@/utils/marketOffers.mapper';
 
 export function MarketOfferListScreen() {
   const scrollRef = useScrollToTopOnFocus();
   const [filter, setFilter] = useState('All');
+  const { data: products = [], isLoading: productsLoading } =
+    useMarketProductsList();
+  const { data: services = [], isLoading: servicesLoading } =
+    useMarketServicesList();
+
+  const isLoading = productsLoading || servicesLoading;
+  const allOffers = useMemo(
+    () =>
+      isLoading
+        ? []
+        : mapProductsAndServicesToOfferList(products, services),
+    [isLoading, products, services],
+  );
+
   const count = useMemo(() => {
     if (filter === 'Products') {
-      return MARKET_OFFERS_ALL.filter((o) => o.kind === 'PRODUCT').length;
+      return allOffers.filter((o) => o.kind === 'PRODUCT').length;
     }
     if (filter === 'Services') {
-      return MARKET_OFFERS_ALL.filter((o) => o.kind === 'SERVICE').length;
+      return allOffers.filter((o) => o.kind === 'SERVICE').length;
     }
-    return MARKET_OFFERS_ALL.length;
-  }, [filter]);
+    return allOffers.length;
+  }, [allOffers, filter]);
 
   return (
     <View style={styles.screen}>

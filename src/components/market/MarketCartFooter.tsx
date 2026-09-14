@@ -1,12 +1,14 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   MARKET_CART_BORDER,
-  MARKET_CART_SUMMARY,
   MARKET_CART_TEAL,
 } from '@/components/market/marketCartData';
+import { useCart } from '@/hooks/useCart';
+import { buildMarketCartSummary } from '@/utils/marketCart.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
 type MarketCartFooterProps = {
@@ -16,6 +18,8 @@ type MarketCartFooterProps = {
 export function MarketCartFooter({ onCheckout }: MarketCartFooterProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { cart } = useCart();
+  const summary = useMemo(() => buildMarketCartSummary(cart), [cart]);
 
   return (
     <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, c(22, 18)) }]}>
@@ -27,7 +31,7 @@ export function MarketCartFooter({ onCheckout }: MarketCartFooterProps) {
         accessibilityRole="button"
       >
         <Text style={styles.checkoutText}>
-          Checkout · {MARKET_CART_SUMMARY.total}
+          Checkout · {summary.total}
         </Text>
       </Pressable>
     </View>

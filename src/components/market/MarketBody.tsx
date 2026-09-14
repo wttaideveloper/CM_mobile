@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 
 import {
@@ -12,6 +13,7 @@ import {
   MarketUserIcon,
   MarketVerifiedIcon,
 } from '@/components/market/MarketIcons';
+import { MarketBusinessAvatar } from '@/components/market/MarketBusinessAvatar';
 import {
   MARKET_BORDER,
   MARKET_BUSINESSES,
@@ -23,10 +25,22 @@ import {
   MARKET_SOFT,
   MARKET_TEAL,
   type MarketBusiness,
+  type MarketOffer,
   type MarketPillar,
 } from '@/components/market/marketDashboardData';
-import { useFeaturedMarketEnterprises } from '@/hooks/useEnterprises';
-import { mapEnterprisesToFeaturedBusinesses } from '@/utils/marketBusiness.mapper';
+import { MARKET_TRAININGS } from '@/components/market/marketTrainingData';
+import { MarketTrainingCard } from '@/components/market/MarketTrainingCard';
+import { FEATURED_BUSINESSES_ALL } from '@/components/market/marketBusinessListData';
+import { useMarketHomeData } from '@/hooks/useMarketHome';
+import { useMarketTrainingsPreview } from '@/hooks/useTrainings';
+import {
+  mapEnterprisesToFeaturedBusinesses,
+  mapEnterprisesToMarketBusinessList,
+} from '@/utils/marketBusiness.mapper';
+import {
+  mapFeaturedMarketOffers,
+  mapMarketHomeOffers,
+} from '@/utils/marketOffers.mapper';
 import { c, NU } from '@/utils/newUiCompact';
 
 function PillarIcon({ pillar }: { pillar: MarketPillar }) {
@@ -77,11 +91,15 @@ function FeaturedBusinessCard({ biz }: { biz: MarketBusiness }) {
         })
       }
     >
-      <View style={[styles.bizAvatar, { backgroundColor: biz.avatarBg }]}>
-        <Text style={[styles.bizInitials, { color: biz.avatarColor }]}>
-          {biz.initials}
-        </Text>
-      </View>
+      <MarketBusinessAvatar
+        imageUrl={biz.imageUrl}
+        initials={biz.initials}
+        avatarBg={biz.avatarBg}
+        avatarColor={biz.avatarColor}
+        size={c(56, 48)}
+        borderRadius={NU.cardRadiusMd}
+        initialsFontSize={c(19, 16)}
+      />
       <View style={styles.bizCopy}>
         <View style={styles.bizNameRow}>
           <Text style={styles.bizName}>{biz.name}</Text>
@@ -101,171 +119,311 @@ function FeaturedBusinessCard({ biz }: { biz: MarketBusiness }) {
   );
 }
 
-export function MarketBody() {
+function FeaturedOfferCard({ offer }: { offer: MarketOffer }) {
   const router = useRouter();
-  const { data, isLoading } = useFeaturedMarketEnterprises(2);
+
+  return (
+    <Pressable
+      style={styles.offerCard}
+      onPress={() =>
+        router.push(
+          offer.kind === 'SERVICE'
+            ? {
+                pathname: '/(main)/market/service-detail',
+                params: { id: offer.id },
+              }
+            : {
+                pathname: '/(main)/market/listing',
+                params: { id: offer.id },
+              },
+        )
+      }
+    >
+      <View style={[styles.offerMedia, { backgroundColor: offer.mediaBg }]}>
+        {offer.imageUrl ? (
+          <Image
+            source={{ uri: offer.imageUrl }}
+            style={styles.offerImage}
+            contentFit="cover"
+            transition={0}
+          />
+        ) : offer.icon === 'bag' ? (
+          <MarketBagIcon color={offer.iconColor} />
+        ) : (
+          <MarketUserIcon color={offer.iconColor} />
+        )}
+      </View>
+      <View style={styles.offerCopy}>
+        <Text
+          style={[
+            styles.offerKind,
+            { color: offer.kindColor, backgroundColor: offer.kindBg },
+          ]}
+        >
+          {offer.kind}
+        </Text>
+        <Text style={styles.offerTitle}>{offer.title}</Text>
+        <Text style={styles.offerVendor}>{offer.vendor}</Text>
+        <Text style={styles.offerPrice}>
+          {offer.price}
+          {offer.priceSuffix ? (
+            <Text style={styles.offerSuffix}>{offer.priceSuffix}</Text>
+          ) : null}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+type MarketBodyProps = {
+  searchQuery?: string;
+  activeFilter?: string;
+};
+
+export function MarketBody({
+  searchQuery = '',
+  activeFilter = 'All',
+}: MarketBodyProps) {
+  const router = useRouter();
+  const {
+    isSearching,
+    enterprises,
+    products,
+    services,
+    isLoading,
+    isFetching,
+  } = useMarketHomeData(searchQuery);
+  const { items: apiTrainingsPreview, isLoading: isTrainingsLoading } =
+    useMarketTrainingsPreview();
+
   const featuredBusinesses =
-    data && data.length > 0
-      ? mapEnterprisesToFeaturedBusinesses(data, 2)
+    enterprises.length > 0
+      ? isSearching
+        ? mapEnterprisesToMarketBusinessList(enterprises, FEATURED_BUSINESSES_ALL)
+        : mapEnterprisesToFeaturedBusinesses(enterprises, 2)
       : isLoading
         ? []
-        : MARKET_BUSINESSES;
+        : isSearching
+          ? []
+          : MARKET_BUSINESSES;
+
+  const featuredOffers = isLoading
+    ? []
+    : isSearching
+      ? mapMarketHomeOffers(products, services)
+      : (() => {
+          const mapped = mapFeaturedMarketOffers(products[0], services[0]);
+          return mapped.length > 0 ? mapped : MARKET_OFFERS;
+        })();
+
+  const showPillars =
+    !isSearching && (activeFilter === 'All' || activeFilter === 'Businesses');
+  const showBiz = activeFilter === 'All' || activeFilter === 'Businesses';
+  const showOffers =
+    activeFilter === 'All' ||
+    activeFilter === 'Products' ||
+    activeFilter === 'Services';
+  const showEvents =
+    !isSearching && (activeFilter === 'All' || activeFilter === 'Events');
+  const showTrainings =
+    !isSearching && (activeFilter === 'All' || activeFilter === 'Trainings');
+
+  const visibleOffers = featuredOffers.filter((offer) => {
+    if (activeFilter === 'Products') return offer.kind === 'PRODUCT';
+    if (activeFilter === 'Services') return offer.kind === 'SERVICE';
+    return true;
+  });
+
+  const offerRows: MarketOffer[][] = [];
+  for (let i = 0; i < visibleOffers.length; i += 2) {
+    offerRows.push(visibleOffers.slice(i, i + 2));
+  }
+
+  const bizTitle = isSearching ? 'Businesses' : 'Featured businesses';
+  const showLoading = isLoading || (isFetching && isSearching);
 
   return (
     <View style={styles.body}>
-      <View style={styles.section}>
-        <SectionLabel title="Browse by pillar" />
-        <View style={styles.pillarGrid}>
-          {MARKET_PILLARS.map((pillar) => (
-            <Pressable
-              key={pillar.id}
-              style={styles.pillarItem}
-              onPress={() =>
-                router.push({
-                  pathname: '/(main)/market/pillar',
-                  params: { id: pillar.id },
-                })
-              }
-            >
-              <View style={[styles.pillarTile, { backgroundColor: pillar.bg }]}>
-                <PillarIcon pillar={pillar} />
-              </View>
-              <Text style={styles.pillarTitle}>{pillar.title}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <SectionLabel
-          title="Featured businesses"
-          action="See all"
-          onActionPress={() => router.push('/(main)/market/businesses')}
-        />
-        {isLoading ? (
-          <View style={styles.bizLoading}>
-            <ActivityIndicator color={MARKET_GREEN} />
+      {showPillars ? (
+        <View style={styles.section}>
+          <SectionLabel title="Browse by pillar" />
+          <View style={styles.pillarGrid}>
+            {MARKET_PILLARS.map((pillar) => (
+              <Pressable
+                key={pillar.id}
+                style={styles.pillarItem}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(main)/market/pillar',
+                    params: { id: pillar.id },
+                  })
+                }
+              >
+                <View style={[styles.pillarTile, { backgroundColor: pillar.bg }]}>
+                  <PillarIcon pillar={pillar} />
+                </View>
+                <Text style={styles.pillarTitle}>{pillar.title}</Text>
+              </Pressable>
+            ))}
           </View>
-        ) : featuredBusinesses.length === 0 ? (
-          <Text style={styles.bizEmpty}>No businesses available yet.</Text>
-        ) : (
-          featuredBusinesses.map((biz) => (
-            <FeaturedBusinessCard key={biz.id} biz={biz} />
-          ))
-        )}
-      </View>
+        </View>
+      ) : null}
 
-      <View style={styles.section}>
-        <SectionLabel
-          title="Products & services"
-          action="See all"
-          onActionPress={() => router.push('/(main)/market/offers')}
-        />
-        <View style={styles.offerGrid}>
-          {MARKET_OFFERS.map((offer) => (
+      {showBiz ? (
+        <View style={styles.section}>
+          <SectionLabel
+            title={bizTitle}
+            action={isSearching ? undefined : 'See all'}
+            onActionPress={
+              isSearching
+                ? undefined
+                : () => router.push('/(main)/market/businesses')
+            }
+          />
+          {showLoading && featuredBusinesses.length === 0 ? (
+            <View style={styles.bizLoading}>
+              <ActivityIndicator color={MARKET_GREEN} />
+            </View>
+          ) : featuredBusinesses.length === 0 ? (
+            <Text style={styles.bizEmpty}>
+              {isSearching
+                ? 'No businesses match your search.'
+                : 'No businesses available yet.'}
+            </Text>
+          ) : (
+            featuredBusinesses.map((biz) => (
+              <FeaturedBusinessCard key={biz.id} biz={biz} />
+            ))
+          )}
+        </View>
+      ) : null}
+
+      {showOffers ? (
+        <View style={styles.section}>
+          <SectionLabel
+            title="Products & services"
+            action={isSearching ? undefined : 'See all'}
+            onActionPress={
+              isSearching
+                ? undefined
+                : () => router.push('/(main)/market/offers')
+            }
+          />
+          {showLoading && visibleOffers.length === 0 ? (
+            <View style={styles.bizLoading}>
+              <ActivityIndicator color={MARKET_GREEN} />
+            </View>
+          ) : visibleOffers.length === 0 ? (
+            <Text style={styles.bizEmpty}>
+              {isSearching
+                ? 'No products or services match your search.'
+                : 'No products or services yet.'}
+            </Text>
+          ) : (
+            <View style={styles.offerGrid}>
+              {offerRows.map((row) => (
+                <View
+                  key={row.map((item) => `${item.kind}-${item.id}`).join('-')}
+                  style={styles.offerRow}
+                >
+                  {row.map((offer) => (
+                    <FeaturedOfferCard
+                      key={`${offer.kind}-${offer.id}`}
+                      offer={offer}
+                    />
+                  ))}
+                  {row.length === 1 ? <View style={styles.offerSpacer} /> : null}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      ) : null}
+
+      {showEvents ? (
+        <View style={styles.section}>
+          <SectionLabel
+            title="Events & courses"
+            action="See all"
+            onActionPress={() => router.push('/(main)/market/events')}
+          />
+          {MARKET_EVENTS.map((item) => (
             <Pressable
-              key={offer.id}
-              style={styles.offerCard}
+              key={item.id}
+              style={styles.eventCard}
               onPress={() =>
                 router.push(
-                  offer.kind === 'SERVICE'
-                    ? {
-                        pathname: '/(main)/market/service-detail',
-                        params: { id: offer.id },
-                      }
-                    : '/(main)/market/listing',
+                  item.id === 'metabolic'
+                    ? '/(main)/market/course-learning'
+                    : '/(main)/market/event-detail',
                 )
               }
             >
-              <View style={[styles.offerMedia, { backgroundColor: offer.mediaBg }]}>
-                {offer.icon === 'bag' ? (
-                  <MarketBagIcon color={offer.iconColor} />
-                ) : (
-                  <MarketUserIcon color={offer.iconColor} />
-                )}
-              </View>
-              <View style={styles.offerCopy}>
+              <View style={[styles.eventSide, { backgroundColor: item.sideBg }]}>
+                <Text style={[styles.eventSideTop, { color: item.sideTopColor }]}>
+                  {item.sideTop}
+                </Text>
                 <Text
-                  style={[
-                    styles.offerKind,
-                    { color: offer.kindColor, backgroundColor: offer.kindBg },
-                  ]}
+                  style={[styles.eventSideBottom, { color: item.sideBottomColor }]}
                 >
-                  {offer.kind}
+                  {item.sideBottom}
                 </Text>
-                <Text style={styles.offerTitle}>{offer.title}</Text>
-                <Text style={styles.offerVendor}>{offer.vendor}</Text>
-                <Text style={styles.offerPrice}>
-                  {offer.price}
-                  {offer.priceSuffix ? (
-                    <Text style={styles.offerSuffix}>{offer.priceSuffix}</Text>
-                  ) : null}
-                </Text>
+              </View>
+              <View style={styles.eventCopy}>
+                <View style={styles.eventBadgeRow}>
+                  <Text
+                    style={[
+                      styles.eventBadge,
+                      { color: item.badgeColor, backgroundColor: item.badgeBg },
+                    ]}
+                  >
+                    {item.badge}
+                  </Text>
+                  <Text style={styles.eventWhen}>{item.when}</Text>
+                </View>
+                <Text style={styles.eventTitle}>{item.title}</Text>
+                <Text style={styles.eventDetail}>{item.detail}</Text>
               </View>
             </Pressable>
           ))}
         </View>
-      </View>
+      ) : null}
 
-      <View style={styles.section}>
-        <SectionLabel
-          title="Events & courses"
-          action="See all"
-          onActionPress={() => router.push('/(main)/market/events')}
-        />
-        {MARKET_EVENTS.map((item) => (
-          <Pressable
-            key={item.id}
-            style={styles.eventCard}
-            onPress={() =>
-              router.push(
-                item.id === 'metabolic'
-                  ? '/(main)/market/course-learning'
-                  : '/(main)/market/event-detail',
-              )
-            }
-          >
-            <View style={[styles.eventSide, { backgroundColor: item.sideBg }]}>
-              <Text style={[styles.eventSideTop, { color: item.sideTopColor }]}>
-                {item.sideTop}
-              </Text>
-              <Text
-                style={[styles.eventSideBottom, { color: item.sideBottomColor }]}
-              >
-                {item.sideBottom}
-              </Text>
+      {showTrainings ? (
+        <View style={styles.section}>
+          <SectionLabel
+            title="Trainings"
+            action="See all"
+            onActionPress={() => router.push('/(main)/market/trainings')}
+          />
+          {isTrainingsLoading && apiTrainingsPreview.length === 0 ? (
+            <View style={styles.bizLoading}>
+              <ActivityIndicator color={MARKET_GREEN} />
             </View>
-            <View style={styles.eventCopy}>
-              <View style={styles.eventBadgeRow}>
-                <Text
-                  style={[
-                    styles.eventBadge,
-                    { color: item.badgeColor, backgroundColor: item.badgeBg },
-                  ]}
-                >
-                  {item.badge}
-                </Text>
-                <Text style={styles.eventWhen}>{item.when}</Text>
-              </View>
-              <Text style={styles.eventTitle}>{item.title}</Text>
-              <Text style={styles.eventDetail}>{item.detail}</Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
+          ) : null}
+          {apiTrainingsPreview.map((item) => (
+            <MarketTrainingCard key={`api-${item.id}`} item={item} />
+          ))}
+          {MARKET_TRAININGS.slice(0, 2).map((item) => (
+            <MarketTrainingCard key={`static-${item.id}`} item={item} />
+          ))}
+        </View>
+      ) : null}
 
-      <View style={styles.cta}>
-        <View style={styles.ctaCopy}>
-          <Text style={styles.ctaTitle}>Own a wellness business?</Text>
-          <Text style={styles.ctaBody}>
-            Listings are created on the web — visit invigorate.health/business on
-            a computer.
-          </Text>
+      {!isSearching ? (
+        <View style={styles.cta}>
+          <View style={styles.ctaCopy}>
+            <Text style={styles.ctaTitle}>Own a wellness business?</Text>
+            <Text style={styles.ctaBody}>
+              Listings are created on the web — visit invigorate.health/business on
+              a computer.
+            </Text>
+          </View>
+          <View style={styles.ctaBtn}>
+            <MarketExternalIcon />
+          </View>
         </View>
-        <View style={styles.ctaBtn}>
-          <MarketExternalIcon />
-        </View>
-      </View>
+      ) : null}
     </View>
   );
 }
@@ -338,17 +496,6 @@ const styles = StyleSheet.create({
     gap: c(13, 11),
     alignItems: 'center',
   },
-  bizAvatar: {
-    width: c(56, 48),
-    height: c(56, 48),
-    borderRadius: NU.cardRadiusMd,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bizInitials: {
-    fontSize: c(19, 16),
-    fontWeight: '800',
-  },
   bizCopy: {
     flex: 1,
     gap: c(4, 3),
@@ -389,6 +536,9 @@ const styles = StyleSheet.create({
     color: MARKET_SOFT,
   },
   offerGrid: {
+    gap: NU.cardGap,
+  },
+  offerRow: {
     flexDirection: 'row',
     gap: NU.cardGap,
   },
@@ -400,10 +550,18 @@ const styles = StyleSheet.create({
     borderRadius: NU.cardRadius,
     overflow: 'hidden',
   },
+  offerSpacer: {
+    flex: 1,
+  },
   offerMedia: {
     height: c(96, 84),
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  offerImage: {
+    width: '100%',
+    height: '100%',
   },
   offerCopy: {
     paddingTop: c(11, 9),
