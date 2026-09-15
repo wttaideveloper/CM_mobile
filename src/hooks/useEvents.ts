@@ -10,6 +10,8 @@ import type { ApiError } from '@/types/api.types';
 import type { Event } from '@/constants/events';
 import type {
   EventCancelRegistrationResponse,
+  EventCheckoutRequest,
+  EventOrderApiResponse,
   EventRegistrationRequest,
   EventRegistrationResult,
   MyEventRegistration,
@@ -134,6 +136,29 @@ export function useCancelRegistration() {
       void queryClient.invalidateQueries({ queryKey: eventKeys.myRegistrations() });
       void queryClient.invalidateQueries({ queryKey: eventKeys.detail(variables.eventId) });
       void queryClient.invalidateQueries({ queryKey: eventKeys.list() });
+    },
+  });
+}
+
+/**
+ * POST /api/v1/events/{id}/checkout — paid registration, demo payment only
+ * (Phase 3). The backend creates both the EventOrder and (best-effort) a
+ * companion EventRegistration in one call — see the Phase 3 report for the
+ * backend gap where that companion creation can silently fail.
+ */
+export function useCheckoutEvent() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    EventOrderApiResponse,
+    ApiError,
+    { id: string; payload: EventCheckoutRequest }
+  >({
+    mutationFn: ({ id, payload }) => eventService.checkout(id, payload),
+    onSuccess: (_result, variables) => {
+      void queryClient.invalidateQueries({ queryKey: eventKeys.detail(variables.id) });
+      void queryClient.invalidateQueries({ queryKey: eventKeys.list() });
+      void queryClient.invalidateQueries({ queryKey: eventKeys.myRegistrations() });
     },
   });
 }

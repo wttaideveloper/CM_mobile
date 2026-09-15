@@ -1,3 +1,5 @@
+import type { EventTicketOption } from '@/types/event.types';
+
 export const EVENT_FILTERS = ['All', 'Upcoming', 'This Week', 'Online', 'Free'] as const;
 
 export type EventFilterTag = 'upcoming' | 'thisWeek' | 'online' | 'free';
@@ -30,6 +32,8 @@ export type Event = {
   isFull?: boolean;
   /** From the API's registration_open flag when present; defaults to true when null. */
   registrationOpen?: boolean;
+  /** Empty when the event has no ticket_types — checkout falls back to the flat event price. */
+  ticketOptions?: EventTicketOption[];
 };
 
 const SUMMIT_DETAIL_IMAGE =

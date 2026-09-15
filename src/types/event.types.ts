@@ -1,3 +1,15 @@
+export type EventTicketTypeApiResponse = {
+  id?: string | null;
+  name?: string | null;
+  price?: string | null;
+  currency?: string | null;
+  capacity?: number | null;
+  early_bird_price?: string | null;
+  early_bird_until?: string | null;
+  promo_price?: string | null;
+  description?: string | null;
+};
+
 export type EventVenue = {
   address?: string | null;
   city?: string | null;
@@ -54,7 +66,7 @@ export type EventApiResponse = {
   /** Backend returns price/capacity as strings — parse before using as a number. */
   price?: string | null;
   currency?: string | null;
-  ticket_types?: unknown[] | null;
+  ticket_types?: EventTicketTypeApiResponse[] | null;
   capacity?: string | null;
   min_participants?: string | null;
   max_participants?: string | null;
@@ -160,4 +172,42 @@ export type MyEventRegistration = {
 
 export type EventCancelRegistrationResponse = {
   message: string;
+};
+
+/** A ticket option as shown on the checkout screen — normalized from EventTicketTypeApiResponse. */
+export type EventTicketOption = {
+  /** '' means "no ticket types on this event — use its flat price" (matches the backend's own fallback in _resolve_ticket). */
+  id: string;
+  name: string;
+  currency: string;
+  /** Early-bird/promo already applied — mirrors the backend's _ticket_effective_price, for preview only. */
+  effectivePrice: number;
+  effectivePriceLabel: string;
+};
+
+/** Body for POST /api/v1/events/{id}/checkout — paid registration (Phase 3). Quantity fixed at 1. */
+export type EventCheckoutRequest = {
+  participant_name: string;
+  participant_email: string;
+  ticket_type_id: string;
+  quantity: number;
+};
+
+/**
+ * Response of POST /api/v1/events/{id}/checkout. Unlike the free-registration
+ * endpoint, this one has a real response_model (EventOrderResponse, backend
+ * event_schema.py) — safe to type directly, no defensive parsing needed.
+ */
+export type EventOrderApiResponse = {
+  id: string;
+  event_id: string;
+  participant_name: string;
+  participant_email: string;
+  ticket_type_id: string | null;
+  quantity: number;
+  amount: string;
+  currency: string;
+  payment_status: string;
+  status: string;
+  created_at: string | null;
 };

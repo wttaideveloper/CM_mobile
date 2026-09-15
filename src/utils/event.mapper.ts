@@ -2,6 +2,8 @@ import type { Event, EventFilterTag } from '@/constants/events';
 import type {
   EventApiResponse,
   EventMyRegistrationApiResponse,
+  EventTicketOption,
+  EventTicketTypeApiResponse,
   MyEventBucket,
   MyEventRegistration,
 } from '@/types/event.types';
@@ -176,6 +178,51 @@ function deriveSpeakerInitials(api: EventApiResponse): {
   };
 }
 
+/**
+ * Mirrors the backend's _ticket_effective_price (event_service.py): early-bird
+ * price wins while still within its deadline, else promo_price, else the
+ * ticket's standard price. Preview only — the backend recomputes and returns
+ * the authoritative amount on checkout.
+ */
+function ticketEffectivePrice(
+  ticket: EventTicketTypeApiResponse,
+  fallbackPrice: number | null,
+): number {
+  const earlyBirdPrice = parseNumericString(ticket.early_bird_price);
+  const earlyBirdUntil = safeParseDate(ticket.early_bird_until);
+  if (earlyBirdPrice != null && earlyBirdUntil && earlyBirdUntil.getTime() >= Date.now()) {
+    return earlyBirdPrice;
+  }
+  const promoPrice = parseNumericString(ticket.promo_price);
+  if (promoPrice != null) {
+    return promoPrice;
+  }
+  return parseNumericString(ticket.price) ?? fallbackPrice ?? 0;
+}
+
+function buildTicketOptions(
+  api: EventApiResponse,
+  fallbackPrice: number | null,
+): EventTicketOption[] {
+  const tickets = api.ticket_types ?? [];
+  return tickets
+    // Checkout looks up a ticket by exact id match server-side (event_service.py,
+    // _resolve_ticket) — a ticket with no real id can never be checked out, so
+    // skip it entirely rather than fabricating one that would 404 at checkout.
+    .filter((ticket) => ticket && ticket.name && ticket.id != null && String(ticket.id).trim())
+    .map((ticket) => {
+      const currency = ticket.currency ?? api.currency ?? 'INR';
+      const effectivePrice = ticketEffectivePrice(ticket, fallbackPrice);
+      return {
+        id: String(ticket.id).trim(),
+        name: ticket.name!,
+        currency,
+        effectivePrice,
+        effectivePriceLabel: formatMoney(effectivePrice, currency),
+      };
+    });
+}
+
 export function mapEventApiToItem(api: EventApiResponse): Event {
   const start = safeParseDate(api.start_date);
   const end = safeParseDate(api.end_date);
@@ -202,6 +249,7 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
   // Prefer the backend's own flags; fall back to capacity math only when it omits them.
   const isFull = api.is_full ?? (capacityRaw != null && registered >= capacityRaw);
   const registrationOpen = api.registration_open ?? true;
+  const ticketOptions = buildTicketOptions(api, price);
 
   return {
     id: String(api.id),
@@ -227,6 +275,7 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
     rawStatus: api.status,
     isFull,
     registrationOpen,
+    ticketOptions,
   };
 }
 

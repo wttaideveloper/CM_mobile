@@ -3,8 +3,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 import type {
   EventApiResponse,
   EventCancelRegistrationResponse,
+  EventCheckoutRequest,
   EventListQuery,
   EventMyRegistrationApiResponse,
+  EventOrderApiResponse,
   EventRegistrationApiResponse,
   EventRegistrationRequest,
   EventRegistrationResult,
@@ -166,5 +168,26 @@ export const eventService = {
     }
 
     return localUri;
+  },
+
+  /**
+   * POST /api/v1/events/{id}/checkout — paid registration (Phase 3, demo
+   * payment only). Unlike register(), this endpoint has a real response_model
+   * (EventOrderResponse) so the response can be trusted directly.
+   */
+  checkout: async (
+    id: string,
+    payload: EventCheckoutRequest,
+  ): Promise<EventOrderApiResponse> => {
+    if (__DEV__) {
+      console.log('[Events API] POST checkout:', id, payload);
+    }
+
+    const response = await apiClient.post<EventOrderApiResponse>(
+      ENDPOINTS.EVENTS.CHECKOUT(id),
+      payload,
+    );
+
+    return response.data;
   },
 };

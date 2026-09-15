@@ -94,7 +94,11 @@ export function EventTicketScreen() {
     );
   }
 
-  const canCancel = registration.registrationStatus === 'confirmed';
+  // Phase 3: cancelling only ever calls DELETE .../registrations/{id}, which
+  // never touches an EventOrder — safe for free registrations, but would leave
+  // a paid order confirmed with no refund. Only offer it once the event is
+  // confirmed free; default to hidden while that's still loading/unknown.
+  const canCancel = registration.registrationStatus === 'confirmed' && event?.isFree === true;
 
   function handleCancel() {
     Alert.alert(
@@ -257,6 +261,11 @@ export function EventTicketScreen() {
           </View>
         ) : registration.bucket === 'cancelled' ? (
           <Text style={styles.cancelledNotice}>This registration has been cancelled.</Text>
+        ) : registration.registrationStatus === 'confirmed' && event && !event.isFree ? (
+          <Text style={styles.cancelledNotice}>
+            Cancelling paid registrations isn&rsquo;t available yet — contact support if you need
+            a refund.
+          </Text>
         ) : null}
       </ScrollView>
     </View>

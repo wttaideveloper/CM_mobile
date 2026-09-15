@@ -99,10 +99,9 @@ export function EventRegisterScreen() {
     blockReason = `Registration is closed — this event is ${event.status.toLowerCase()}.`;
   } else if (!registrationOpen) {
     blockReason = 'Registration is not currently open for this event.';
-  } else if (isPaid) {
-    blockReason =
-      "This is a paid event. Online checkout isn't available in the app yet — please check back soon.";
-  } else if (isFull) {
+  } else if (!isPaid && isFull) {
+    // Paid events aren't gated on this: checkout enforces capacity per ticket
+    // type server-side, which this event-wide figure doesn't reliably reflect.
     blockReason = 'This event is at full capacity. Registration is currently unavailable.';
   }
 
@@ -141,6 +140,14 @@ export function EventRegisterScreen() {
     setSubmitError(null);
 
     if (!validate()) {
+      return;
+    }
+
+    if (isPaid) {
+      router.push({
+        pathname: '/(main)/event/checkout',
+        params: { id, participantName: name.trim(), participantEmail: email.trim() },
+      });
       return;
     }
 
@@ -357,13 +364,19 @@ export function EventRegisterScreen() {
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : null}
                 <Text style={styles.submitBtnText}>
-                  {registerMutation.isPending ? 'Registering…' : 'Confirm Registration'}
+                  {registerMutation.isPending
+                    ? 'Registering…'
+                    : isPaid
+                      ? 'Continue to Checkout'
+                      : 'Confirm Registration'}
                 </Text>
               </View>
             </LeafyGradientButton>
 
             <Text style={styles.disclaimer}>
-              This event is free to attend. We&rsquo;ll email your confirmation once you register.
+              {isPaid
+                ? "This is a paid event. You'll review pricing and complete a demo payment on the next screen."
+                : "This event is free to attend. We’ll email your confirmation once you register."}
             </Text>
           </ScrollView>
         </KeyboardAvoidingView>

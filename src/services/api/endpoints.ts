@@ -77,6 +77,7 @@ export const ENDPOINTS = {
       `/api/v1/events/${id}/registrations/${registrationId}`,
     REGISTRATION_QR: (id: string, registrationId: string) =>
       `/api/v1/events/${id}/registrations/${registrationId}/qr`,
+    CHECKOUT: (id: string) => `/api/v1/events/${id}/checkout`,
   },
 
   SEARCH: {
