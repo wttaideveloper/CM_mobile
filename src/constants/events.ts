@@ -24,6 +24,12 @@ export type Event = {
   organizerInitial: string;
   speakerInitials: string[];
   additionalSpeakers: number;
+  /** Raw backend status (e.g. "published", "cancelled") — `status` above is a display label. */
+  rawStatus?: string;
+  /** From the API when present; falls back to capacity math when null (see event.mapper.ts). */
+  isFull?: boolean;
+  /** From the API's registration_open flag when present; defaults to true when null. */
+  registrationOpen?: boolean;
 };
 
 const SUMMIT_DETAIL_IMAGE =

@@ -93,3 +93,31 @@ export type EventListQuery = {
   page?: number;
   page_size?: number;
 };
+
+/** Body for POST /api/v1/events/{id}/registrations — free/individual registration only (Phase 1). */
+export type EventRegistrationRequest = {
+  participant_name: string;
+  participant_email: string;
+};
+
+/**
+ * The endpoint has no declared response_model on the backend (returns the raw
+ * EventRegistration ORM row), so every field here is optional/unverified —
+ * parse defensively, mirroring TrainingEnrollmentResult in training.types.ts.
+ */
+export type EventRegistrationApiResponse = {
+  id?: string;
+  event_id?: string;
+  participant_name?: string | null;
+  participant_email?: string | null;
+  status?: string | null;
+  qr_code?: string | null;
+  created_at?: string | null;
+} & Record<string, unknown>;
+
+/** Normalized shape the app actually relies on, after defensive parsing. */
+export type EventRegistrationResult = {
+  id: string | null;
+  status: string;
+  qrCode: string | null;
+};

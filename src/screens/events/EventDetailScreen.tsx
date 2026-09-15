@@ -83,7 +83,9 @@ export function EventDetailScreen() {
         <EventDetailFooter
           registerLabel={registerLabel}
           paddingBottom={insets.bottom + 10}
-          onRegister={() => router.replace('/(main)/(tabs)/events/courses')}
+          onRegister={() =>
+            router.push({ pathname: '/(main)/event/register', params: { id } })
+          }
         />
       </View>
     </View>

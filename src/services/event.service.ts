@@ -1,6 +1,9 @@
 import type {
   EventApiResponse,
   EventListQuery,
+  EventRegistrationApiResponse,
+  EventRegistrationRequest,
+  EventRegistrationResult,
   EventsPaginatedApiResponse,
 } from '@/types/event.types';
 import { mapEventApiToItem, mapEventsApiResponse } from '@/utils/event.mapper';
@@ -56,5 +59,31 @@ export const eventService = {
       ENDPOINTS.EVENTS.GET_BY_ID(id),
     );
     return mapEventApiToItem(response.data);
+  },
+
+  /**
+   * POST /api/v1/events/{id}/registrations — free registration only.
+   * No response_model on the backend, so parse the body defensively rather
+   * than trusting a specific shape (same approach as trainingService.enroll).
+   */
+  register: async (
+    id: string,
+    payload: EventRegistrationRequest,
+  ): Promise<EventRegistrationResult> => {
+    if (__DEV__) {
+      console.log('[Events API] POST register:', id, payload);
+    }
+
+    const response = await apiClient.post<EventRegistrationApiResponse>(
+      ENDPOINTS.EVENTS.REGISTER(id),
+      payload,
+    );
+    const data = response.data ?? {};
+
+    return {
+      id: data.id != null ? String(data.id) : null,
+      status: String(data.status ?? 'confirmed'),
+      qrCode: data.qr_code != null ? String(data.qr_code) : null,
+    };
   },
 };

@@ -194,6 +194,10 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
 
   const { speakerInitials, additionalSpeakers } = deriveSpeakerInitials(api);
 
+  // Prefer the backend's own flags; fall back to capacity math only when it omits them.
+  const isFull = api.is_full ?? (capacityRaw != null && registered >= capacityRaw);
+  const registrationOpen = api.registration_open ?? true;
+
   return {
     id: String(api.id),
     name: api.title,
@@ -215,6 +219,9 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
     organizerInitial,
     speakerInitials,
     additionalSpeakers,
+    rawStatus: api.status,
+    isFull,
+    registrationOpen,
   };
 }
 
