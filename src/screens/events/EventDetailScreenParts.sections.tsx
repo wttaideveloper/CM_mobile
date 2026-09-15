@@ -180,13 +180,14 @@ export function EventDetailContent({
 }
 
 export function EventDetailFooter({
-  registerLabel,
+  ctaLabel,
   paddingBottom,
-  onRegister,
+  onPress,
 }: {
-  registerLabel: string;
+  ctaLabel: string;
   paddingBottom: number;
-  onRegister: () => void;
+  /** Undefined when the event's current availability offers no action (closed/cancelled/completed). */
+  onPress?: () => void;
 }) {
   return (
     <View style={[styles.footer, { paddingBottom, paddingTop: 10 }]}>
@@ -207,11 +208,12 @@ export function EventDetailFooter({
       </Pressable>
 
       <LeafyGradientButton
-        onPress={onRegister}
+        onPress={onPress}
+        disabled={!onPress}
         style={styles.registerBtn}
         borderRadius={14}
       >
-        <Text style={styles.registerBtnText}>{registerLabel}</Text>
+        <Text style={styles.registerBtnText}>{ctaLabel}</Text>
       </LeafyGradientButton>
     </View>
   );

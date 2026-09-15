@@ -11,6 +11,9 @@ import type {
   EventRegistrationRequest,
   EventRegistrationResult,
   EventsPaginatedApiResponse,
+  EventWaitlistApiResponse,
+  EventWaitlistEntryResult,
+  EventWaitlistJoinRequest,
   MyEventRegistration,
 } from '@/types/event.types';
 import {
@@ -189,5 +192,42 @@ export const eventService = {
     );
 
     return response.data;
+  },
+
+  /**
+   * POST /api/v1/events/{id}/waitlist — join. No response_model on the
+   * backend (same risk as register()), so parse defensively.
+   */
+  joinWaitlist: async (
+    id: string,
+    payload: EventWaitlistJoinRequest,
+  ): Promise<EventWaitlistEntryResult> => {
+    if (__DEV__) {
+      console.log('[Events API] POST waitlist:', id, payload);
+    }
+
+    const response = await apiClient.post<EventWaitlistApiResponse>(
+      ENDPOINTS.EVENTS.WAITLIST(id),
+      payload,
+    );
+    const data = response.data ?? {};
+
+    return { id: data.id != null ? String(data.id) : null };
+  },
+
+  /** DELETE /api/v1/events/{id}/waitlist/{entryId} — leave. */
+  leaveWaitlist: async (
+    id: string,
+    entryId: string,
+  ): Promise<EventCancelRegistrationResponse> => {
+    if (__DEV__) {
+      console.log('[Events API] DELETE waitlist entry:', id, entryId);
+    }
+
+    const response = await apiClient.delete<EventCancelRegistrationResponse>(
+      ENDPOINTS.EVENTS.WAITLIST_ENTRY(id, entryId),
+    );
+
+    return { message: response.data?.message ?? 'Removed from waitlist' };
   },
 };

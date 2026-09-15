@@ -12,6 +12,7 @@ import {
   EventDetailHero,
   getEventRegisterLabel,
 } from '@/screens/events/EventDetailScreenParts';
+import { getEventAvailability } from '@/utils/event.mapper';
 import { PRIMARY, styles } from '@/screens/events/EventDetailScreen.styles';
 
 export function EventDetailScreen() {
@@ -53,7 +54,23 @@ export function EventDetailScreen() {
   const fillPercent =
     event.capacity > 0 ? Math.round((event.registered / event.capacity) * 100) : 0;
   const spotsRemaining = event.capacity - event.registered;
-  const registerLabel = getEventRegisterLabel(event);
+
+  const availability = getEventAvailability(event);
+  let ctaLabel: string;
+  let onCtaPress: (() => void) | undefined;
+  switch (availability.kind) {
+    case 'available':
+      ctaLabel = getEventRegisterLabel(event);
+      onCtaPress = () => router.push({ pathname: '/(main)/event/register', params: { id } });
+      break;
+    case 'full':
+      ctaLabel = 'Join Waitlist';
+      onCtaPress = () => router.push({ pathname: '/(main)/event/waitlist', params: { id } });
+      break;
+    default:
+      ctaLabel = availability.label;
+      onCtaPress = undefined;
+  }
 
   return (
     <View style={styles.screen}>
@@ -81,11 +98,9 @@ export function EventDetailScreen() {
         </ScrollView>
 
         <EventDetailFooter
-          registerLabel={registerLabel}
+          ctaLabel={ctaLabel}
           paddingBottom={insets.bottom + 10}
-          onRegister={() =>
-            router.push({ pathname: '/(main)/event/register', params: { id } })
-          }
+          onPress={onCtaPress}
         />
       </View>
     </View>

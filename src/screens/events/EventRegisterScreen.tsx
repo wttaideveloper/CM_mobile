@@ -20,11 +20,11 @@ import { useEvent, useRegisterForEvent } from '@/hooks/useEvents';
 import { useAuthStore } from '@/stores/auth.store';
 import type { ApiError } from '@/types/api.types';
 import type { EventRegistrationResult } from '@/types/event.types';
+import { getEventAvailability } from '@/utils/event.mapper';
 import { InfoCard } from '@/screens/events/EventDetailScreenParts.shared';
 import { PRIMARY, styles } from '@/screens/events/EventRegisterScreen.styles';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const BLOCKED_STATUSES = new Set(['cancelled', 'completed', 'archived', 'suspended']);
 
 function buildErrorMessage(error: ApiError): string {
   const raw = error.message?.trim();
@@ -88,21 +88,23 @@ export function EventRegisterScreen() {
     );
   }
 
-  const rawStatus = (event.rawStatus ?? '').toLowerCase();
-  const isBlockedStatus = BLOCKED_STATUSES.has(rawStatus);
-  const registrationOpen = event.registrationOpen ?? true;
-  const isFull = event.isFull ?? false;
   const isPaid = !event.isFree;
+  const availability = getEventAvailability(event);
+  // Paid events aren't gated on "full": checkout enforces capacity per ticket
+  // type server-side, which this event-wide figure doesn't reliably reflect.
+  const isFullBlock = !isPaid && availability.kind === 'full';
 
   let blockReason: string | null = null;
-  if (isBlockedStatus) {
-    blockReason = `Registration is closed — this event is ${event.status.toLowerCase()}.`;
-  } else if (!registrationOpen) {
+  let blockActionLabel = 'Back to event';
+  let blockAction = goBack;
+  if (availability.kind === 'cancelled' || availability.kind === 'completed') {
+    blockReason = `Registration is closed — this event is ${availability.label.replace('Event ', '').toLowerCase()}.`;
+  } else if (availability.kind === 'closed') {
     blockReason = 'Registration is not currently open for this event.';
-  } else if (!isPaid && isFull) {
-    // Paid events aren't gated on this: checkout enforces capacity per ticket
-    // type server-side, which this event-wide figure doesn't reliably reflect.
-    blockReason = 'This event is at full capacity. Registration is currently unavailable.';
+  } else if (isFullBlock) {
+    blockReason = 'This event is at full capacity. Join the waitlist to be notified if a spot opens up.';
+    blockActionLabel = 'Join Waitlist';
+    blockAction = () => router.push({ pathname: '/(main)/event/waitlist', params: { id } });
   }
 
   const spotsRemaining = Math.max(0, event.capacity - event.registered);
@@ -268,10 +270,10 @@ export function EventRegisterScreen() {
       ) : blockReason ? (
         <EmptyState
           variant="empty"
-          title="Registration unavailable"
+          title={isFullBlock ? 'Event full' : 'Registration unavailable'}
           description={blockReason}
-          onAction={goBack}
-          actionLabel="Back to event"
+          onAction={blockAction}
+          actionLabel={blockActionLabel}
         />
       ) : (
         <KeyboardAvoidingView

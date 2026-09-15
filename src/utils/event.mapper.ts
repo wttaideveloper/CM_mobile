@@ -292,6 +292,45 @@ export function filterEventsByTag(events: Event[], filter: string): Event[] {
   return events.filter((event) => event.filterTags.includes(tag));
 }
 
+export type EventAvailabilityKind = 'available' | 'full' | 'closed' | 'cancelled' | 'completed';
+
+export type EventAvailability = {
+  kind: EventAvailabilityKind;
+  /** Empty for "available" — no status banner needed in that case. */
+  label: string;
+};
+
+/**
+ * Single source of truth for what the customer can do right now, mirroring
+ * the backend's own two-part gate (event_service.py, both
+ * create_registration_service and create_event_checkout_service):
+ * `status in [cancelled, completed, archived, suspended] → specific reason`,
+ * then `status != "published" → generic "not open" reason`. Checking
+ * `rawStatus !== 'published'` covers every one of those non-terminal
+ * statuses (draft, pending_approval, suspended, archived, ...) without
+ * having to enumerate them by hand.
+ */
+export function getEventAvailability(event: Event): EventAvailability {
+  const rawStatus = (event.rawStatus ?? '').toLowerCase();
+
+  if (rawStatus === 'cancelled') {
+    return { kind: 'cancelled', label: 'Event Cancelled' };
+  }
+  if (rawStatus === 'completed') {
+    return { kind: 'completed', label: 'Event Completed' };
+  }
+  if (rawStatus !== 'published') {
+    return { kind: 'closed', label: 'Registration Closed' };
+  }
+  if (!(event.registrationOpen ?? true)) {
+    return { kind: 'closed', label: 'Registration Closed' };
+  }
+  if (event.isFull ?? false) {
+    return { kind: 'full', label: 'Event Full' };
+  }
+  return { kind: 'available', label: '' };
+}
+
 const REGISTRATION_STATUS_LABELS: Record<string, string> = {
   confirmed: 'Confirmed',
   cancelled: 'Cancelled',

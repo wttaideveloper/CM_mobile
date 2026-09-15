@@ -14,6 +14,8 @@ import type {
   EventOrderApiResponse,
   EventRegistrationRequest,
   EventRegistrationResult,
+  EventWaitlistEntryResult,
+  EventWaitlistJoinRequest,
   MyEventRegistration,
 } from '@/types/event.types';
 
@@ -159,6 +161,41 @@ export function useCheckoutEvent() {
       void queryClient.invalidateQueries({ queryKey: eventKeys.detail(variables.id) });
       void queryClient.invalidateQueries({ queryKey: eventKeys.list() });
       void queryClient.invalidateQueries({ queryKey: eventKeys.myRegistrations() });
+    },
+  });
+}
+
+/** POST /api/v1/events/{id}/waitlist — join (Phase 4). */
+export function useJoinWaitlist() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    EventWaitlistEntryResult,
+    ApiError,
+    { id: string; payload: EventWaitlistJoinRequest }
+  >({
+    mutationFn: ({ id, payload }) => eventService.joinWaitlist(id, payload),
+    onSuccess: (_result, variables) => {
+      // Joining doesn't change capacity, but keep event/list data fresh regardless.
+      void queryClient.invalidateQueries({ queryKey: eventKeys.detail(variables.id) });
+      void queryClient.invalidateQueries({ queryKey: eventKeys.list() });
+    },
+  });
+}
+
+/** DELETE /api/v1/events/{id}/waitlist/{entryId} — leave (Phase 4). */
+export function useLeaveWaitlist() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    EventCancelRegistrationResponse,
+    ApiError,
+    { eventId: string; entryId: string }
+  >({
+    mutationFn: ({ eventId, entryId }) => eventService.leaveWaitlist(eventId, entryId),
+    onSuccess: (_result, variables) => {
+      void queryClient.invalidateQueries({ queryKey: eventKeys.detail(variables.eventId) });
+      void queryClient.invalidateQueries({ queryKey: eventKeys.list() });
     },
   });
 }

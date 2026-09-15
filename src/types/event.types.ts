@@ -198,6 +198,29 @@ export type EventCheckoutRequest = {
  * endpoint, this one has a real response_model (EventOrderResponse, backend
  * event_schema.py) — safe to type directly, no defensive parsing needed.
  */
+/** Body for POST /api/v1/events/{id}/waitlist. */
+export type EventWaitlistJoinRequest = {
+  participant_name: string;
+  participant_email: string;
+};
+
+/**
+ * Response of POST /api/v1/events/{id}/waitlist. No response_model on the
+ * backend (returns the raw EventWaitlist ORM row) — same class of risk as
+ * the free-registration endpoint, so parse defensively.
+ */
+export type EventWaitlistApiResponse = {
+  id?: string;
+  event_id?: string;
+  participant_name?: string | null;
+  participant_email?: string | null;
+  created_at?: string | null;
+} & Record<string, unknown>;
+
+export type EventWaitlistEntryResult = {
+  id: string | null;
+};
+
 export type EventOrderApiResponse = {
   id: string;
   event_id: string;
