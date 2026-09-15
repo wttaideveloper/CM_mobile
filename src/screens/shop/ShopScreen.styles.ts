@@ -144,6 +144,9 @@ export const styles = StyleSheet.create({
     color: TEXT_BLACK,
     paddingVertical: 0,
   },
+  categoriesScrollOuter: {
+    marginTop: isSmallDevice ? 12 : 14,
+  },
   categoriesScroll: {
     gap: isSmallDevice ? 6 : 8,
     paddingBottom: isSmallDevice ? 12 : 14,

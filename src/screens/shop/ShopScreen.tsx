@@ -240,6 +240,7 @@ export function ShopScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.categoriesScrollOuter}
           contentContainerStyle={styles.categoriesScroll}
         >
           {categories.map((category) => {
