@@ -57,7 +57,9 @@ export function SelectTenantModal({
       <View style={styles.backdrop}>
         <View style={styles.card} accessibilityViewIsModal>
           <View style={styles.headerAccent} />
-          <Text style={styles.title}>Select tenant</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            Select tenant
+          </Text>
           <Text style={styles.subtitle}>Choose your organization to continue.</Text>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -118,9 +120,10 @@ export function SelectTenantModal({
           <Pressable
             onPress={onClose}
             disabled={Boolean(joiningSlug)}
-            style={styles.cancelBtn}
+            style={({ pressed }) => [styles.cancelBtn, pressed && styles.cancelBtnPressed]}
             accessibilityRole="button"
             accessibilityLabel="Cancel"
+            accessibilityState={{ disabled: Boolean(joiningSlug) }}
           >
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
@@ -248,6 +251,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E5E7EB',
+  },
+  cancelBtnPressed: {
+    backgroundColor: '#F6F8F7',
   },
   cancelText: {
     fontSize: 15,

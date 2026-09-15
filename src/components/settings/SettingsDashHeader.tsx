@@ -31,14 +31,18 @@ export function SettingsDashHeader() {
       />
       <View style={styles.topRow}>
         <Pressable
-          style={styles.iconBtn}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           onPress={() => router.back()}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
         >
           <MarketBackIcon />
         </Pressable>
-        <Text style={styles.title}>Settings</Text>
+        <Text style={styles.title} accessibilityRole="header">
+          Settings
+        </Text>
       </View>
     </View>
   );
@@ -68,6 +72,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   title: {
     fontSize: NU.title,

@@ -43,24 +43,38 @@ export function ListeningScreen() {
         />
         <View style={styles.topRow}>
           <Pressable
-            style={styles.iconBtn}
+            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
             onPress={() => router.back()}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             accessibilityRole="button"
+            accessibilityLabel="Back"
+            accessibilityHint="Returns to the previous screen"
           >
             <MarketBackIcon />
           </Pressable>
           <View style={styles.titleBlock}>
             <Text style={styles.eyebrow}>{content.eyebrow}</Text>
-            <Text style={styles.title}>{content.title}</Text>
+            <Text style={styles.title} accessibilityRole="header">
+              {content.title}
+            </Text>
           </View>
         </View>
       </View>
 
       <View style={styles.body}>
         <View style={styles.card}>
-          <Text style={styles.track}>{content.track}</Text>
-          <Text style={styles.artist}>{content.artist}</Text>
-          <View style={styles.progressTrack}>
+          <View
+            accessible
+            accessibilityLabel={`${content.track}, ${content.artist}, ${content.elapsed} elapsed, ${content.remaining} remaining`}
+          >
+            <Text style={styles.track}>{content.track}</Text>
+            <Text style={styles.artist}>{content.artist}</Text>
+          </View>
+          <View
+            style={styles.progressTrack}
+            accessibilityRole="progressbar"
+            accessibilityValue={{ min: 0, max: 100, now: Math.round(content.progress * 100) }}
+          >
             <View style={[styles.progressFill, { width: `${content.progress * 100}%` }]} />
           </View>
           <View style={styles.timeRow}>
@@ -68,8 +82,11 @@ export function ListeningScreen() {
             <Text style={styles.time}>{content.remaining}</Text>
           </View>
           <Pressable
-            style={styles.cta}
+            style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
             onPress={() => router.push('/(main)/(tabs)/check-in')}
+            accessibilityRole="button"
+            accessibilityLabel="Log air"
+            accessibilityHint="Opens the daily check-in screen"
           >
             <Text style={styles.ctaText}>Log air</Text>
           </Pressable>
@@ -98,6 +115,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   titleBlock: { flex: 1 },
   eyebrow: { fontSize: NU.eyebrow, color: 'rgba(255,255,255,0.85)' },
@@ -138,6 +158,9 @@ const styles = StyleSheet.create({
     backgroundColor: LIB_TEAL,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  ctaPressed: {
+    opacity: 0.88,
   },
   ctaText: { color: '#FFFFFF', fontSize: NU.cardTitle, fontWeight: '700' },
 });

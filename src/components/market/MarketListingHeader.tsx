@@ -39,17 +39,26 @@ export function MarketListingHeader({ listing }: MarketListingHeaderProps) {
       />
       <View style={styles.topRow}>
         <Pressable
-          style={styles.iconBtn}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
+          hitSlop={8}
         >
           <MarketBackIcon />
         </Pressable>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={styles.title} numberOfLines={1} accessibilityRole="header">
           {listing.title}
         </Text>
-        <Pressable style={styles.iconBtn} accessibilityRole="button">
+        <Pressable
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed, styles.iconBtnDisabled]}
+          disabled
+          accessibilityRole="button"
+          accessibilityLabel="Save to favorites"
+          accessibilityHint="Not available yet"
+          accessibilityState={{ disabled: true }}
+        >
           <MarketHeartIcon color="#fff" size={18} />
         </Pressable>
       </View>
@@ -79,6 +88,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconBtnPressed: {
+    opacity: 0.7,
+  },
+  iconBtnDisabled: {
+    opacity: 0.45,
   },
   title: {
     flex: 1,

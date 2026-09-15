@@ -43,28 +43,44 @@ export function WatchingScreen() {
         />
         <View style={styles.topRow}>
           <Pressable
-            style={styles.iconBtn}
+            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
             onPress={() => router.back()}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             accessibilityRole="button"
+            accessibilityLabel="Back"
+            accessibilityHint="Returns to the previous screen"
           >
             <MarketBackIcon />
           </Pressable>
           <View style={styles.titleBlock}>
             <Text style={styles.eyebrow}>{content.eyebrow}</Text>
-            <Text style={styles.title}>{content.title}</Text>
+            <Text style={styles.title} accessibilityRole="header">
+              {content.title}
+            </Text>
           </View>
         </View>
       </View>
 
       <View style={styles.body}>
-        <View style={styles.player}>
-          <View style={styles.playMark}>
+        <View
+          style={styles.player}
+          importantForAccessibility="no-hide-descendants"
+        >
+          <View style={styles.playMark} pointerEvents="none">
             <Text style={styles.playIcon}>▶</Text>
           </View>
         </View>
-        <View style={styles.card}>
+        <View
+          style={styles.card}
+          accessible
+          accessibilityLabel={`${content.track}, ${content.meta}`}
+        >
           <Text style={styles.track}>{content.track}</Text>
-          <View style={styles.progressTrack}>
+          <View
+            style={styles.progressTrack}
+            accessibilityRole="progressbar"
+            accessibilityValue={{ min: 0, max: 100, now: Math.round(content.progress * 100) }}
+          >
             <View style={[styles.progressFill, { width: `${content.progress * 100}%` }]} />
           </View>
           <Text style={styles.meta}>{content.meta}</Text>
@@ -93,6 +109,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   titleBlock: { flex: 1 },
   eyebrow: { fontSize: NU.eyebrow, color: 'rgba(255,255,255,0.85)' },

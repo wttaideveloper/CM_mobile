@@ -117,7 +117,8 @@ export function SettingsDashBody({ toggles, onToggle }: SettingsDashBodyProps) {
           <View style={styles.menuCard}>
             {group.rows.map((row, index) => {
               const isLast = index === group.rows.length - 1;
-              const rowStyle = [styles.row, !isLast && styles.rowBorder];
+              const rowBorderStyle = !isLast && styles.rowBorder;
+              const hasDestination = row.kind === 'link' && Boolean(row.href);
               const content = (
                 <>
                   <View style={styles.iconWrap}>
@@ -136,20 +137,21 @@ export function SettingsDashBody({ toggles, onToggle }: SettingsDashBodyProps) {
                         true: SETTINGS_TOGGLE_ON,
                       }}
                       thumbColor="#FFFFFF"
+                      accessibilityLabel={row.title}
                     />
                   ) : row.badge ? (
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>{row.badge}</Text>
                     </View>
-                  ) : (
+                  ) : hasDestination ? (
                     <SettingsDashChevronIcon />
-                  )}
+                  ) : null}
                 </>
               );
 
               if (row.kind === 'toggle') {
                 return (
-                  <View key={row.id} style={rowStyle}>
+                  <View key={row.id} style={[styles.row, rowBorderStyle]}>
                     {content}
                   </View>
                 );
@@ -158,10 +160,18 @@ export function SettingsDashBody({ toggles, onToggle }: SettingsDashBodyProps) {
               return (
                 <Pressable
                   key={row.id}
-                  style={rowStyle}
+                  disabled={!hasDestination}
+                  style={({ pressed }) => [
+                    styles.row,
+                    rowBorderStyle,
+                    !hasDestination && styles.rowDisabled,
+                    pressed && hasDestination && styles.rowPressed,
+                  ]}
                   onPress={() => handleRowPress(row)}
                   accessibilityRole="button"
-                  accessibilityLabel={row.title}
+                  accessibilityLabel={`${row.title}. ${row.subtitle}`}
+                  accessibilityState={{ disabled: !hasDestination }}
+                  accessibilityHint={hasDestination ? undefined : 'Not available yet'}
                 >
                   {content}
                 </Pressable>
@@ -173,7 +183,11 @@ export function SettingsDashBody({ toggles, onToggle }: SettingsDashBodyProps) {
 
       <View style={styles.menuCard}>
         <Pressable
-          style={[styles.row, styles.rowBorder]}
+          style={({ pressed }) => [
+            styles.row,
+            styles.rowBorder,
+            pressed && styles.rowPressed,
+          ]}
           onPress={handleSignOut}
           accessibilityRole="button"
           accessibilityLabel="Sign out"
@@ -184,10 +198,11 @@ export function SettingsDashBody({ toggles, onToggle }: SettingsDashBodyProps) {
           <Text style={styles.signOutText}>Sign Out</Text>
         </Pressable>
         <Pressable
-          style={styles.row}
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           onPress={handleDelete}
           accessibilityRole="button"
           accessibilityLabel="Delete account"
+          accessibilityHint="This is a preview action; account deletion is not wired yet"
         >
           <View style={[styles.iconWrap, styles.dangerIcon]}>
             <SettingsDashIcon kind="trash" color={SETTINGS_DANGER} />
@@ -311,6 +326,12 @@ const styles = StyleSheet.create({
   rowBorder: {
     borderBottomWidth: 1,
     borderBottomColor: SETTINGS_ROW_BORDER,
+  },
+  rowPressed: {
+    backgroundColor: '#f7fbf7',
+  },
+  rowDisabled: {
+    opacity: 0.5,
   },
   iconWrap: {
     width: c(36, 32),

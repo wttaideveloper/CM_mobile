@@ -105,19 +105,30 @@ export function LoginAuthRecoveryFields({
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={t('auth.resendResetCode')}
+            accessibilityState={{
+              disabled: forgotResendCooldown > 0 || isForgotPasswordSending,
+              busy: isForgotPasswordSending,
+            }}
           >
-            <Text
-              style={[
-                styles.resendLink,
-                (forgotResendCooldown > 0 || isForgotPasswordSending) && styles.resendLinkDisabled,
-              ]}
-            >
-              {isForgotPasswordSending
-                ? 'Sending...'
-                : forgotResendCooldown > 0
-                  ? `Resend in ${forgotResendCooldown}s`
-                  : t('auth.resendCode')}
-            </Text>
+            {({ pressed }) => (
+              <Text
+                style={[
+                  styles.resendLink,
+                  (forgotResendCooldown > 0 || isForgotPasswordSending) &&
+                    styles.resendLinkDisabled,
+                  pressed &&
+                    forgotResendCooldown === 0 &&
+                    !isForgotPasswordSending &&
+                    styles.optionLinkPressed,
+                ]}
+              >
+                {isForgotPasswordSending
+                  ? 'Sending...'
+                  : forgotResendCooldown > 0
+                    ? `Resend in ${forgotResendCooldown}s`
+                    : t('auth.resendCode')}
+              </Text>
+            )}
           </Pressable>
         </View>
       </>

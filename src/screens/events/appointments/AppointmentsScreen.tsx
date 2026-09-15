@@ -114,16 +114,30 @@ function AppointmentCard({ appointment }: { appointment: Appointment }) {
           <Text style={styles.chatBtnText}>Chat</Text>
         </Pressable>
         <Pressable
+          disabled
           accessibilityRole="button"
           accessibilityLabel="Reschedule"
-          style={({ pressed }) => [styles.rescheduleBtn, pressed && styles.pressed]}
+          accessibilityState={{ disabled: true }}
+          accessibilityHint="Not available yet"
+          style={({ pressed }) => [
+            styles.rescheduleBtn,
+            styles.actionBtnDisabled,
+            pressed && styles.pressed,
+          ]}
         >
           <Text style={styles.rescheduleBtnText}>Reschedule</Text>
         </Pressable>
         <Pressable
+          disabled
           accessibilityRole="button"
           accessibilityLabel="Join / Directions"
-          style={({ pressed }) => [styles.directionsBtn, pressed && styles.pressed]}
+          accessibilityState={{ disabled: true }}
+          accessibilityHint="Not available yet"
+          style={({ pressed }) => [
+            styles.directionsBtn,
+            styles.actionBtnDisabled,
+            pressed && styles.pressed,
+          ]}
         >
           <Text style={styles.directionsBtnText}>Join / Directions</Text>
         </Pressable>
@@ -150,9 +164,16 @@ export function AppointmentsScreen() {
         <View style={styles.titleRowHeader}>
           <Text style={styles.title}>Appointments</Text>
           <Pressable
+            disabled
             accessibilityRole="button"
             accessibilityLabel="Add appointment"
-            style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
+            accessibilityState={{ disabled: true }}
+            accessibilityHint="Not available yet"
+            style={({ pressed }) => [
+              styles.addBtn,
+              styles.addBtnDisabled,
+              pressed && styles.pressed,
+            ]}
             hitSlop={6}
           >
             <PlusIcon size={isSmallDevice ? 18 : 20} color="#FFFFFF" />

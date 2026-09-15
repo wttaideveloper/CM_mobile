@@ -30,10 +30,11 @@ export function LoginAuthFormActions({
   return (
     <>
       <Pressable
-        style={[
+        style={({ pressed }) => [
           styles.primaryButton,
           showSocial && styles.primaryButtonWithSocial,
           isSubmitting && styles.primaryButtonDisabled,
+          pressed && !isSubmitting && styles.primaryButtonPressed,
         ]}
         onPress={onPrimaryAction}
         disabled={isSubmitting}

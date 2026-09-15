@@ -191,6 +191,9 @@ export const styles = StyleSheet.create({
     paddingHorizontal: isSmallDevice ? 12 : 14,
     paddingVertical: isSmallDevice ? 8 : 10,
   },
+  menuItemDisabled: {
+    opacity: 0.5,
+  },
   menuIconWrap: {
     width: ICON_SIZE,
     height: ICON_SIZE,

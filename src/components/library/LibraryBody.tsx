@@ -16,12 +16,14 @@ export function LibraryBody() {
 
   return (
     <View style={styles.body}>
-      <Text style={styles.sectionLabel}>Articles</Text>
+      <Text style={styles.sectionLabel} accessibilityRole="header">
+        Articles
+      </Text>
       <View style={styles.list}>
         {LIBRARY_ITEMS.map((item) => (
           <Pressable
             key={item.id}
-            style={styles.card}
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             onPress={() =>
               router.push({
                 pathname: '/(main)/library/reading',
@@ -29,8 +31,13 @@ export function LibraryBody() {
               })
             }
             accessibilityRole="button"
+            accessibilityLabel={`${item.kind}: ${item.title}, by ${item.author}, ${item.meta}`}
+            accessibilityHint="Opens the article"
           >
-            <View style={[styles.media, { backgroundColor: item.mediaBg }]}>
+            <View
+              style={[styles.media, { backgroundColor: item.mediaBg }]}
+              importantForAccessibility="no-hide-descendants"
+            >
               <HomeBookIcon color="#07473e" />
             </View>
             <View style={styles.copy}>
@@ -79,6 +86,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: NU.cardGap,
     alignItems: 'center',
+  },
+  cardPressed: {
+    opacity: 0.85,
   },
   media: {
     width: 56,
