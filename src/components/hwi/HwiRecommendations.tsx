@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 
 import {
@@ -34,8 +35,16 @@ function Chevron() {
 }
 
 function RecommendationCard({ item }: { item: HwiRecommendation }) {
+  const router = useRouter();
+
   return (
-    <Pressable style={styles.card} accessibilityRole="button">
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={() => router.push('/(main)/(tabs)/check-in')}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title}. ${item.body}`}
+      accessibilityHint="Opens the daily check-in screen"
+    >
       <View style={[styles.iconWrap, { backgroundColor: item.iconBg }]}>
         <RecIcon item={item} />
       </View>
@@ -55,7 +64,11 @@ export function HwiRecommendations() {
     <View style={styles.section}>
       <View style={styles.header}>
         <Text style={styles.heading}>Recommendations</Text>
-        <Pressable accessibilityRole="button">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="View all recommendations"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <Text style={styles.link}>View all</Text>
         </Pressable>
       </View>
@@ -94,6 +107,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: NU.rowGap,
     alignItems: 'flex-start',
+  },
+  cardPressed: {
+    backgroundColor: '#f7fbf7',
   },
   iconWrap: {
     width: NU.iconBtn,

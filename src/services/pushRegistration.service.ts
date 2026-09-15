@@ -1,19 +1,37 @@
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { ANDROID_NOTIFICATION_CHANNEL_ID } from '@/constants/push';
 import { registerDevice, unregisterDevice } from '@/services/device.service';
 import type { PushPlatform } from '@/types/push.types';
+import { isRemotePushSupported } from '@/utils/isRemotePushSupported';
 import { pushError, pushLog, pushWarn } from '@/utils/pushLog';
 
+type NotificationsModule = typeof import('expo-notifications');
+
 let registeredToken: string | null = null;
+let notificationsModule: NotificationsModule | null = null;
 
 export function getRegisteredPushToken(): string | null {
   return registeredToken;
 }
 
-async function ensureAndroidNotificationChannel(): Promise<void> {
+async function loadNotifications(): Promise<NotificationsModule | null> {
+  if (!isRemotePushSupported()) {
+    return null;
+  }
+
+  if (notificationsModule) {
+    return notificationsModule;
+  }
+
+  notificationsModule = await import('expo-notifications');
+  return notificationsModule;
+}
+
+async function ensureAndroidNotificationChannel(
+  Notifications: NotificationsModule,
+): Promise<void> {
   if (Platform.OS !== 'android') return;
 
   await Notifications.setNotificationChannelAsync(ANDROID_NOTIFICATION_CHANNEL_ID, {
@@ -26,7 +44,9 @@ async function ensureAndroidNotificationChannel(): Promise<void> {
   pushLog('Android notification channel ready', { channelId: ANDROID_NOTIFICATION_CHANNEL_ID });
 }
 
-async function requestPushPermissions(): Promise<Notifications.PermissionStatus> {
+async function requestPushPermissions(
+  Notifications: NotificationsModule,
+): Promise<string> {
   const current = await Notifications.getPermissionsAsync();
   pushLog('Push permission status (current)', { status: current.status });
 
@@ -46,7 +66,9 @@ async function requestPushPermissions(): Promise<Notifications.PermissionStatus>
   return requested.status;
 }
 
-async function getNativePushToken(): Promise<string | null> {
+async function getNativePushToken(
+  Notifications: NotificationsModule,
+): Promise<string | null> {
   pushLog('Fetching native push token', {
     platform: Platform.OS,
     isDevice: Device.isDevice,
@@ -98,16 +120,22 @@ export async function registerDevicePushToken(existingToken?: string): Promise<s
   });
 
   try {
-    await ensureAndroidNotificationChannel();
+    const Notifications = await loadNotifications();
+    if (!Notifications) {
+      pushWarn('Push registration skipped — remote push unavailable in Expo Go on Android');
+      return null;
+    }
 
-    const status = await requestPushPermissions();
+    await ensureAndroidNotificationChannel(Notifications);
+
+    const status = await requestPushPermissions(Notifications);
 
     if (status !== Notifications.PermissionStatus.GRANTED) {
       pushWarn('Push registration stopped — permission not granted', { status });
       return null;
     }
 
-    const pushToken = existingToken ?? (await getNativePushToken());
+    const pushToken = existingToken ?? (await getNativePushToken(Notifications));
 
     if (!pushToken) {
       pushWarn('Push registration stopped — no native token returned');

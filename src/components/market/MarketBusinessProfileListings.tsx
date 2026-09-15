@@ -51,12 +51,17 @@ export function MarketBusinessProfileListings({
     <>
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>Products & services</Text>
+          <Text style={styles.sectionLabel} accessibilityRole="header">
+            Products & services
+          </Text>
           <Text style={styles.count}>{String(offers.length)}</Text>
         </View>
         {isLoading ? (
           <View style={styles.loading}>
-            <ActivityIndicator color={BIZ_PROFILE_GREEN} />
+            <ActivityIndicator
+              color={BIZ_PROFILE_GREEN}
+              accessibilityLabel="Loading products and services"
+            />
           </View>
         ) : offers.length === 0 ? (
           <Text style={styles.empty}>No products or services yet.</Text>
@@ -65,7 +70,7 @@ export function MarketBusinessProfileListings({
             {offers.map((item) => (
               <Pressable
                 key={`${item.kind}-${item.id}`}
-                style={styles.itemCard}
+                style={({ pressed }) => [styles.itemCard, pressed && styles.itemCardPressed]}
                 onPress={() =>
                   router.push(
                     item.kind === 'service'
@@ -79,6 +84,9 @@ export function MarketBusinessProfileListings({
                         },
                   )
                 }
+                accessibilityRole="button"
+                accessibilityLabel={`${item.title}, ${item.price}`}
+                accessibilityHint={item.subtitle}
               >
                 <View style={[styles.itemIcon, { backgroundColor: item.iconBg }]}>
                   {item.icon === 'bag' ? (
@@ -101,12 +109,14 @@ export function MarketBusinessProfileListings({
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Events & courses</Text>
+        <Text style={styles.sectionLabel} accessibilityRole="header">
+          Events & courses
+        </Text>
         <View style={styles.list}>
           {BIZ_PROFILE_EVENTS.map((item) => (
             <Pressable
               key={item.id}
-              style={styles.itemCard}
+              style={({ pressed }) => [styles.itemCard, pressed && styles.itemCardPressed]}
               onPress={() =>
                 router.push(
                   item.id === 'batch'
@@ -114,6 +124,9 @@ export function MarketBusinessProfileListings({
                     : '/(main)/market/event-detail',
                 )
               }
+              accessibilityRole="button"
+              accessibilityLabel={`${item.title}, ${item.price}`}
+              accessibilityHint={item.subtitle}
             >
               <View style={[styles.eventSide, { backgroundColor: item.sideBg }]}>
                 <Text style={[styles.eventTop, { color: item.sideTopColor }]}>
@@ -182,6 +195,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: NU.cardGap,
     alignItems: 'center',
+  },
+  itemCardPressed: {
+    opacity: 0.85,
   },
   itemIcon: {
     width: c(52, 46),

@@ -130,19 +130,23 @@ export function LoginAuthAccountFields({
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={t('auth.resendVerificationCode')}
+              accessibilityState={{ disabled: resendCooldown > 0 || isResending, busy: isResending }}
             >
-              <Text
-                style={[
-                  styles.resendLink,
-                  (resendCooldown > 0 || isResending) && styles.resendLinkDisabled,
-                ]}
-              >
-                {isResending
-                  ? 'Sending...'
-                  : resendCooldown > 0
-                    ? `Resend in ${resendCooldown}s`
-                    : t('auth.resendCode')}
-              </Text>
+              {({ pressed }) => (
+                <Text
+                  style={[
+                    styles.resendLink,
+                    (resendCooldown > 0 || isResending) && styles.resendLinkDisabled,
+                    pressed && resendCooldown === 0 && !isResending && styles.optionLinkPressed,
+                  ]}
+                >
+                  {isResending
+                    ? 'Sending...'
+                    : resendCooldown > 0
+                      ? `Resend in ${resendCooldown}s`
+                      : t('auth.resendCode')}
+                </Text>
+              )}
             </Pressable>
           </View>
         </>
@@ -167,7 +171,7 @@ export function LoginAuthAccountFields({
 
       {authMode === 'signup' && (
         <Pressable
-          style={styles.termsRow}
+          style={({ pressed }) => [styles.termsRow, pressed && styles.rowPressed]}
           onPress={() => setAcceptedTerms((prev) => !prev)}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: acceptedTerms }}
@@ -183,7 +187,7 @@ export function LoginAuthAccountFields({
       {authMode === 'login' && (
         <View style={styles.optionsRow}>
           <Pressable
-            style={styles.rememberRow}
+            style={({ pressed }) => [styles.rememberRow, pressed && styles.rowPressed]}
             onPress={() => setRememberMe((prev) => !prev)}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: rememberMe }}
@@ -201,7 +205,11 @@ export function LoginAuthAccountFields({
             accessibilityRole="button"
             accessibilityLabel={t('auth.forgotPassword')}
           >
-            <Text style={styles.optionLink}>{t('auth.forgotPassword')}</Text>
+            {({ pressed }) => (
+              <Text style={[styles.optionLink, pressed && styles.optionLinkPressed]}>
+                {t('auth.forgotPassword')}
+              </Text>
+            )}
           </Pressable>
         </View>
       )}

@@ -47,7 +47,11 @@ export function MarketBusinessProfileScreen() {
       >
         {isLoading && enterpriseId && profile == null ? (
           <View style={styles.loading}>
-            <ActivityIndicator color={BIZ_PROFILE_GREEN} size="large" />
+            <ActivityIndicator
+              color={BIZ_PROFILE_GREEN}
+              size="large"
+              accessibilityLabel="Loading business"
+            />
             <Text style={styles.loadingText}>Loading business…</Text>
           </View>
         ) : profile != null ? (

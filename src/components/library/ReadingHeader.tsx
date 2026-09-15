@@ -35,10 +35,12 @@ export function ReadingHeader({ content }: ReadingHeaderProps) {
       />
       <View style={styles.topRow}>
         <Pressable
-          style={styles.iconBtn}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           onPress={() => router.back()}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
         >
           <MarketBackIcon />
         </Pressable>
@@ -46,7 +48,7 @@ export function ReadingHeader({ content }: ReadingHeaderProps) {
           <Text style={styles.eyebrow} numberOfLines={1}>
             {content.eyebrow}
           </Text>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={styles.title} numberOfLines={1} accessibilityRole="header">
             {content.title}
           </Text>
         </View>
@@ -79,6 +81,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   titleBlock: {
     flex: 1,

@@ -115,9 +115,16 @@ export function EventDetailContent({
           </Text>
         </View>
         <Pressable
+          disabled
           accessibilityRole="button"
           accessibilityLabel="Follow"
-          style={({ pressed }) => [styles.followBtn, pressed && styles.pressed]}
+          accessibilityState={{ disabled: true }}
+          accessibilityHint="Not available yet"
+          style={({ pressed }) => [
+            styles.followBtn,
+            styles.followBtnDisabled,
+            pressed && styles.pressed,
+          ]}
         >
           <Text style={styles.followBtnText}>Follow</Text>
         </Pressable>
@@ -184,9 +191,16 @@ export function EventDetailFooter({
   return (
     <View style={[styles.footer, { paddingBottom, paddingTop: 10 }]}>
       <Pressable
+        disabled
         accessibilityRole="button"
         accessibilityLabel="Chat"
-        style={({ pressed }) => [styles.chatBtn, pressed && styles.pressed]}
+        accessibilityState={{ disabled: true }}
+        accessibilityHint="Not available yet"
+        style={({ pressed }) => [
+          styles.chatBtn,
+          styles.chatBtnDisabled,
+          pressed && styles.pressed,
+        ]}
         hitSlop={6}
       >
         <MessageSquareIcon size={20} color={TEXT_MUTED} />

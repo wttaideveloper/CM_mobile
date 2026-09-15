@@ -66,6 +66,9 @@ export const styles = StyleSheet.create({
     paddingVertical: isSmallDevice ? 6 : 8,
     borderRadius: isSmallDevice ? 8 : 10,
   },
+  myCoursesBtnDisabled: {
+    opacity: 0.5,
+  },
   myCoursesBtnText: {
     fontSize: isSmallDevice ? 12 : 13,
     lineHeight: isSmallDevice ? 14 : 16,

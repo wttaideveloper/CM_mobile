@@ -73,7 +73,6 @@ export function ProductsListPanel({
     refetch,
     isRefetching,
   } = useInfiniteProducts(apiQuery);
-console.log("products",data);
   const products = useMemo(
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data],

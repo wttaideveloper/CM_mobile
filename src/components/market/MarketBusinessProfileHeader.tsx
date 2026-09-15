@@ -43,29 +43,49 @@ export function MarketBusinessProfileHeader({
       />
       <View style={styles.topRow}>
         <Pressable
-          style={styles.iconBtn}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
+          hitSlop={8}
         >
           <MarketBackIcon />
         </Pressable>
         <View style={styles.titleBlock}>
           <Text style={styles.eyebrow}>{profile.eyebrow}</Text>
-          <Text style={styles.title}>{profile.shortName}</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            {profile.shortName}
+          </Text>
         </View>
         <View style={styles.spacer} />
-        <Pressable style={styles.iconBtn} accessibilityRole="button">
+        <Pressable
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed, styles.iconBtnDisabled]}
+          disabled
+          accessibilityRole="button"
+          accessibilityLabel="Save to favorites"
+          accessibilityHint="Not available yet"
+          accessibilityState={{ disabled: true }}
+        >
           <MarketHeartIcon color="#fff" size={18} />
         </Pressable>
-        <Pressable style={styles.iconBtn} accessibilityRole="button">
+        <Pressable
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed, styles.iconBtnDisabled]}
+          disabled
+          accessibilityRole="button"
+          accessibilityLabel="Share"
+          accessibilityHint="Not available yet"
+          accessibilityState={{ disabled: true }}
+        >
           <BizProfileShareIcon />
         </Pressable>
       </View>
       <Pressable
-        style={styles.search}
+        style={({ pressed }) => [styles.search, pressed && styles.searchPressed]}
         onPress={() => router.push('/(main)/search-data')}
         accessibilityRole="button"
+        accessibilityLabel="Search products, services and events"
+        accessibilityHint="Opens search"
       >
         <MarketSearchIcon />
         <Text style={styles.searchText}>
@@ -101,6 +121,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconBtnPressed: {
+    opacity: 0.7,
+  },
+  iconBtnDisabled: {
+    opacity: 0.45,
+  },
   titleBlock: {
     flexShrink: 1,
   },
@@ -131,5 +157,8 @@ const styles = StyleSheet.create({
   searchText: {
     fontSize: NU.link,
     color: 'rgba(255,255,255,0.8)',
+  },
+  searchPressed: {
+    opacity: 0.85,
   },
 });

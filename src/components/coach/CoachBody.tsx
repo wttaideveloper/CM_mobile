@@ -25,12 +25,11 @@ function MemberCard({
   onPress?: () => void;
   onActionPress?: () => void;
 }) {
-  return (
-    <Pressable
-      style={styles.card}
-      onPress={onPress}
-      accessibilityRole="button"
-    >
+  const cardLabel = `${member.name}, ${member.role}, ${member.time}. ${member.message}`;
+  const actionAvailable = member.action !== 'none' && !!onActionPress;
+
+  const content = (
+    <>
       <View style={[styles.avatar, { backgroundColor: member.avatarBg }]}>
         <Text style={[styles.initials, { color: member.avatarColor }]}>
           {member.initials}
@@ -55,21 +54,34 @@ function MemberCard({
         />
         {member.action === 'chat' ? (
           <Pressable
-            style={styles.actionBtn}
+            style={({ pressed }) => [
+              styles.actionBtn,
+              !actionAvailable && styles.actionBtnDisabled,
+              pressed && actionAvailable && styles.actionBtnPressed,
+            ]}
             onPress={onActionPress}
+            disabled={!actionAvailable}
             hitSlop={6}
             accessibilityRole="button"
             accessibilityLabel={`Chat with ${member.name}`}
+            accessibilityState={{ disabled: !actionAvailable }}
+            accessibilityHint={actionAvailable ? undefined : 'Not available yet'}
           >
             <CoachChatIcon />
           </Pressable>
         ) : member.action === 'people' ? (
           <Pressable
-            style={styles.actionBtn}
+            style={({ pressed }) => [
+              styles.actionBtn,
+              !actionAvailable && styles.actionBtnDisabled,
+              pressed && actionAvailable && styles.actionBtnPressed,
+            ]}
             onPress={onActionPress}
+            disabled={!actionAvailable}
             hitSlop={6}
             accessibilityRole="button"
             accessibilityLabel={`Open ${member.name}`}
+            accessibilityState={{ disabled: !actionAvailable }}
           >
             <CoachPeopleIcon />
           </Pressable>
@@ -77,6 +89,21 @@ function MemberCard({
           <View style={styles.actionSpacer} />
         )}
       </View>
+    </>
+  );
+
+  if (!onPress) {
+    return <View style={styles.card}>{content}</View>;
+  }
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={cardLabel}
+    >
+      {content}
     </Pressable>
   );
 }
@@ -150,6 +177,9 @@ const styles = StyleSheet.create({
     gap: c(13, 11),
     alignItems: 'flex-start',
   },
+  cardPressed: {
+    backgroundColor: '#f7fbf7',
+  },
   avatar: {
     width: c(42, 38),
     height: c(42, 38),
@@ -207,6 +237,12 @@ const styles = StyleSheet.create({
     backgroundColor: COACH_CHAT_BG,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  actionBtnDisabled: {
+    opacity: 0.4,
+  },
+  actionBtnPressed: {
+    opacity: 0.7,
   },
   actionSpacer: {
     width: NU.iconBtn,

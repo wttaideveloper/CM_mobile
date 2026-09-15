@@ -47,7 +47,7 @@ export function MarketBusinessProfileBody({
   return (
     <View style={styles.body}>
       <View style={styles.identity}>
-        <View style={styles.avatar}>
+        <View style={styles.avatar} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {showLogo ? (
             <Image
               source={{ uri: profile.logoUrl! }}
@@ -61,7 +61,9 @@ export function MarketBusinessProfileBody({
           )}
         </View>
         <View style={styles.identityCopy}>
-          <Text style={styles.fullName}>{profile.fullName}</Text>
+          <Text style={styles.fullName} accessibilityRole="header">
+            {profile.fullName}
+          </Text>
           <View style={styles.metaRow}>
             <View style={styles.rating}>
               <MarketStarIcon />
@@ -74,17 +76,30 @@ export function MarketBusinessProfileBody({
 
       <View style={styles.actions}>
         <Pressable
-          style={styles.messageBtn}
+          style={({ pressed }) => [styles.messageBtn, pressed && styles.pressed]}
           onPress={() => router.push('/(main)/market/business-chat')}
           accessibilityRole="button"
+          accessibilityLabel="Message"
+          accessibilityHint={`Opens a chat with ${profile.fullName}`}
         >
           <Text style={styles.messageText}>Message</Text>
         </Pressable>
         <Pressable
-          style={[styles.websiteBtn, !profile.websiteUrl && styles.websiteBtnDisabled]}
+          style={({ pressed }) => [
+            styles.websiteBtn,
+            !profile.websiteUrl && styles.websiteBtnDisabled,
+            pressed && profile.websiteUrl && styles.pressed,
+          ]}
           onPress={openWebsite}
           disabled={!profile.websiteUrl}
           accessibilityRole="button"
+          accessibilityLabel="Website"
+          accessibilityHint={
+            profile.websiteUrl
+              ? 'Opens the business website in your browser'
+              : 'Not available yet'
+          }
+          accessibilityState={{ disabled: !profile.websiteUrl }}
         >
           <Text style={styles.websiteText}>Website</Text>
         </Pressable>
@@ -212,6 +227,9 @@ const styles = StyleSheet.create({
   },
   websiteBtnDisabled: {
     opacity: 0.55,
+  },
+  pressed: {
+    opacity: 0.85,
   },
   websiteText: {
     fontSize: c(14.5, 13.5),

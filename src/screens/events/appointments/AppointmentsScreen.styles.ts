@@ -48,6 +48,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  addBtnDisabled: {
+    opacity: 0.5,
+  },
   monthRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -252,6 +255,9 @@ export const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  actionBtnDisabled: {
+    opacity: 0.5,
   },
   rescheduleBtnText: {
     fontSize: isSmallDevice ? 12 : 13,

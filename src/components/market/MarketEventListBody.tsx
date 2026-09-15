@@ -43,6 +43,9 @@ export function MarketEventListBody({
                 key={item}
                 style={[styles.chip, active && styles.chipActive]}
                 onPress={() => onFilterChange(item)}
+                accessibilityRole="button"
+                accessibilityLabel={`Filter: ${item}`}
+                accessibilityState={{ selected: active }}
               >
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>
                   {item}
@@ -57,7 +60,7 @@ export function MarketEventListBody({
         {items.map((item) => (
           <Pressable
             key={item.id}
-            style={styles.card}
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             onPress={() =>
               router.push(
                 item.kind === 'course'
@@ -66,6 +69,7 @@ export function MarketEventListBody({
               )
             }
             accessibilityRole="button"
+            accessibilityLabel={`${item.badge}, ${item.title}, ${item.when}, ${item.detail}`}
           >
             <View style={[styles.side, { backgroundColor: item.sideBg }]}>
               <Text style={[styles.sideTop, { color: item.sideTopColor }]}>
@@ -152,6 +156,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: c(13, 11),
     alignItems: 'center',
+  },
+  cardPressed: {
+    opacity: 0.85,
   },
   side: {
     width: c(58, 50),

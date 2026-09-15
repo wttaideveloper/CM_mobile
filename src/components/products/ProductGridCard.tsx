@@ -1,4 +1,4 @@
-import { HeartIcon, PlusIcon, StarIcon } from '@/components/dashboard/DashboardIcons';
+import { ChevronRightIcon, HeartIcon, StarIcon } from '@/components/dashboard/DashboardIcons';
 import type { ProductListItem } from '@/types/product.types';
 import { detailFromEnterpriseHref, detailHref, exploreTabProductHref } from '@/utils/searchNavigation';
 import { formatProductPrice } from '@/utils/product.mapper';
@@ -50,11 +50,18 @@ export function ProductGridCard({
           contentFit="cover"
         />
         <Pressable
+          disabled
           onPress={(event) => event.stopPropagation()}
-          style={({ pressed }) => [styles.heartBtn, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.heartBtn,
+            styles.heartBtnDisabled,
+            pressed && styles.pressed,
+          ]}
           hitSlop={6}
           accessibilityRole="button"
           accessibilityLabel={`Save ${product.name}`}
+          accessibilityState={{ disabled: true }}
+          accessibilityHint="Not available yet"
         >
           <HeartIcon size={16} color="#9AA8A2" />
         </Pressable>
@@ -83,8 +90,9 @@ export function ProductGridCard({
             hitSlop={6}
             accessibilityRole="button"
             accessibilityLabel={`Open ${product.name}`}
+            accessibilityHint="Opens product details"
           >
-            <PlusIcon size={18} color="#FFFFFF" />
+            <ChevronRightIcon size={18} color="#FFFFFF" />
           </Pressable>
         </View>
       </View>

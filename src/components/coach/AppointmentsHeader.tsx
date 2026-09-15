@@ -35,16 +35,20 @@ export function AppointmentsHeader({ count }: AppointmentsHeaderProps) {
       />
       <View style={styles.topRow}>
         <Pressable
-          style={styles.iconBtn}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           onPress={() => router.back()}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
         >
           <MarketBackIcon />
         </Pressable>
         <View style={styles.titleBlock}>
           <Text style={styles.eyebrow}>Care team</Text>
-          <Text style={styles.title}>Appointments</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            Appointments
+          </Text>
         </View>
       </View>
       <Text style={styles.count}>
@@ -78,6 +82,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   titleBlock: {
     flex: 1,

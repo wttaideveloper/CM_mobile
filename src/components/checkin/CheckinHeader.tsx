@@ -42,13 +42,15 @@ export function CheckinHeader({ goalsMet, goalsTotal }: CheckinHeaderProps) {
       />
       <View style={styles.topRow}>
         <Pressable
-          style={styles.backBtn}
+          style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
           onPress={() => {
             if (router.canGoBack()) router.back();
             else router.replace('/(main)/(tabs)');
           }}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
         >
           <MarketBackIcon />
         </Pressable>
@@ -57,7 +59,9 @@ export function CheckinHeader({ goalsMet, goalsTotal }: CheckinHeaderProps) {
             <CheckinCalendarIcon />
             <Text style={styles.dateText}>{CHECKIN_HEADER.dateLabel}</Text>
           </View>
-          <Text style={styles.title}>{CHECKIN_HEADER.title}</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            {CHECKIN_HEADER.title}
+          </Text>
         </View>
       </View>
 
@@ -68,7 +72,12 @@ export function CheckinHeader({ goalsMet, goalsTotal }: CheckinHeaderProps) {
             {goalsMet}/{goalsTotal} goals met
           </Text>
         </View>
-        <View style={styles.progressTrack}>
+        <View
+          style={styles.progressTrack}
+          accessibilityRole="progressbar"
+          accessibilityLabel="Today's progress"
+          accessibilityValue={{ min: 0, max: goalsTotal, now: goalsMet }}
+        >
           <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
         </View>
         <Text style={styles.progressHint}>{CHECKIN_HEADER.progressHint}</Text>
@@ -101,6 +110,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  backBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   titleBlock: {
     flex: 1,

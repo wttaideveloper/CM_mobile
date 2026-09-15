@@ -70,6 +70,7 @@ function PreferenceRow({
         disabled={disabled}
         accessibilityRole="switch"
         accessibilityLabel={label}
+        accessibilityHint={subtitle}
         accessibilityState={{ disabled: !!disabled, checked: value }}
         trackColor={{ false: '#D1D5DB', true: '#86EFAC' }}
         thumbColor={value ? PRIMARY : '#F9FAFB'}
@@ -170,12 +171,15 @@ export function NotificationPreferencesScreen() {
           onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Go back"
+          accessibilityHint="Returns to the previous screen"
           style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
           hitSlop={8}
         >
           <ChevronLeftIcon size={22} color={PRIMARY} />
         </Pressable>
-        <Text style={styles.title}>Notification Preferences</Text>
+        <Text style={styles.title} accessibilityRole="header">
+          Notification Preferences
+        </Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -186,11 +190,14 @@ export function NotificationPreferencesScreen() {
         </View>
       ) : errorMessage && !preferences ? (
         <View style={styles.centerState}>
-          <Text style={styles.errorText}>{errorMessage}</Text>
+          <Text style={styles.errorText} accessibilityRole="alert">
+            {errorMessage}
+          </Text>
           <Pressable
             onPress={() => void loadPreferences()}
             accessibilityRole="button"
             accessibilityLabel="Retry"
+            accessibilityHint="Tries loading your notification preferences again"
             style={({ pressed }) => [styles.retryBtn, pressed && styles.pressed]}
           >
             <Text style={styles.retryText}>Retry</Text>
@@ -205,7 +212,9 @@ export function NotificationPreferencesScreen() {
             paddingBottom: insets.bottom + (isSmallDevice ? 20 : 24),
           }}
         >
-          <Text style={styles.sectionTitle}>CHANNELS</Text>
+          <Text style={styles.sectionTitle} accessibilityRole="header">
+            CHANNELS
+          </Text>
           <View style={styles.card}>
             {PREFERENCE_ITEMS.map((item, index) => (
               <View key={item.key}>
@@ -221,7 +230,15 @@ export function NotificationPreferencesScreen() {
             ))}
           </View>
 
-          {errorMessage ? <Text style={styles.inlineError}>{errorMessage}</Text> : null}
+          {errorMessage ? (
+            <Text
+              style={styles.inlineError}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+            >
+              {errorMessage}
+            </Text>
+          ) : null}
         </ScrollView>
       ) : null}
     </View>

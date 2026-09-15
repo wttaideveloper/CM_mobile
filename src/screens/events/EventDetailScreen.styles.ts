@@ -194,6 +194,9 @@ export const styles = StyleSheet.create({
     borderRadius: isSmallDevice ? 10 : 12,
     flexShrink: 0,
   },
+  followBtnDisabled: {
+    opacity: 0.5,
+  },
   followBtnText: {
     fontSize: isSmallDevice ? 11 : 12,
     lineHeight: isSmallDevice ? 14 : 16,
@@ -296,6 +299,9 @@ export const styles = StyleSheet.create({
     backgroundColor: CARD_BG,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  chatBtnDisabled: {
+    opacity: 0.5,
   },
   registerBtn: {
     flex: 1,

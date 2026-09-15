@@ -69,6 +69,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  filterBtnDisabled: {
+    opacity: 0.5,
+  },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -170,6 +173,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...shadowSm,
+  },
+  heartBtnDisabled: {
+    opacity: 0.6,
   },
   cardBody: {
     paddingHorizontal: isSmallDevice ? 10 : 12,

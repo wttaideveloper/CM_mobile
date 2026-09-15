@@ -8,17 +8,30 @@ import { isSmallDevice } from '@/utils/responsive';
 type SettingsMenuItemProps = {
   item: SettingsMenuItemType;
   isLast: boolean;
+  active?: boolean;
   onPress?: () => void;
 };
 
-export function SettingsMenuItem({ item, isLast, onPress }: SettingsMenuItemProps) {
+export function SettingsMenuItem({
+  item,
+  isLast,
+  active = true,
+  onPress,
+}: SettingsMenuItemProps) {
   return (
     <View>
       <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}
+        onPress={active ? onPress : undefined}
+        disabled={!active}
+        style={({ pressed }) => [
+          styles.menuItem,
+          !active && styles.menuItemDisabled,
+          pressed && active && styles.pressed,
+        ]}
         accessibilityRole="button"
         accessibilityLabel={`${item.label}. ${item.subtitle}`}
+        accessibilityState={{ disabled: !active }}
+        accessibilityHint={active ? undefined : 'Not available yet'}
       >
         <View style={styles.menuIconWrap}>
           <Text style={styles.menuEmoji}>{item.emoji}</Text>
@@ -29,7 +42,9 @@ export function SettingsMenuItem({ item, isLast, onPress }: SettingsMenuItemProp
           <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
         </View>
 
-        <ChevronRightIcon size={isSmallDevice ? 16 : 18} color="#D1D5DB" />
+        {active ? (
+          <ChevronRightIcon size={isSmallDevice ? 16 : 18} color="#D1D5DB" />
+        ) : null}
       </Pressable>
       {!isLast ? <View style={styles.menuDivider} /> : null}
     </View>

@@ -106,6 +106,7 @@ export function PaymentScreen() {
             value={form.cardName}
             onChangeText={(cardName) => setForm((current) => ({ ...current, cardName }))}
             autoCapitalize="words"
+            accessibilityLabel="Name on card"
           />
 
           <Text style={styles.fieldLabel}>Card number</Text>
@@ -114,6 +115,7 @@ export function PaymentScreen() {
             value={form.cardNumber}
             onChangeText={(cardNumber) => setForm((current) => ({ ...current, cardNumber }))}
             keyboardType="number-pad"
+            accessibilityLabel="Card number"
           />
 
           <View style={styles.row}>
@@ -123,6 +125,7 @@ export function PaymentScreen() {
                 style={styles.input}
                 value={form.expiry}
                 onChangeText={(expiry) => setForm((current) => ({ ...current, expiry }))}
+                accessibilityLabel="Expiry date"
               />
             </View>
             <View style={styles.flex}>
@@ -133,6 +136,7 @@ export function PaymentScreen() {
                 onChangeText={(cvv) => setForm((current) => ({ ...current, cvv }))}
                 keyboardType="number-pad"
                 secureTextEntry
+                accessibilityLabel="CVV"
               />
             </View>
           </View>

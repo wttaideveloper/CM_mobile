@@ -68,8 +68,11 @@ export function ListeningScreen() {
             <Text style={styles.time}>{content.remaining}</Text>
           </View>
           <Pressable
-            style={styles.cta}
+            style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
             onPress={() => router.push('/(main)/check-in')}
+            accessibilityRole="button"
+            accessibilityLabel="Log air"
+            accessibilityHint="Opens the daily check-in screen"
           >
             <Text style={styles.ctaText}>Log air</Text>
           </Pressable>
@@ -131,6 +134,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   time: { fontSize: NU.bodySm, color: LIB_MUTED, fontWeight: '600' },
+  ctaPressed: {
+    opacity: 0.85,
+  },
   cta: {
     marginTop: c(10, 8),
     height: NU.searchH,

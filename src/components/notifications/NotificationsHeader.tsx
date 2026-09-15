@@ -14,11 +14,13 @@ const DESIGN_W = 430;
 type NotificationsHeaderProps = {
   unreadLabel: string;
   onMarkAllRead: () => void;
+  markAllDisabled?: boolean;
 };
 
 export function NotificationsHeader({
   unreadLabel,
   onMarkAllRead,
+  markAllDisabled,
 }: NotificationsHeaderProps) {
   const router = useRouter();
   const scale = SCREEN_W / DESIGN_W;
@@ -40,22 +42,35 @@ export function NotificationsHeader({
       />
       <View style={styles.topRow}>
         <Pressable
-          style={styles.iconBtn}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           onPress={() => router.back()}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
         >
           <MarketBackIcon />
         </Pressable>
         <View style={styles.titleBlock}>
-          <Text style={styles.title}>Notifications</Text>
-          <Text style={styles.subtitle}>{unreadLabel}</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            Notifications
+          </Text>
+          <Text style={styles.subtitle} accessibilityLiveRegion="polite">
+            {unreadLabel}
+          </Text>
         </View>
         <Pressable
-          style={styles.markAll}
+          disabled={markAllDisabled}
+          style={({ pressed }) => [
+            styles.markAll,
+            markAllDisabled && styles.markAllDisabled,
+            pressed && !markAllDisabled && styles.markAllPressed,
+          ]}
           onPress={onMarkAllRead}
           accessibilityRole="button"
           accessibilityLabel="Mark all read"
+          accessibilityState={{ disabled: !!markAllDisabled }}
+          accessibilityHint={markAllDisabled ? undefined : 'Marks every notification as read'}
         >
           <NotifCheckIcon />
           <Text style={styles.markAllText}>Mark all read</Text>
@@ -90,6 +105,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
+  },
   titleBlock: {
     flex: 1,
   },
@@ -117,5 +135,11 @@ const styles = StyleSheet.create({
     fontSize: NU.chipFont,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  markAllPressed: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  markAllDisabled: {
+    opacity: 0.5,
   },
 });

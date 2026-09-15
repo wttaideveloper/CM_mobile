@@ -25,7 +25,7 @@ export function OnboardingScreen({ onNavigateToLogin }: OnboardingScreenProps) {
       <View style={styles.content}>
         <AuthBadge label="INVIGORATE HEALTH" align="center" />
 
-        <Text style={styles.heading}>
+        <Text style={styles.heading} accessibilityRole="header">
           <Text style={styles.headingRestoring}>Restoring </Text>
           <Text style={styles.headingAccent}>mind, body & spirit.</Text>
         </Text>
@@ -35,17 +35,19 @@ export function OnboardingScreen({ onNavigateToLogin }: OnboardingScreenProps) {
           restoration.
         </Text>
 
-        <View style={styles.dots}>
+        <View
+          style={styles.dots}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
           <View style={styles.activeDot} />
-          {/* <View style={styles.dot} /> */}
-          {/* <View style={styles.dot} /> */}
           <View style={styles.dot} />
         </View>
       </View>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
         <Pressable
-          style={styles.primaryButton}
+          style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
           onPress={goToLogin}
           accessibilityRole="button"
           accessibilityLabel="Continue"
@@ -55,7 +57,8 @@ export function OnboardingScreen({ onNavigateToLogin }: OnboardingScreenProps) {
 
         <Pressable
           onPress={goToLogin}
-          style={styles.signInRow}
+          style={({ pressed }) => [styles.signInRow, pressed && styles.signInRowPressed]}
+          hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Sign in"
         >
@@ -130,10 +133,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: authTheme.primaryButtonText.fontWeight,
   },
+  primaryButtonPressed: {
+    opacity: 0.88,
+  },
   signInRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  signInRowPressed: {
+    opacity: 0.7,
   },
   signInMuted: {
     fontSize: 14,

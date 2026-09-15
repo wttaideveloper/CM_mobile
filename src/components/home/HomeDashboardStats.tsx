@@ -33,13 +33,18 @@ export function HomeDashboardStats() {
   return (
     <View style={styles.row}>
       {HOME_QUICK_METRICS.map((metric) => (
-        <View key={metric.id} style={styles.card}>
+        <View
+          key={metric.id}
+          style={styles.card}
+          accessibilityRole="text"
+          accessibilityLabel={`${metric.label}: ${metric.value} ${metric.unit}`}
+        >
           <View style={[styles.iconWrap, { backgroundColor: metric.iconBg }]}>
             <MetricIcon metric={metric} />
           </View>
-          <Text style={styles.value}>{metric.value}</Text>
-          <Text style={styles.unit}>{metric.unit}</Text>
-          <Text style={styles.label}>{metric.label}</Text>
+          <Text style={styles.value} accessibilityElementsHidden importantForAccessibility="no">{metric.value}</Text>
+          <Text style={styles.unit} accessibilityElementsHidden importantForAccessibility="no">{metric.unit}</Text>
+          <Text style={styles.label} accessibilityElementsHidden importantForAccessibility="no">{metric.label}</Text>
         </View>
       ))}
     </View>
@@ -79,6 +84,7 @@ const styles = StyleSheet.create({
     fontSize: c(10, 9),
     fontWeight: '600',
     color: HOME_DASH_TEAL,
+    marginTop: -1,
   },
   label: {
     fontSize: c(10, 9),

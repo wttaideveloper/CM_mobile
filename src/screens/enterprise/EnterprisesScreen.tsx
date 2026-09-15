@@ -79,7 +79,6 @@ export function EnterprisesScreen() {
     refetch,
     isRefetching,
   } = useInfiniteEnterprises(apiQuery);
-console.log('Enterprises', data);
   const enterprises = useMemo(
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data],
@@ -127,7 +126,10 @@ console.log('Enterprises', data);
               <ChevronLeftIcon size={22} color={PRIMARY} />
             </Pressable>
           ) : null}
-          <Text style={[styles.title, openedFromSearch && styles.titleInHeader]}>
+          <Text
+            style={[styles.title, openedFromSearch && styles.titleInHeader]}
+            accessibilityRole="header"
+          >
             Enterprises
           </Text>
         </View>
@@ -143,6 +145,7 @@ console.log('Enterprises', data);
             returnKeyType="search"
             autoCorrect={false}
             onSubmitEditing={() => setDebouncedSearch(search.trim())}
+            accessibilityLabel="Search enterprises"
           />
         </View>
 
@@ -175,7 +178,7 @@ console.log('Enterprises', data);
           })}
         </ScrollView>
 
-        <Text style={styles.resultCount}>
+        <Text style={styles.resultCount} accessibilityLiveRegion="polite">
           {totalCount} enterprises found
         </Text>
       </View>

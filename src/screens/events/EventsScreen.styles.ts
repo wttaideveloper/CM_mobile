@@ -60,6 +60,7 @@ export const styles = StyleSheet.create({
     gap: isSmallDevice ? 8 : 10,
   },
   filterChip: {
+    flexShrink: 0,
     paddingHorizontal: isSmallDevice ? 14 : 16,
     paddingVertical: isSmallDevice ? 8 : 9,
     borderRadius: 20,

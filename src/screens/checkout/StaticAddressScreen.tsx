@@ -47,6 +47,7 @@ export function StaticAddressScreen() {
             value={form.fullName}
             onChangeText={(fullName) => setForm((current) => ({ ...current, fullName }))}
             autoCapitalize="words"
+            accessibilityLabel="Full name"
           />
 
           <Text style={styles.fieldLabel}>Phone</Text>
@@ -55,6 +56,7 @@ export function StaticAddressScreen() {
             value={form.phone}
             onChangeText={(phone) => setForm((current) => ({ ...current, phone }))}
             keyboardType="phone-pad"
+            accessibilityLabel="Phone"
           />
 
           <Text style={styles.fieldLabel}>Address line 1</Text>
@@ -62,6 +64,7 @@ export function StaticAddressScreen() {
             style={styles.input}
             value={form.line1}
             onChangeText={(line1) => setForm((current) => ({ ...current, line1 }))}
+            accessibilityLabel="Address line 1"
           />
 
           <Text style={styles.fieldLabel}>Address line 2</Text>
@@ -69,6 +72,7 @@ export function StaticAddressScreen() {
             style={styles.input}
             value={form.line2}
             onChangeText={(line2) => setForm((current) => ({ ...current, line2 }))}
+            accessibilityLabel="Address line 2"
           />
 
           <View style={styles.row}>
@@ -78,6 +82,7 @@ export function StaticAddressScreen() {
                 style={styles.input}
                 value={form.city}
                 onChangeText={(city) => setForm((current) => ({ ...current, city }))}
+                accessibilityLabel="City"
               />
             </View>
             <View style={styles.flex}>
@@ -86,6 +91,7 @@ export function StaticAddressScreen() {
                 style={styles.input}
                 value={form.state}
                 onChangeText={(state) => setForm((current) => ({ ...current, state }))}
+                accessibilityLabel="State"
               />
             </View>
           </View>
@@ -98,6 +104,7 @@ export function StaticAddressScreen() {
                 value={form.zip}
                 onChangeText={(zip) => setForm((current) => ({ ...current, zip }))}
                 keyboardType="number-pad"
+                accessibilityLabel="ZIP code"
               />
             </View>
             <View style={styles.flex}>
@@ -106,6 +113,7 @@ export function StaticAddressScreen() {
                 style={styles.input}
                 value={form.country}
                 onChangeText={(country) => setForm((current) => ({ ...current, country }))}
+                accessibilityLabel="Country"
               />
             </View>
           </View>

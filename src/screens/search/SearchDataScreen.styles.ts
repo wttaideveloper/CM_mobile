@@ -34,7 +34,7 @@ export const styles = StyleSheet.create({
     backgroundColor: BODY_BG,
   },
   backBtn: {
-    width: isSmallDevice ? 20 : 20,
+    width: isSmallDevice ? 32 : 36,
     height: isSmallDevice ? 32 : 36,
     borderRadius: isSmallDevice ? 10 : 12,
     alignItems: 'center',
@@ -66,6 +66,23 @@ export const styles = StyleSheet.create({
     ...(Platform.OS === 'android'
       ? { textAlignVertical: 'center' as const, includeFontPadding: false }
       : {}),
+  },
+  clearBtn: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearBtnPressed: {
+    opacity: 0.7,
+  },
+  clearBtnText: {
+    fontSize: 14,
+    lineHeight: 14,
+    fontWeight: '700',
+    color: TEXT_MUTED,
   },
   resultsScroll: {
     flex: 1,

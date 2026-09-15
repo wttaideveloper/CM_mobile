@@ -18,7 +18,9 @@ export function MarketListingSections({ listing }: MarketListingSectionsProps) {
   return (
     <>
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Details</Text>
+        <Text style={styles.sectionLabel} accessibilityRole="header">
+          Details
+        </Text>
         <View style={styles.detailsGrid}>
           {listing.details.map((item) => (
             <View key={item.id} style={styles.detailCard}>
@@ -30,7 +32,9 @@ export function MarketListingSections({ listing }: MarketListingSectionsProps) {
       </View>
 
       <View style={styles.reviews}>
-        <Text style={styles.sectionLabel}>Reviews</Text>
+        <Text style={styles.sectionLabel} accessibilityRole="header">
+          Reviews
+        </Text>
         <View style={styles.reviewCard}>
           <View style={styles.reviewHeader}>
             <View

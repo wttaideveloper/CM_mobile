@@ -56,6 +56,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  heroBtnDisabled: {
+    opacity: 0.5,
+  },
   content: {
     backgroundColor: BODY_BG,
     paddingHorizontal: H_PAD,

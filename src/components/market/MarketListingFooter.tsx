@@ -24,15 +24,20 @@ export function MarketListingFooter({
   return (
     <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, c(22, 18)) }]}>
       <Pressable
-        style={styles.listBtn}
+        style={({ pressed }) => [styles.listBtn, pressed && styles.pressed]}
         onPress={() => router.push('/(main)/market/cart')}
         accessibilityRole="button"
         accessibilityLabel="View cart"
+        accessibilityHint="Opens your cart"
       >
         <ListingListIcon />
       </Pressable>
       <Pressable
-        style={[styles.addBtn, isAdding && styles.addBtnDisabled]}
+        style={({ pressed }) => [
+          styles.addBtn,
+          isAdding && styles.addBtnDisabled,
+          pressed && !isAdding && styles.pressed,
+        ]}
         onPress={onAddToCart ?? (() => router.push('/(main)/market/cart'))}
         disabled={isAdding}
         accessibilityRole="button"
@@ -77,6 +82,9 @@ const styles = StyleSheet.create({
   },
   addBtnDisabled: {
     opacity: 0.7,
+  },
+  pressed: {
+    opacity: 0.85,
   },
   addText: {
     fontSize: NU.cardTitle,

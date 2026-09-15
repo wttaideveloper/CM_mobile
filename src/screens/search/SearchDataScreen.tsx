@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
@@ -95,6 +95,9 @@ export function SearchDataScreen() {
           }}
           style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
         >
           <ChevronLeftIcon size={22} color={PRIMARY} />
         </Pressable>
@@ -110,12 +113,28 @@ export function SearchDataScreen() {
             onChangeText={setSearch}
             autoFocus
             returnKeyType="search"
-            clearButtonMode="while-editing"
             multiline={false}
             numberOfLines={1}
             scrollEnabled={false}
             onSubmitEditing={() => setDebouncedSearch(search.trim())}
+            accessibilityLabel="Search"
+            accessibilityHint={SEARCH_PLACEHOLDER}
           />
+          {search.length > 0 ? (
+            <Pressable
+              onPress={() => {
+                setSearch('');
+                setDebouncedSearch('');
+                inputRef.current?.focus();
+              }}
+              style={({ pressed }) => [styles.clearBtn, pressed && styles.clearBtnPressed]}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Text style={styles.clearBtnText}>×</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 

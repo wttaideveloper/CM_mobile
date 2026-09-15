@@ -68,9 +68,16 @@ export function CoursesScreen() {
           <Text style={styles.title}>Learn</Text>
           {!openedFromSearch ? (
             <Pressable
+              disabled
               accessibilityRole="button"
               accessibilityLabel="My Courses"
-              style={({ pressed }) => [styles.myCoursesBtn, pressed && styles.cardPressed]}
+              accessibilityState={{ disabled: true }}
+              accessibilityHint="Not available yet"
+              style={({ pressed }) => [
+                styles.myCoursesBtn,
+                styles.myCoursesBtnDisabled,
+                pressed && styles.cardPressed,
+              ]}
             >
               <Text style={styles.myCoursesBtnText}>My Courses</Text>
             </Pressable>

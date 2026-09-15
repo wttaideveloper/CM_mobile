@@ -62,11 +62,12 @@ export function AuthPasswordField({
         accessibilityLabel={accessibilityLabel}
       />
       <Pressable
-        style={styles.passwordToggle}
+        style={({ pressed }) => [styles.passwordToggle, pressed && styles.passwordTogglePressed]}
         onPress={onToggleVisible}
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={visible ? t('auth.hidePassword') : t('auth.showPassword')}
+        accessibilityState={{ selected: visible }}
       >
         <Ionicons
           name={visible ? 'eye-off-outline' : 'eye-outline'}
@@ -144,10 +145,15 @@ export function AuthModeFooter({
       <Text style={styles.createAccountMuted}>{mutedText}</Text>
       <Pressable
         onPress={onPress}
+        hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
       >
-        <Text style={styles.createAccountLink}>{linkText}</Text>
+        {({ pressed }) => (
+          <Text style={[styles.createAccountLink, pressed && styles.createAccountLinkPressed]}>
+            {linkText}
+          </Text>
+        )}
       </Pressable>
     </View>
   );
@@ -176,6 +182,9 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  passwordTogglePressed: {
+    opacity: 0.6,
   },
   socialRow: {
     flexDirection: 'row',
@@ -212,5 +221,8 @@ const styles = StyleSheet.create({
     fontSize: getFontSize(16),
     fontWeight: '400',
     color: '#257D3F',
+  },
+  createAccountLinkPressed: {
+    opacity: 0.65,
   },
 });

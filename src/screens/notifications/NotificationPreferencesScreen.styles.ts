@@ -1,15 +1,16 @@
 import { StyleSheet } from 'react-native';
 
+import { appColors } from '@/constants/designTokens';
 import { shadowSm } from '@/utils/shadows';
 import { isSmallDevice } from '@/utils/responsive';
 
-export const PRIMARY = '#1F5D4E';
-const PAGE_BG = '#FFFFFF';
-const BODY_BG = '#F7F8F9';
-const TEXT_MUTED = '#9CA3AF';
-const TEXT_DESC = '#6B7280';
-const TEXT_BLACK = '#111111';
-const BORDER = '#E5E7EB';
+export const PRIMARY = appColors.primary;
+const PAGE_BG = appColors.surface;
+const BODY_BG = appColors.background;
+const TEXT_MUTED = appColors.textMuted;
+const TEXT_DESC = appColors.textSecondary;
+const TEXT_BLACK = appColors.textPrimary;
+const BORDER = appColors.border;
 export const H_PAD = isSmallDevice ? 16 : 20;
 
 export const styles = StyleSheet.create({
@@ -103,7 +104,7 @@ export const styles = StyleSheet.create({
   inlineError: {
     fontSize: isSmallDevice ? 12 : 13,
     lineHeight: isSmallDevice ? 16 : 18,
-    color: '#DC2626',
+    color: appColors.error,
     marginTop: 12,
     textAlign: 'center',
   },

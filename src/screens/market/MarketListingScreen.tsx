@@ -64,7 +64,11 @@ export function MarketListingScreen() {
       <StatusBarFill lightColor={LISTING_GREEN} darkColor={LISTING_GREEN} />
       {isLoading && productId && listing == null ? (
         <View style={styles.loading}>
-          <ActivityIndicator color={LISTING_GREEN} size="large" />
+          <ActivityIndicator
+            color={LISTING_GREEN}
+            size="large"
+            accessibilityLabel="Loading product"
+          />
           <Text style={styles.loadingText}>Loading product…</Text>
         </View>
       ) : listing != null ? (

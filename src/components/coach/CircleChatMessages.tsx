@@ -62,10 +62,13 @@ export function CircleChatMessages({
 
       {messages.map((message) => {
         const mine = message.from === 'me';
+        const sender = mine ? 'You' : message.sender ?? 'Circle member';
         return (
           <View
             key={message.id}
             style={[styles.row, mine ? styles.rowMe : styles.rowThem]}
+            accessible
+            accessibilityLabel={`${sender}, ${message.time}: ${message.text}`}
           >
             {!mine && message.sender ? (
               <Text style={[styles.sender, { color: message.senderColor }]}>
@@ -85,12 +88,6 @@ export function CircleChatMessages({
           </View>
         );
       })}
-
-      <View style={styles.typing}>
-        <View style={[styles.dot, { backgroundColor: COACH_CHAT_SOFT }]} />
-        <View style={[styles.dot, { backgroundColor: '#c6d8ca' }]} />
-        <View style={[styles.dot, { backgroundColor: '#dce9de' }]} />
-      </View>
     </ScrollView>
   );
 }
@@ -207,23 +204,5 @@ const styles = StyleSheet.create({
   },
   timeMe: {
     alignSelf: 'flex-end',
-  },
-  typing: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: c(5, 4),
-    paddingVertical: NU.cardPadXs,
-    paddingHorizontal: NU.cardPad,
-    borderRadius: c(18, 16),
-    borderBottomLeftRadius: c(6, 5),
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: COACH_CHAT_BORDER,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
   },
 });

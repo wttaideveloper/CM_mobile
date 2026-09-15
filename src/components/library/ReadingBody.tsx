@@ -19,7 +19,9 @@ export function ReadingBody({ content }: ReadingBodyProps) {
         <Text style={styles.kind}>{content.kind}</Text>
         <Text style={styles.remaining}>{content.remaining}</Text>
       </View>
-      <Text style={styles.headline}>{content.headline}</Text>
+      <Text style={styles.headline} accessibilityRole="header">
+        {content.headline}
+      </Text>
       <Text style={styles.quote}>{content.quote}</Text>
       {content.body.map((para) => (
         <Text key={para.slice(0, 24)} style={styles.para}>

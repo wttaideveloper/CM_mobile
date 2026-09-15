@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { HomeBookIcon } from '@/components/home/HomeDashboardIcons';
 import {
   HOME_DAILY_INSIGHT,
+  HOME_DASH_BORDER,
   HOME_DASH_LINK,
   HOME_DASH_TEAL,
 } from '@/components/home/homeDashboardData';
@@ -20,6 +21,8 @@ export function HomeDashboardInsight() {
           onPress={() => router.push('/(main)/library')}
           accessibilityRole="button"
           accessibilityLabel="Open library"
+          accessibilityHint="Browse all wellness articles"
+          style={styles.libraryLink}
         >
           <Text style={styles.link}>Library ›</Text>
         </Pressable>
@@ -33,6 +36,8 @@ export function HomeDashboardInsight() {
           })
         }
         accessibilityRole="button"
+        accessibilityLabel={`Read article: ${HOME_DAILY_INSIGHT.title}. ${HOME_DAILY_INSIGHT.meta}`}
+        accessibilityHint="Opens the full article"
       >
         <View style={styles.iconWrap}>
           <HomeBookIcon color="#07473e" />
@@ -68,11 +73,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: HOME_DASH_LINK,
   },
+  libraryLink: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
   card: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#c8e0cc',
-    borderRadius: NU.cardRadiusSm,
+    borderColor: HOME_DASH_BORDER,
+    borderRadius: NU.cardRadiusMd,
     padding: NU.cardPad,
     flexDirection: 'row',
     gap: NU.rowGap,

@@ -15,7 +15,12 @@ export function SearchSectionHeading({
 
   return (
     <View style={styles.sectionHeadingRow}>
-      <Text style={styles.sectionHeading} numberOfLines={1}>
+      <Text
+        style={styles.sectionHeading}
+        numberOfLines={1}
+        accessibilityRole="header"
+        accessibilityLabel={`${title}, ${count} results`}
+      >
         {title}{' '}
         <Text style={styles.sectionCount}>{count}</Text>
       </Text>
@@ -24,6 +29,9 @@ export function SearchSectionHeading({
           onPress={onViewAll}
           hitSlop={8}
           style={({ pressed }) => [styles.viewAllBtn, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel={`View all ${title.toLowerCase()}`}
+          accessibilityHint={`Shows all ${count} results`}
         >
           <Text style={styles.viewAllText}>View all</Text>
         </Pressable>

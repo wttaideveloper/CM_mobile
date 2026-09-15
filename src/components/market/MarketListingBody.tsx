@@ -40,11 +40,12 @@ export function MarketListingBody({ listing }: MarketListingBodyProps) {
             contentFit="cover"
             transition={0}
             onError={() => setImageFailed(true)}
+            accessibilityLabel={listing.title}
           />
         ) : (
           <MarketBagIcon color={listing.mediaIcon} size={56} />
         )}
-        <View style={styles.dots}>
+        <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <View style={styles.dotActive} />
           <View style={styles.dot} />
           <View style={styles.dot} />
@@ -65,7 +66,7 @@ export function MarketListingBody({ listing }: MarketListingBodyProps) {
         </View>
 
         <Pressable
-          style={styles.vendor}
+          style={({ pressed }) => [styles.vendor, pressed && styles.vendorPressed]}
           onPress={() =>
             router.push(
               listing.enterpriseId
@@ -77,6 +78,8 @@ export function MarketListingBody({ listing }: MarketListingBodyProps) {
             )
           }
           accessibilityRole="button"
+          accessibilityLabel={`${listing.vendorName}, ${listing.vendorMeta}`}
+          accessibilityHint="Opens this business's profile"
         >
           <View style={styles.vendorAvatar}>
             <Text style={styles.vendorInitials}>{listing.vendorInitials}</Text>
@@ -89,7 +92,9 @@ export function MarketListingBody({ listing }: MarketListingBodyProps) {
         </Pressable>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Description</Text>
+          <Text style={styles.sectionLabel} accessibilityRole="header">
+            Description
+          </Text>
           <Text style={styles.description}>{listing.description}</Text>
         </View>
 
@@ -182,6 +187,9 @@ const styles = StyleSheet.create({
     borderColor: LISTING_BORDER,
     borderRadius: NU.cardRadius,
     padding: NU.cardPadSm,
+  },
+  vendorPressed: {
+    opacity: 0.85,
   },
   vendorAvatar: {
     width: c(44, 40),

@@ -55,7 +55,11 @@ function ProviderCard({
 }) {
   return (
     <View style={styles.providerCard}>
-      <View style={styles.providerTop}>
+      <View
+        style={styles.providerTop}
+        accessible
+        accessibilityLabel={`${provider.name}, ${provider.specialty}, rated ${provider.rating} out of 5`}
+      >
         <View style={[styles.avatar, { backgroundColor: provider.avatarBg }]}>
           <Text style={[styles.initials, { color: provider.avatarColor }]}>
             {provider.initials}
@@ -76,9 +80,16 @@ function ProviderCard({
           return (
             <Pressable
               key={slot}
-              style={[styles.slot, active && styles.slotActive]}
+              style={({ pressed }) => [
+                styles.slot,
+                active && styles.slotActive,
+                pressed && !active && styles.slotPressed,
+              ]}
               onPress={() => onSelectSlot(slot)}
+              hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               accessibilityRole="button"
+              accessibilityLabel={`${slot} with ${provider.name}`}
+              accessibilityState={{ selected: active }}
             >
               <Text style={[styles.slotText, active && styles.slotTextActive]}>
                 {slot}
@@ -107,7 +118,18 @@ export function ConsultBody({
           <Text style={styles.nextDoctor}>{CONSULT_NEXT_VISIT.doctor}</Text>
           <Text style={styles.nextWhen}>{CONSULT_NEXT_VISIT.when}</Text>
         </View>
-        <Pressable style={styles.joinBtn} accessibilityRole="button">
+        <Pressable
+          style={({ pressed }) => [
+            styles.joinBtn,
+            styles.joinBtnDisabled,
+            pressed && styles.joinBtnPressed,
+          ]}
+          disabled
+          accessibilityRole="button"
+          accessibilityLabel="Join"
+          accessibilityState={{ disabled: true }}
+          accessibilityHint="Not available yet"
+        >
           <Text style={styles.joinText}>Join</Text>
         </Pressable>
       </View>
@@ -125,9 +147,11 @@ export function ConsultBody({
       </View>
 
       <Pressable
-        style={styles.confirm}
+        style={({ pressed }) => [styles.confirm, pressed && styles.confirmPressed]}
         onPress={onConfirm}
         accessibilityRole="button"
+        accessibilityLabel={`Confirm ${selectedSlot}`}
+        accessibilityHint="Books this appointment"
       >
         <Text style={styles.confirmText}>Confirm {selectedSlot}</Text>
       </Pressable>
@@ -185,6 +209,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: NU.cardPadSm,
     borderRadius: 99,
     backgroundColor: CONSULT_TEAL,
+  },
+  joinBtnDisabled: {
+    opacity: 0.45,
+  },
+  joinBtnPressed: {
+    opacity: 0.6,
   },
   joinText: {
     fontSize: NU.chipFont,
@@ -263,6 +293,9 @@ const styles = StyleSheet.create({
     backgroundColor: CONSULT_TEAL,
     borderColor: CONSULT_TEAL,
   },
+  slotPressed: {
+    backgroundColor: '#eef6ef',
+  },
   slotText: {
     fontSize: NU.chipFont,
     fontWeight: '600',
@@ -277,6 +310,9 @@ const styles = StyleSheet.create({
     backgroundColor: CONSULT_TEAL,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  confirmPressed: {
+    opacity: 0.88,
   },
   confirmText: {
     fontSize: NU.cardTitleLg,

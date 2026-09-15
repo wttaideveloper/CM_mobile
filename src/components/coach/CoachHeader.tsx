@@ -37,14 +37,20 @@ export function CoachHeader() {
           <Text style={styles.title}>Your Care Team</Text>
         </View>
         <Pressable
-          style={styles.iconBtn}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           onPress={() => router.push('/(main)/coach/appointments')}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
-          accessibilityLabel="Appointments"
+          accessibilityLabel={
+            count > 0
+              ? `Appointments, ${count} upcoming`
+              : 'Appointments'
+          }
+          accessibilityHint="Opens your upcoming appointments"
         >
           <CoachCalendarIcon />
           {count > 0 ? (
-            <View style={styles.badge}>
+            <View style={styles.badge} importantForAccessibility="no-hide-descendants">
               <Text style={styles.badgeText}>{count > 9 ? '9+' : count}</Text>
             </View>
           ) : null}
@@ -91,6 +97,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   badge: {
     position: 'absolute',

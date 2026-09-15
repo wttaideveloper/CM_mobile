@@ -2,17 +2,14 @@ import { EmptyState } from '@/components/EmptyState';
 import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
 import { ChevronLeftIcon } from '@/components/dashboard/DashboardIcons';
 import { EventCard, FeaturedEventCard, matchesEventSearch } from '@/components/events/EventCards';
-import {
-  EVENT_FILTERS,
-  filterEvents,
-  getFeaturedEvent,
-  getListEvents,
-} from '@/constants/events';
+import { EVENT_FILTERS } from '@/constants/events';
+import { useEvents } from '@/hooks/useEvents';
 import { useRouteSearchParam } from '@/hooks/useRouteSearchParam';
+import { filterEventsByTag } from '@/utils/event.mapper';
 import { isFromSearchParam } from '@/utils/searchNavigation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PRIMARY, styles } from '@/screens/events/EventsScreen.styles';
@@ -30,12 +27,19 @@ export function EventsScreen() {
   const openedFromSearch = isFromSearchParam(fromSearch);
   const [activeFilter, setActiveFilter] = useState<string>('All');
 
-  const featuredEvent = getFeaturedEvent();
+  const { data: events, isLoading, isError, refetch } = useEvents();
+
+  // No backend "featured" flag exists — the first item of the fetched list is
+  // treated as featured, mirroring the previous mock's fallback-to-first-item behavior.
+  const featuredEvent = (events ?? [])[0];
   const filteredEvents = useMemo(() => {
-    const byFilter = filterEvents(activeFilter);
+    const byFilter = filterEventsByTag(events ?? [], activeFilter);
     return byFilter.filter((event) => matchesEventSearch(event, routeSearch));
-  }, [activeFilter, routeSearch]);
-  const listEvents = useMemo(() => getListEvents(filteredEvents), [filteredEvents]);
+  }, [events, activeFilter, routeSearch]);
+  const listEvents = useMemo(
+    () => filteredEvents.filter((event) => event.id !== featuredEvent?.id),
+    [filteredEvents, featuredEvent],
+  );
   const showFeatured =
     featuredEvent &&
     (activeFilter === 'All' || filteredEvents.some((event) => event.id === featuredEvent.id));
@@ -81,6 +85,7 @@ export function EventsScreen() {
                     styles.filterChipText,
                     isActive && styles.filterChipTextActive,
                   ]}
+                  numberOfLines={1}
                 >
                   {filter}
                 </Text>
@@ -117,7 +122,17 @@ export function EventsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         ListHeaderComponent={listHeader}
-        ListEmptyComponent={!showFeatured ? <EmptyState entity="events" /> : null}
+        ListEmptyComponent={
+          isLoading ? (
+            <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator color={PRIMARY} size="large" />
+            </View>
+          ) : isError ? (
+            <EmptyState variant="error" entity="events" onAction={() => void refetch()} />
+          ) : !showFeatured ? (
+            <EmptyState entity="events" />
+          ) : null
+        }
         ItemSeparatorComponent={() => <View style={{ height: LIST_GAP }} />}
         renderItem={({ item }) => (
           <View style={styles.content}>

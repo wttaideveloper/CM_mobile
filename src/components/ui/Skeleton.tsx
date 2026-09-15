@@ -1,10 +1,18 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, StyleSheet, View, type DimensionValue, type ViewStyle } from 'react-native';
+import { useEffect, useRef, type ReactNode } from "react";
+import {
+  Animated,
+  StyleSheet,
+  View,
+  type DimensionValue,
+  type ViewStyle,
+} from "react-native";
 
-import { isSmallDevice } from '@/utils/responsive';
+import { appColors } from "@/constants/designTokens";
+import { isSmallDevice } from "@/utils/responsive";
 
-const BONE = '#E5EBE7';
-const BONE_SOFT = '#F0F4F1';
+const BONE = "#E5EBE7";
+const BONE_SOFT = "#F0F4F1";
+const CARD_BORDER = appColors.border;
 
 type SkeletonBlockProps = {
   width?: DimensionValue;
@@ -15,7 +23,7 @@ type SkeletonBlockProps = {
 
 /** Soft pulsing bone used to build layout-shaped loaders (§6 loading pattern). */
 export function SkeletonBlock({
-  width = '100%',
+  width = "100%",
   height = 14,
   radius = 8,
   style,
@@ -66,7 +74,12 @@ type SkeletonListProps = {
   style?: ViewStyle;
 };
 
-export function SkeletonList({ count = 4, children, gap = 12, style }: SkeletonListProps) {
+export function SkeletonList({
+  count = 4,
+  children,
+  gap = 12,
+  style,
+}: SkeletonListProps) {
   return (
     <View
       style={style}
@@ -75,7 +88,10 @@ export function SkeletonList({ count = 4, children, gap = 12, style }: SkeletonL
       accessibilityState={{ busy: true }}
     >
       {Array.from({ length: count }, (_, index) => (
-        <View key={index} style={index < count - 1 ? { marginBottom: gap } : undefined}>
+        <View
+          key={index}
+          style={index < count - 1 ? { marginBottom: gap } : undefined}
+        >
           {children(index)}
         </View>
       ))}
@@ -168,7 +184,11 @@ export function ProductGridSkeleton({ count = 6 }: { count?: number }) {
 function ProductSkeletonCard() {
   return (
     <View style={styles.productCard}>
-      <SkeletonBlock width="100%" height={isSmallDevice ? 110 : 128} radius={0} />
+      <SkeletonBlock
+        width="100%"
+        height={isSmallDevice ? 110 : 128}
+        radius={0}
+      />
       <View style={styles.productBody}>
         <SkeletonBlock width="40%" height={11} />
         <SkeletonBlock width="78%" height={13} style={{ marginTop: 8 }} />
@@ -185,9 +205,11 @@ export function ChatMessageSkeletonList({ count = 6 }: { count?: number }) {
       {(index) => {
         const isUser = index % 3 === 0;
         return (
-          <View style={[styles.chatBubbleRow, isUser && styles.chatBubbleRowUser]}>
+          <View
+            style={[styles.chatBubbleRow, isUser && styles.chatBubbleRowUser]}
+          >
             <SkeletonBlock
-              width={isUser ? '62%' : '74%'}
+              width={isUser ? "62%" : "74%"}
               height={isUser ? 44 : 56}
               radius={16}
               style={{ backgroundColor: BONE_SOFT }}
@@ -201,14 +223,14 @@ export function ChatMessageSkeletonList({ count = 6 }: { count?: number }) {
 
 const styles = StyleSheet.create({
   enterpriseCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: appColors.surface,
     borderRadius: isSmallDevice ? 14 : 18,
     padding: isSmallDevice ? 10 : 14,
     gap: isSmallDevice ? 10 : 12,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    borderColor: CARD_BORDER,
   },
   enterpriseMain: {
     flex: 1,
@@ -217,8 +239,8 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   inboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 4,
     gap: 12,
@@ -227,21 +249,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   inboxTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 12,
   },
   paddedList: {
     paddingTop: 4,
   },
   serviceCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFFFFF",
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E6EBE7',
+    borderColor: "#E6EBE7",
     padding: isSmallDevice ? 12 : 14,
     gap: 12,
   },
@@ -253,17 +275,17 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   productRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: isSmallDevice ? 10 : 12,
     marginBottom: isSmallDevice ? 10 : 12,
   },
   productCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E6EBE7',
-    overflow: 'hidden',
+    borderColor: "#E6EBE7",
+    overflow: "hidden",
   },
   productBody: {
     paddingHorizontal: isSmallDevice ? 10 : 12,
@@ -275,10 +297,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   chatBubbleRow: {
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
   },
   chatBubbleRowUser: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
 });
 

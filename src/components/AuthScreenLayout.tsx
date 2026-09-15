@@ -44,7 +44,14 @@ export function AuthScreenLayout({
         />
 
         {showSkip && onSkip && (
-          <Pressable style={styles.skipButton} onPress={onSkip}>
+          <Pressable
+            style={({ pressed }) => [styles.skipButton, pressed && styles.skipButtonPressed]}
+            onPress={onSkip}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Skip"
+            accessibilityHint="Skips onboarding and goes to sign in"
+          >
             <Text style={styles.skipText}>Skip</Text>
           </Pressable>
         )}
@@ -76,6 +83,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 24,
     zIndex: 2,
+  },
+  skipButtonPressed: {
+    backgroundColor: '#0F241C',
   },
   skipText: {
     color: '#FFFFFF',

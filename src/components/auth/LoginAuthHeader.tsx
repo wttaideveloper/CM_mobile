@@ -52,7 +52,7 @@ export function LoginAuthHeader({
     <>
       <AuthBadge label={badgeLabel} align="left" />
 
-      <Text style={styles.heading}>
+      <Text style={styles.heading} accessibilityRole="header">
         {authMode === 'verify' ? (
           <>
             <Text style={styles.headingDark}>Check your </Text>

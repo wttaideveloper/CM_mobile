@@ -58,13 +58,19 @@ export function MarketPillarListings({
           {pillar.businesses.map((biz) => (
             <Pressable
               key={biz.id}
-              style={styles.bizCard}
+              style={({ pressed }) => [
+                styles.bizCard,
+                pressed && styles.cardPressed,
+              ]}
               onPress={() =>
                 router.push({
                   pathname: '/(main)/market/business-profile',
                   params: { id: biz.id },
                 })
               }
+              accessibilityRole="button"
+              accessibilityLabel={`${biz.name}${biz.verified ? ', verified' : ''}, ${biz.subtitle}, rated ${biz.rating}, ${biz.meta}`}
+              accessibilityHint="Opens business profile"
             >
               <MarketBusinessAvatar
                 imageUrl={biz.imageUrl}
@@ -206,6 +212,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1.3,
     textTransform: 'uppercase',
     color: PILLAR_MUTED,
+  },
+  cardPressed: {
+    opacity: 0.85,
   },
   bizCard: {
     backgroundColor: '#FFFFFF',

@@ -14,6 +14,8 @@ import {
   SETTINGS_SECTIONS,
   type SettingsMenuItem as SettingsMenuItemType,
 } from '@/constants/settings';
+
+const ACTIVE_MENU_ITEM_IDS = new Set(['edit-profile', 'notifications']);
 import { useScreenPrivacy } from '@/hooks/useScreenPrivacy';
 import { useAuthStore } from '@/stores/auth.store';
 import { isSmallDevice } from '@/utils/responsive';
@@ -108,6 +110,7 @@ export function SettingsScreen() {
                     key={item.id}
                     item={item}
                     isLast={index === section.items.length - 1}
+                    active={ACTIVE_MENU_ITEM_IDS.has(item.id)}
                     onPress={() => handleMenuPress(item)}
                   />
                 ))}

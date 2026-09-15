@@ -1,23 +1,29 @@
-import { useCallback, useState } from 'react';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Image } from 'expo-image';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from "react";
+import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import {
   HomeBellOutlineIcon,
   HomeSettingsSunIcon,
   HomeTrendIcon,
-} from '@/components/home/HomeDashboardIcons';
+} from "@/components/home/HomeDashboardIcons";
 import {
   getHomeGreeting,
   HOME_DASH_TEAL,
-} from '@/components/home/homeDashboardData';
-import { HwiScoreRing } from '@/components/hwi/HwiScoreRing';
-import { fetchNotificationUnreadCount } from '@/services/notification.service';
-import { c, NU } from '@/utils/newUiCompact';
+} from "@/components/home/homeDashboardData";
+import { HwiScoreRing } from "@/components/hwi/HwiScoreRing";
+import {
+  appColors,
+  appRadius,
+  appSpacing,
+  appTypography,
+} from "@/constants/designTokens";
+import { fetchNotificationUnreadCount } from "@/services/notification.service";
+import { c, NU } from "@/utils/newUiCompact";
 
-const headerDeco = require('../../assets/images/home-header-heart.png');
-const { width: SCREEN_W } = Dimensions.get('window');
+const headerDeco = require("../../assets/images/home-header-heart.png");
+const { width: SCREEN_W } = Dimensions.get("window");
 const DESIGN_W = 430;
 
 type HomeDashboardHeaderProps = {
@@ -42,7 +48,7 @@ export function HomeDashboardHeader({ displayName }: HomeDashboardHeaderProps) {
       <Image
         source={headerDeco}
         style={{
-          position: 'absolute',
+          position: "absolute",
           left: 220 * scale,
           bottom: -30,
           width: 210 * scale,
@@ -65,20 +71,26 @@ export function HomeDashboardHeader({ displayName }: HomeDashboardHeaderProps) {
         <View style={styles.actions}>
           <Pressable
             style={styles.iconBtn}
-            onPress={() => router.push('/(main)/notifications')}
+            onPress={() => router.push("/(main)/notifications")}
             accessibilityRole="button"
             accessibilityLabel="Notifications"
+            accessibilityHint={
+              unread > 0
+                ? `${unread} unread notification${unread === 1 ? '' : 's'}`
+                : 'No unread notifications'
+            }
           >
-            <HomeBellOutlineIcon />
+            <HomeBellOutlineIcon color={appColors.white} />
             {unread > 0 ? <View style={styles.dot} /> : null}
           </Pressable>
           <Pressable
             style={styles.iconBtn}
-            onPress={() => router.push('/(main)/settings')}
+            onPress={() => router.push("/(main)/settings")}
             accessibilityRole="button"
             accessibilityLabel="Settings"
+            accessibilityHint="Open app settings"
           >
-            <HomeSettingsSunIcon />
+            <HomeSettingsSunIcon color={appColors.white} />
           </Pressable>
         </View>
       </View>
@@ -96,34 +108,29 @@ export function HomeDashboardHeader({ displayName }: HomeDashboardHeaderProps) {
             <Text style={styles.trendText}>+4 pts this week</Text>
           </View>
           <Text style={styles.hwiBody}>
-            1 of 6 pillars logged today. Log Nutrition & Water to push your score
-            higher.
+            1 of 6 pillars logged today. Log Nutrition & Water to push your
+            score higher.
           </Text>
           <Pressable
-            style={styles.breakdownBtn}
+            style={styles.primaryAction}
+            onPress={() => router.push('/(main)/check-in')}
             accessibilityRole="button"
+            accessibilityLabel="Log today's pillars"
+            accessibilityHint="Opens the daily check-in screen"
+          >
+            <Text style={styles.primaryActionText}>
+              Log today’s pillars
+            </Text>
+          </Pressable>
+          <Pressable
+            style={styles.breakdownAction}
+            accessibilityRole="button"
+            accessibilityLabel="Full HWI breakdown"
+            accessibilityHint="Opens detailed HWI score analysis"
             onPress={() => router.push('/(main)/hwi')}
           >
             <Text style={styles.breakdownText}>Full breakdown ›</Text>
           </Pressable>
-          <View style={styles.actionRow}>
-            <Pressable
-              style={styles.actionBtn}
-              accessibilityRole="button"
-              accessibilityLabel="HWI"
-              onPress={() => router.push('/(main)/hwi')}
-            >
-              <Text style={styles.breakdownText}>HWI™ ›</Text>
-            </Pressable>
-            <Pressable
-              style={styles.actionBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Check In"
-              onPress={() => router.push('/(main)/check-in')}
-            >
-              <Text style={styles.breakdownText}>Check In ›</Text>
-            </Pressable>
-          </View>
         </View>
       </View>
     </View>
@@ -132,19 +139,19 @@ export function HomeDashboardHeader({ displayName }: HomeDashboardHeaderProps) {
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: 'rgb(37, 125, 63)',
+    backgroundColor: appColors.primary,
     paddingHorizontal: NU.hPadHome,
     paddingTop: NU.headerPadTopHome,
     paddingBottom: NU.headerPadBottomHome,
     borderBottomLeftRadius: c(30, 26),
     borderBottomRightRadius: c(30, 26),
-    overflow: 'hidden',
-    position: 'relative',
+    overflow: "hidden",
+    position: "relative",
   },
   topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: c(10, 8),
     zIndex: 1,
   },
@@ -154,94 +161,92 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontSize: c(14, 13),
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.85)',
+    fontWeight: "500",
+    color: "rgba(255,255,255,0.85)",
   },
   name: {
     marginTop: 1,
     fontSize: NU.name,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: "800",
+    color: "#FFFFFF",
     letterSpacing: -0.4,
   },
   actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: c(8, 6),
   },
   iconBtn: {
     width: NU.iconBtn,
     height: NU.iconBtn,
     borderRadius: NU.iconBtnRadius,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(255,255,255,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   dot: {
-    position: 'absolute',
-    top: 8,
+    position: "absolute",
+    top: 9,
     right: 9,
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ff7a45',
+    backgroundColor: "#ff7a45",
     borderWidth: 2,
-    borderColor: 'rgb(37, 125, 63)',
+    borderColor: appColors.primary,
   },
   hwiCard: {
     marginTop: NU.sectionGap,
-    backgroundColor: 'rgba(255,255,255,0.13)',
-    borderRadius: c(18, 16),
-    padding: NU.cardPad,
-    flexDirection: 'row',
-    gap: NU.rowGap,
-    alignItems: 'center',
+    backgroundColor: "rgba(255,255,255,0.13)",
+    borderRadius: appRadius.lg,
+    padding: appSpacing.lg,
+    flexDirection: "row",
+    gap: c(14, 12),
+    alignItems: "center",
     zIndex: 1,
   },
   hwiCopy: {
     flex: 1,
+    flexShrink: 1,
     gap: c(6, 4),
   },
   trendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: c(6, 4),
   },
   trendText: {
     fontSize: c(14, 13),
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   hwiBody: {
     fontSize: NU.bodySm,
     lineHeight: c(17, 15),
-    color: 'rgba(255,255,255,0.88)',
+    color: "rgba(255,255,255,0.88)",
   },
-  breakdownBtn: {
-    alignSelf: 'flex-start',
+  primaryAction: {
+    alignSelf: "flex-start",
     marginTop: 2,
-    paddingVertical: c(7, 5),
-    paddingHorizontal: c(12, 10),
-    borderRadius: 99,
-    backgroundColor: HOME_DASH_TEAL,
+    minHeight: 44,
+    paddingVertical: appSpacing.sm,
+    paddingHorizontal: appSpacing.md,
+    borderRadius: appRadius.md,
+    backgroundColor: appColors.white,
+    justifyContent: "center",
   },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: c(8, 6),
-    marginTop: 2,
+  primaryActionText: {
+    ...appTypography.button,
+    color: HOME_DASH_TEAL,
   },
-  actionBtn: {
-    alignSelf: 'flex-start',
-    paddingVertical: c(7, 5),
-    paddingHorizontal: c(12, 10),
-    borderRadius: 99,
-    backgroundColor: HOME_DASH_TEAL,
+  breakdownAction: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    justifyContent: "center",
   },
   breakdownText: {
     fontSize: NU.bodySm,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 });

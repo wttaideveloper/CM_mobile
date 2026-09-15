@@ -151,6 +151,12 @@ export const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#257D3F',
   },
+  optionLinkPressed: {
+    opacity: 0.65,
+  },
+  rowPressed: {
+    opacity: 0.7,
+  },
   primaryButton: {
     backgroundColor: '#164744',
     height: isSmallDevice ? 44 : 48,
@@ -170,6 +176,9 @@ export const styles = StyleSheet.create({
   },
   primaryButtonDisabled: {
     opacity: 0.7,
+  },
+  primaryButtonPressed: {
+    opacity: 0.88,
   },
   primaryButtonText: {
     color: authTheme.primaryButtonText.color,

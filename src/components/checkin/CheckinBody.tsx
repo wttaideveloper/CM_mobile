@@ -1,13 +1,16 @@
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CheckinPracticeCard } from '@/components/checkin/CheckinPracticeCard';
-import { CheckinSparkIcon } from '@/components/checkin/CheckinIcons';
+import { CheckinCheckIcon, CheckinSparkIcon } from '@/components/checkin/CheckinIcons';
 import {
   CHECKIN_PRACTICES,
   CHECKIN_TEAL,
   type CheckinPractice,
 } from '@/components/checkin/checkinData';
 import { c, NU } from '@/utils/newUiCompact';
+
+const SAVE_CONFIRM_MS = 550;
 
 type CheckinBodyProps = {
   values: Record<string, number>;
@@ -16,11 +19,32 @@ type CheckinBodyProps = {
 };
 
 export function CheckinBody({ values, onChange, onSave }: CheckinBodyProps) {
+  const [saved, setSaved] = useState(false);
+  const savingRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const handleSave = () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaved(true);
+    timeoutRef.current = setTimeout(() => {
+      onSave();
+    }, SAVE_CONFIRM_MS);
+  };
+
   return (
     <View style={styles.body}>
       <View style={styles.sectionTitle}>
         <CheckinSparkIcon />
-        <Text style={styles.sectionText}>Nature-Based Practices</Text>
+        <Text style={styles.sectionText} accessibilityRole="header">
+          Nature-Based Practices
+        </Text>
       </View>
 
       {CHECKIN_PRACTICES.map((practice: CheckinPractice) => (
@@ -32,8 +56,27 @@ export function CheckinBody({ values, onChange, onSave }: CheckinBodyProps) {
         />
       ))}
 
-      <Pressable style={styles.save} onPress={onSave} accessibilityRole="button">
-        <Text style={styles.saveText}>Save today's check-in</Text>
+      <Pressable
+        style={({ pressed }) => [
+          styles.save,
+          pressed && !saved && styles.savePressed,
+          saved && styles.saveDone,
+        ]}
+        onPress={handleSave}
+        disabled={saved}
+        accessibilityRole="button"
+        accessibilityLabel={saved ? 'Check-in saved' : "Save today's check-in"}
+        accessibilityHint="Saves your check-in and opens your HWI score"
+        accessibilityState={{ disabled: saved, busy: saved }}
+      >
+        {saved ? (
+          <>
+            <CheckinCheckIcon color="#FFFFFF" size={16} />
+            <Text style={styles.saveText}>Saved</Text>
+          </>
+        ) : (
+          <Text style={styles.saveText}>Save today's check-in</Text>
+        )}
       </Pressable>
     </View>
   );
@@ -61,8 +104,16 @@ const styles = StyleSheet.create({
     height: NU.searchH,
     borderRadius: 99,
     backgroundColor: CHECKIN_TEAL,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: c(8, 6),
+  },
+  savePressed: {
+    opacity: 0.9,
+  },
+  saveDone: {
+    backgroundColor: '#2f7d32',
   },
   saveText: {
     fontSize: NU.cardTitleLg,

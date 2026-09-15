@@ -27,7 +27,8 @@ type NotificationsBodyProps = {
   filter: NotifFilter;
   onFilterChange: (filter: NotifFilter) => void;
   groups: { label: string; items: StaticNotification[] }[];
-  allRead: boolean;
+  readIds: ReadonlySet<string>;
+  onMarkRead: (id: string) => void;
 };
 
 function NotifIcon({ kind, color }: { kind: NotifIconKind; color: string }) {
@@ -51,7 +52,8 @@ export function NotificationsBody({
   filter,
   onFilterChange,
   groups,
-  allRead,
+  readIds,
+  onMarkRead,
 }: NotificationsBodyProps) {
   return (
     <View style={styles.body}>
@@ -61,9 +63,14 @@ export function NotificationsBody({
           return (
             <Pressable
               key={item}
-              style={[styles.chip, active ? styles.chipActive : styles.chipIdle]}
+              style={({ pressed }) => [
+                styles.chip,
+                active ? styles.chipActive : styles.chipIdle,
+                pressed && styles.chipPressed,
+              ]}
               onPress={() => onFilterChange(item)}
               accessibilityRole="button"
+              accessibilityLabel={`Filter: ${item}`}
               accessibilityState={{ selected: active }}
             >
               <Text style={[styles.chipText, active && styles.chipTextActive]}>
@@ -87,23 +94,20 @@ export function NotificationsBody({
             <Text style={styles.groupLabel}>{group.label}</Text>
             <View style={styles.card}>
               {group.items.map((item, index) => {
-                const unread = item.unread && !allRead;
-                return (
-                  <View
-                    key={item.id}
-                    style={[
-                      styles.row,
-                      unread && styles.rowUnread,
-                      index === group.items.length - 1 && styles.rowLast,
-                    ]}
-                  >
+                const unread = item.unread && !readIds.has(item.id);
+                const isLast = index === group.items.length - 1;
+                const rowContent = (
+                  <>
                     <View
                       style={[
                         styles.dot,
                         { backgroundColor: unread ? '#2f7d32' : 'transparent' },
                       ]}
                     />
-                    <View style={[styles.iconWrap, { backgroundColor: item.bg }]}>
+                    <View
+                      style={[styles.iconWrap, { backgroundColor: item.bg }]}
+                      importantForAccessibility="no-hide-descendants"
+                    >
                       <NotifIcon kind={item.icon} color={item.color} />
                     </View>
                     <View style={styles.copy}>
@@ -113,6 +117,34 @@ export function NotificationsBody({
                       </View>
                       <Text style={styles.bodyText}>{item.body}</Text>
                     </View>
+                  </>
+                );
+                const a11yLabel = `${item.title}${unread ? ', unread' : ''}. ${item.body}. ${item.time}.`;
+
+                return unread ? (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => onMarkRead(item.id)}
+                    style={({ pressed }) => [
+                      styles.row,
+                      styles.rowUnread,
+                      isLast && styles.rowLast,
+                      pressed && styles.rowPressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={a11yLabel}
+                    accessibilityHint="Double tap to mark as read"
+                  >
+                    {rowContent}
+                  </Pressable>
+                ) : (
+                  <View
+                    key={item.id}
+                    style={[styles.row, isLast && styles.rowLast]}
+                    accessible
+                    accessibilityLabel={a11yLabel}
+                  >
+                    {rowContent}
                   </View>
                 );
               })}
@@ -150,6 +182,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderColor: NOTIF_CHIP_BORDER,
   },
+  chipPressed: {
+    opacity: 0.8,
+  },
   chipText: {
     fontSize: NU.chipFont,
     fontWeight: '600',
@@ -185,6 +220,9 @@ const styles = StyleSheet.create({
   },
   rowUnread: {
     backgroundColor: '#fafffb',
+  },
+  rowPressed: {
+    backgroundColor: '#eef7ef',
   },
   rowLast: {
     borderBottomWidth: 0,
