@@ -60,6 +60,15 @@ export function EventsScreen() {
             </Pressable>
           ) : null}
           <Text style={styles.title}>Events</Text>
+          <Pressable
+            onPress={() => router.push('/(main)/event/my-events')}
+            accessibilityRole="button"
+            accessibilityLabel="My Events"
+            accessibilityHint="Shows the events you've registered for"
+            style={({ pressed }) => [styles.myEventsBtn, pressed && styles.cardPressed]}
+          >
+            <Text style={styles.myEventsBtnText}>My Events</Text>
+          </Pressable>
         </View>
 
         <ScrollView

@@ -56,6 +56,19 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  myEventsBtn: {
+    backgroundColor: MINT,
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    paddingVertical: isSmallDevice ? 6 : 8,
+    borderRadius: isSmallDevice ? 8 : 10,
+    flexShrink: 0,
+  },
+  myEventsBtnText: {
+    fontSize: isSmallDevice ? 12 : 13,
+    lineHeight: isSmallDevice ? 14 : 16,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
   filtersScroll: {
     gap: isSmallDevice ? 8 : 10,
   },

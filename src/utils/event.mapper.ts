@@ -1,5 +1,10 @@
 import type { Event, EventFilterTag } from '@/constants/events';
-import type { EventApiResponse } from '@/types/event.types';
+import type {
+  EventApiResponse,
+  EventMyRegistrationApiResponse,
+  MyEventBucket,
+  MyEventRegistration,
+} from '@/types/event.types';
 import { formatMoney } from '@/utils/currency';
 import {
   formatISTShortDate,
@@ -236,4 +241,73 @@ export function filterEventsByTag(events: Event[], filter: string): Event[] {
     return events;
   }
   return events.filter((event) => event.filterTags.includes(tag));
+}
+
+const REGISTRATION_STATUS_LABELS: Record<string, string> = {
+  confirmed: 'Confirmed',
+  cancelled: 'Cancelled',
+  attended: 'Attended',
+  no_show: 'No-show',
+};
+
+function formatRegistrationStatus(status: string): string {
+  const known = REGISTRATION_STATUS_LABELS[status];
+  if (known) return known;
+  const normalized = status.trim();
+  if (!normalized) return 'NA';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+/**
+ * The backend has no single "upcoming/completed/cancelled" bucket — it returns
+ * registration_status (confirmed|cancelled|attended|no_show), event_status
+ * (draft|...|published|completed|cancelled|archived|...), and event_start.
+ * Bucket derivation, in priority order:
+ *  1. registration_status === "cancelled" → cancelled
+ *  2. registration_status attended/no_show → completed (the event happened)
+ *  3. event_status === "cancelled"/"archived" → cancelled (nothing to attend,
+ *     even though the customer's own registration was never explicitly cancelled)
+ *  4. event_status === "completed" → completed
+ *  5. event_start already in the past → completed
+ *  6. otherwise → upcoming
+ */
+function classifyMyEventBucket(
+  registrationStatus: string,
+  eventStatus: string | null,
+  eventStart: Date | null,
+): MyEventBucket {
+  if (registrationStatus === 'cancelled') return 'cancelled';
+  if (registrationStatus === 'attended' || registrationStatus === 'no_show') {
+    return 'completed';
+  }
+  if (eventStatus === 'cancelled' || eventStatus === 'archived') return 'cancelled';
+  if (eventStatus === 'completed') return 'completed';
+  if (eventStart && eventStart.getTime() < Date.now()) return 'completed';
+  return 'upcoming';
+}
+
+export function mapMyRegistrationApiToItem(
+  api: EventMyRegistrationApiResponse,
+): MyEventRegistration {
+  const eventStart = safeParseDate(api.event_start);
+
+  return {
+    registrationId: String(api.registration_id),
+    eventId: String(api.event_id),
+    eventTitle: textOrNa(api.event_title),
+    eventStatus: api.event_status ?? null,
+    eventStart,
+    eventStartLabel: formatEventDateTime(eventStart),
+    registrationStatus: api.registration_status,
+    registrationStatusLabel: formatRegistrationStatus(api.registration_status),
+    hasQr: Boolean(api.qr_code),
+    checkedInAt: safeParseDate(api.checked_in_at),
+    bucket: classifyMyEventBucket(api.registration_status, api.event_status ?? null, eventStart),
+  };
+}
+
+export function mapMyRegistrationsApiResponse(
+  items: EventMyRegistrationApiResponse[],
+): MyEventRegistration[] {
+  return items.map(mapMyRegistrationApiToItem);
 }

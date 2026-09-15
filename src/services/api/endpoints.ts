@@ -72,6 +72,11 @@ export const ENDPOINTS = {
     GET_ALL: '/api/v1/events/',
     GET_BY_ID: (id: string) => `/api/v1/events/${id}`,
     REGISTER: (id: string) => `/api/v1/events/${id}/registrations`,
+    MY_REGISTRATIONS: '/api/v1/events/my/registrations',
+    REGISTRATION: (id: string, registrationId: string) =>
+      `/api/v1/events/${id}/registrations/${registrationId}`,
+    REGISTRATION_QR: (id: string, registrationId: string) =>
+      `/api/v1/events/${id}/registrations/${registrationId}/qr`,
   },
 
   SEARCH: {

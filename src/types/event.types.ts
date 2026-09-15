@@ -121,3 +121,43 @@ export type EventRegistrationResult = {
   status: string;
   qrCode: string | null;
 };
+
+/**
+ * Shape of one item returned by GET /api/v1/events/my/registrations.
+ * This endpoint has no response_model either, but (unlike the raw ORM
+ * object POST /registrations returns) the service already builds plain
+ * dicts with these exact keys — see app/services/event_service.py,
+ * my_registrations_service.
+ */
+export type EventMyRegistrationApiResponse = {
+  registration_id: string;
+  event_id: string;
+  event_title: string | null;
+  event_status: string | null;
+  event_start: string | null;
+  registration_status: string;
+  qr_code: string | null;
+  checked_in_at: string | null;
+};
+
+/** Bucket derived client-side — the backend has no single "upcoming/completed/cancelled" field. */
+export type MyEventBucket = 'upcoming' | 'completed' | 'cancelled';
+
+/** Normalized shape the app renders for "My Events". */
+export type MyEventRegistration = {
+  registrationId: string;
+  eventId: string;
+  eventTitle: string;
+  eventStatus: string | null;
+  eventStart: Date | null;
+  eventStartLabel: string;
+  registrationStatus: string;
+  registrationStatusLabel: string;
+  hasQr: boolean;
+  checkedInAt: Date | null;
+  bucket: MyEventBucket;
+};
+
+export type EventCancelRegistrationResponse = {
+  message: string;
+};

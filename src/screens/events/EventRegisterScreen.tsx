@@ -180,7 +180,10 @@ export function EventRegisterScreen() {
       </View>
 
       {result ? (
-        <View style={styles.successWrap}>
+        <ScrollView
+          contentContainerStyle={styles.successWrap}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.successIconWrap}>
             <CircleCheckIcon size={34} color={PRIMARY} />
           </View>
@@ -189,16 +192,72 @@ export function EventRegisterScreen() {
             You&rsquo;ve successfully registered for {event.detailTitle}. We&rsquo;ve sent a
             confirmation to {email.trim()}.
           </Text>
+
+          <View style={styles.successSummaryCard}>
+            <View style={styles.successSummaryRow}>
+              <View style={styles.successSummaryItem}>
+                <InfoCard emoji="📅" label="Date & Time" value={event.schedule} />
+              </View>
+              <View style={styles.successSummaryItem}>
+                <InfoCard emoji="📍" label="Location" value={event.location} />
+              </View>
+            </View>
+            <View style={styles.successStatusRow}>
+              <Text style={styles.successStatusLabel}>Status</Text>
+              <View style={styles.successStatusPill}>
+                <Text style={styles.successStatusPillText}>
+                  {result.status.charAt(0).toUpperCase() + result.status.slice(1)}
+                </Text>
+              </View>
+            </View>
+          </View>
+
           {result.id ? (
             <View style={styles.successRefCard}>
               <Text style={styles.successRefLabel}>REGISTRATION REFERENCE</Text>
               <Text style={styles.successRefValue}>{result.id.slice(0, 8).toUpperCase()}</Text>
             </View>
-          ) : null}
-          <LeafyGradientButton onPress={goBack} style={styles.doneBtn} borderRadius={14}>
-            <Text style={styles.doneBtnText}>Done</Text>
-          </LeafyGradientButton>
-        </View>
+          ) : (
+            <Text style={styles.successRefMissing}>
+              Your registration was successful. Find your ticket anytime from My Events.
+            </Text>
+          )}
+
+          <View style={styles.successActions}>
+            {result.id ? (
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/(main)/event/ticket',
+                    params: { eventId: id, registrationId: result.id! },
+                  })
+                }
+                accessibilityRole="button"
+                accessibilityLabel="View QR ticket"
+                style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
+              >
+                <Text style={styles.secondaryBtnText}>View QR Ticket</Text>
+              </Pressable>
+            ) : null}
+
+            <LeafyGradientButton
+              onPress={() => router.push('/(main)/event/my-events')}
+              style={styles.doneBtn}
+              borderRadius={14}
+            >
+              <Text style={styles.doneBtnText}>View My Events</Text>
+            </LeafyGradientButton>
+
+            <Pressable
+              onPress={() => router.replace('/(main)/(tabs)/events')}
+              accessibilityRole="button"
+              accessibilityLabel="Back to events"
+              style={({ pressed }) => [styles.textBtn, pressed && styles.pressed]}
+            >
+              <Text style={styles.textBtnText}>Back to Events</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
       ) : blockReason ? (
         <EmptyState
           variant="empty"
