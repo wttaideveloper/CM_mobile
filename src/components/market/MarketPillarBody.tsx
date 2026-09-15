@@ -65,8 +65,15 @@ export function MarketPillarBody({
 
   return (
     <View style={styles.body}>
-      <View style={[styles.hero, { borderColor: pillar.bg }]}>
-        <View style={[styles.heroIcon, { backgroundColor: pillar.bg }]}>
+      <View
+        style={[styles.hero, { borderColor: pillar.bg }]}
+        accessible
+        accessibilityLabel={`${pillar.title}. ${pillar.tagline}. ${pillar.stats}`}
+      >
+        <View
+          style={[styles.heroIcon, { backgroundColor: pillar.bg }]}
+          importantForAccessibility="no-hide-descendants"
+        >
           <PillarGlyph icon={pillar.icon} color={pillar.color} />
         </View>
         <View style={styles.heroCopy}>
@@ -90,6 +97,9 @@ export function MarketPillarBody({
               key={filter}
               style={[styles.chip, active && styles.chipActive]}
               onPress={() => onFilterChange(filter)}
+              accessibilityRole="button"
+              accessibilityLabel={`Filter: ${filter}`}
+              accessibilityState={{ selected: active }}
             >
               <Text style={[styles.chipText, active && styles.chipTextActive]}>
                 {filter}

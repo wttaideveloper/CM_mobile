@@ -32,17 +32,31 @@ export function ExploreHero({ heroImage, onBack }: { heroImage: string; onBack: 
         </Pressable>
         <View style={styles.heroActionsRight}>
           <Pressable
+            disabled
             accessibilityRole="button"
             accessibilityLabel="Favorite"
-            style={({ pressed }) => [styles.heroBtn, pressed && styles.btnPressed]}
+            accessibilityState={{ disabled: true }}
+            accessibilityHint="Not available yet"
+            style={({ pressed }) => [
+              styles.heroBtn,
+              styles.heroBtnDisabled,
+              pressed && styles.btnPressed,
+            ]}
             hitSlop={8}
           >
             <HeartIcon size={18} color="#FFFFFF" />
           </Pressable>
           <Pressable
+            disabled
             accessibilityRole="button"
             accessibilityLabel="More options"
-            style={({ pressed }) => [styles.heroBtn, pressed && styles.btnPressed]}
+            accessibilityState={{ disabled: true }}
+            accessibilityHint="Not available yet"
+            style={({ pressed }) => [
+              styles.heroBtn,
+              styles.heroBtnDisabled,
+              pressed && styles.btnPressed,
+            ]}
             hitSlop={8}
           >
             <MoreVerticalIcon size={18} color="#FFFFFF" />

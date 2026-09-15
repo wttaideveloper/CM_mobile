@@ -48,7 +48,6 @@ export function ServiceDetailContent({
           {displayProviderName ? (
             <Text style={styles.providerName}>{displayProviderName}</Text>
           ) : null}
-          <Text style={styles.providerRole}>Certified Personal Trainer ·</Text>
           {providerEnterprise ? (
             <Text style={styles.providerEnterprise} numberOfLines={1}>
               {providerEnterprise}

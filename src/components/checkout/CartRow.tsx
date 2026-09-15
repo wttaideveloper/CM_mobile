@@ -37,6 +37,8 @@ export function CartRow({
               disabled={disabled}
               accessibilityRole="button"
               accessibilityLabel="Decrease quantity"
+              accessibilityState={{ disabled: !!disabled }}
+              hitSlop={8}
               style={({ pressed }) => [styles.qtyBtn, pressed && styles.pressed]}
             >
               <View style={{ width: 10, height: 2, backgroundColor: PRIMARY, borderRadius: 1 }} />
@@ -47,6 +49,8 @@ export function CartRow({
               disabled={disabled}
               accessibilityRole="button"
               accessibilityLabel="Increase quantity"
+              accessibilityState={{ disabled: !!disabled }}
+              hitSlop={8}
               style={({ pressed }) => [styles.qtyBtn, styles.qtyBtnPlus, pressed && styles.pressed]}
             >
               <PlusIcon size={14} color={PAGE_BG} />
@@ -57,6 +61,8 @@ export function CartRow({
             disabled={disabled}
             accessibilityRole="button"
             accessibilityLabel="Remove item"
+            accessibilityState={{ disabled: !!disabled }}
+            hitSlop={8}
           >
             <Text style={styles.removeText}>Remove</Text>
           </Pressable>

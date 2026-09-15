@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   CheckinBarbellIcon,
+  CheckinCheckIcon,
   CheckinDropIcon,
   CheckinLeafIcon,
   CheckinMinusIcon,
@@ -49,11 +50,15 @@ function PracticeIcon({
   }
 }
 
+const STEP_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
+
 export function CheckinPracticeCard({
   practice,
   value,
   onChange,
 }: CheckinPracticeCardProps) {
+  const met = value >= practice.goal;
+  const atMin = value <= 0;
   const pct = Math.min(100, (value / practice.goal) * 100);
   const valueLabel = formatCheckinValue(
     value,
@@ -65,17 +70,40 @@ export function CheckinPracticeCard({
     practice.unitSingular,
     practice.unitPlural,
   );
+  const statusLabel = met
+    ? `goal met, ${valueLabel} of ${goalLabel}`
+    : `${valueLabel} of ${goalLabel}, goal not met yet`;
 
   return (
     <View style={styles.card}>
-      <View style={styles.top}>
-        <View style={[styles.iconWrap, { backgroundColor: practice.iconBg }]}>
+      <View
+        style={styles.top}
+        accessible
+        accessibilityRole="summary"
+        accessibilityLabel={`${practice.title}. ${practice.subtitle}. ${statusLabel}.`}
+      >
+        <View
+          style={[styles.iconWrap, { backgroundColor: practice.iconBg }]}
+          importantForAccessibility="no-hide-descendants"
+        >
           <PracticeIcon icon={practice.icon} color={practice.color} />
         </View>
         <View style={styles.copy}>
-          <Text style={[styles.title, { color: practice.color }]}>
-            {practice.title}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text style={[styles.title, { color: practice.color }]}>
+              {practice.title}
+            </Text>
+            {met ? (
+              <View
+                style={[styles.metBadge, { backgroundColor: practice.iconBg }]}
+              >
+                <CheckinCheckIcon color={practice.color} size={10} />
+                <Text style={[styles.metBadgeText, { color: practice.color }]}>
+                  Goal met
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={styles.subtitle}>{practice.subtitle}</Text>
         </View>
       </View>
@@ -83,30 +111,48 @@ export function CheckinPracticeCard({
       <View style={styles.controls}>
         <View style={styles.stepper}>
           <Pressable
-            style={[styles.stepBtn, { backgroundColor: practice.iconBg }]}
+            style={[
+              styles.stepBtn,
+              { backgroundColor: practice.iconBg },
+              atMin && styles.stepBtnDisabled,
+            ]}
             onPress={() => onChange(Math.max(0, value - 1))}
+            disabled={atMin}
+            hitSlop={STEP_HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel={`Decrease ${practice.title}`}
+            accessibilityHint={`Currently ${valueLabel}`}
+            accessibilityState={{ disabled: atMin }}
           >
             <CheckinMinusIcon color={practice.color} />
           </Pressable>
-          <Text style={styles.count}>{value}</Text>
+          <Text style={styles.count} accessibilityLiveRegion="polite">
+            {value}
+          </Text>
           <Pressable
             style={[styles.stepBtn, { backgroundColor: practice.iconBg }]}
             onPress={() => onChange(value + 1)}
+            hitSlop={STEP_HIT_SLOP}
             accessibilityRole="button"
             accessibilityLabel={`Increase ${practice.title}`}
+            accessibilityHint={`Currently ${valueLabel}`}
           >
             <CheckinPlusIcon color={practice.color} />
           </Pressable>
         </View>
         <View style={styles.goalBlock}>
-          <Text style={styles.valueLabel}>{valueLabel}</Text>
+          <Text style={styles.valueLabel} accessibilityLiveRegion="polite">
+            {valueLabel}
+          </Text>
           <Text style={styles.goalLabel}>Goal: {goalLabel}</Text>
         </View>
       </View>
 
-      <View style={styles.track}>
+      <View
+        style={styles.track}
+        accessibilityRole="progressbar"
+        accessibilityValue={{ min: 0, max: practice.goal, now: value }}
+      >
         <View
           style={[
             styles.fill,
@@ -141,8 +187,26 @@ const styles = StyleSheet.create({
   copy: {
     flex: 1,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: c(7, 6),
+  },
   title: {
     fontSize: NU.cardTitle,
+    fontWeight: '700',
+  },
+  metBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: c(7, 6),
+    paddingVertical: 2,
+    borderRadius: 99,
+  },
+  metBadgeText: {
+    fontSize: c(10.5, 10),
     fontWeight: '700',
   },
   subtitle: {
@@ -167,6 +231,9 @@ const styles = StyleSheet.create({
     borderRadius: c(16, 14),
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  stepBtnDisabled: {
+    opacity: 0.4,
   },
   count: {
     fontSize: NU.cardTitleXl,

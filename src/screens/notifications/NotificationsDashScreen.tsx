@@ -15,10 +15,25 @@ import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 export function NotificationsDashScreen() {
   const scrollRef = useScrollToTopOnFocus();
   const [filter, setFilter] = useState<NotifFilter>('All');
-  const [allRead, setAllRead] = useState(false);
+  const [readIds, setReadIds] = useState<ReadonlySet<string>>(() => new Set());
 
-  const unreadCount = STATIC_NOTIFICATIONS.filter((n) => n.unread).length;
-  const unreadLabel = allRead || unreadCount === 0 ? 'All caught up' : `${unreadCount} unread`;
+  const unreadCount = STATIC_NOTIFICATIONS.filter(
+    (n) => n.unread && !readIds.has(n.id),
+  ).length;
+  const unreadLabel = unreadCount === 0 ? 'All caught up' : `${unreadCount} unread`;
+
+  const markAllRead = () => {
+    setReadIds(new Set(STATIC_NOTIFICATIONS.map((n) => n.id)));
+  };
+
+  const markRead = (id: string) => {
+    setReadIds((current) => {
+      if (current.has(id)) return current;
+      const next = new Set(current);
+      next.add(id);
+      return next;
+    });
+  };
 
   const groups = useMemo(() => {
     const filtered = STATIC_NOTIFICATIONS.filter(
@@ -44,13 +59,15 @@ export function NotificationsDashScreen() {
       >
         <NotificationsHeader
           unreadLabel={unreadLabel}
-          onMarkAllRead={() => setAllRead(true)}
+          onMarkAllRead={markAllRead}
+          markAllDisabled={unreadCount === 0}
         />
         <NotificationsBody
           filter={filter}
           onFilterChange={setFilter}
           groups={groups}
-          allRead={allRead}
+          readIds={readIds}
+          onMarkRead={markRead}
         />
       </ScrollView>
     </View>

@@ -50,6 +50,9 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     color: PRIMARY,
   },
+  nearMeBtnDisabled: {
+    opacity: 0.5,
+  },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -67,6 +70,9 @@ export const styles = StyleSheet.create({
   },
   filterBtn: {
     backgroundColor: MINT,
+  },
+  filterBtnDisabled: {
+    opacity: 0.5,
   },
   chatIconBtn: {
     backgroundColor: MINT,

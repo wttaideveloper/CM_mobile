@@ -127,6 +127,20 @@ export function CheckinMoonIcon({ color = '#6b46c1', size = 19 }: IconProps) {
   );
 }
 
+export function CheckinCheckIcon({ color = '#2f7d32', size = 12 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M4 12.5 9.5 18 20 6"
+        stroke={color}
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 export function CheckinBarbellIcon({
   color = '#d94848',
   size = 19,

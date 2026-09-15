@@ -21,7 +21,7 @@ export function MarketScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
       >
         <MarketHeader activeFilter={filter} onFilterChange={setFilter} />
-        <MarketBody />
+        <MarketBody filter={filter} />
       </ScrollView>
     </View>
   );

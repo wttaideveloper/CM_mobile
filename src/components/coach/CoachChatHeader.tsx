@@ -50,18 +50,22 @@ export function CoachChatHeader({
       />
       <View style={styles.row}>
         <Pressable
-          style={styles.iconBtn}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           onPress={() => router.back()}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
         >
           <MarketBackIcon />
         </Pressable>
-        <View style={styles.avatar}>
+        <View style={styles.avatar} importantForAccessibility="no-hide-descendants">
           <Text style={styles.initials}>{initials}</Text>
         </View>
         <View style={styles.copy}>
-          <Text style={styles.name}>{name}</Text>
+          <Text style={styles.name} accessibilityRole="header">
+            {name}
+          </Text>
           <View style={styles.statusRow}>
             <View style={styles.onlineDot} />
             <Text style={styles.status}>{status}</Text>
@@ -69,10 +73,12 @@ export function CoachChatHeader({
         </View>
         {showCalendar ? (
           <Pressable
-            style={styles.iconBtn}
+            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
             onPress={onCalendarPress}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             accessibilityRole="button"
             accessibilityLabel="Book a consult"
+            accessibilityHint="Opens available consult times"
           >
             <CoachCalendarIcon />
           </Pressable>
@@ -106,6 +112,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   avatar: {
     width: c(42, 38),

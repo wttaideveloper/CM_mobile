@@ -15,6 +15,7 @@ import {
   COACH_CHAT_INPUT_BORDER,
   COACH_CHAT_PAGE,
   COACH_CHAT_QUICK_REPLIES,
+  COACH_CHAT_SOFT,
   COACH_CHAT_TEAL,
 } from '@/components/coach/coachChatData';
 import { c, NU } from '@/utils/newUiCompact';
@@ -32,6 +33,8 @@ export function CoachChatComposer({
   onSend,
   onQuickReply,
 }: CoachChatComposerProps) {
+  const canSend = value.trim().length > 0;
+
   return (
     <View>
       <ScrollView
@@ -43,9 +46,10 @@ export function CoachChatComposer({
         {COACH_CHAT_QUICK_REPLIES.map((reply) => (
           <Pressable
             key={reply}
-            style={styles.chip}
+            style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
             onPress={() => onQuickReply(reply)}
             accessibilityRole="button"
+            accessibilityLabel={`Send quick reply: ${reply}`}
           >
             <Text style={styles.chipText}>{reply}</Text>
           </Pressable>
@@ -53,7 +57,19 @@ export function CoachChatComposer({
       </ScrollView>
 
       <View style={styles.bar}>
-        <Pressable style={styles.plusBtn} accessibilityRole="button">
+        <Pressable
+          style={({ pressed }) => [
+            styles.plusBtn,
+            styles.plusBtnDisabled,
+            pressed && styles.plusBtnPressed,
+          ]}
+          disabled
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          accessibilityRole="button"
+          accessibilityLabel="Add attachment"
+          accessibilityState={{ disabled: true }}
+          accessibilityHint="Not available yet"
+        >
           <CoachPlusIcon />
         </Pressable>
         <TextInput
@@ -64,12 +80,20 @@ export function CoachChatComposer({
           placeholderTextColor="#9db3a4"
           returnKeyType="send"
           onSubmitEditing={onSend}
+          accessibilityLabel="Message"
         />
         <Pressable
-          style={styles.sendBtn}
+          style={({ pressed }) => [
+            styles.sendBtn,
+            !canSend && styles.sendBtnDisabled,
+            pressed && canSend && styles.sendBtnPressed,
+          ]}
           onPress={onSend}
+          disabled={!canSend}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
           accessibilityRole="button"
           accessibilityLabel="Send"
+          accessibilityState={{ disabled: !canSend }}
         >
           <CoachSendIcon />
         </Pressable>
@@ -90,6 +114,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: c(15, 12),
     borderRadius: 99,
     backgroundColor: COACH_CHAT_CHIP_BG,
+  },
+  chipPressed: {
+    opacity: 0.7,
   },
   chipText: {
     fontSize: NU.chipFont,
@@ -117,6 +144,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  plusBtnDisabled: {
+    opacity: 0.45,
+  },
+  plusBtnPressed: {
+    opacity: 0.6,
+  },
   input: {
     flex: 1,
     height: NU.searchH,
@@ -135,5 +168,11 @@ const styles = StyleSheet.create({
     backgroundColor: COACH_CHAT_TEAL,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sendBtnDisabled: {
+    backgroundColor: COACH_CHAT_SOFT,
+  },
+  sendBtnPressed: {
+    opacity: 0.85,
   },
 });

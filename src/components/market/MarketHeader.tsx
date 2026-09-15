@@ -38,7 +38,6 @@ export function MarketHeader({ activeFilter, onFilterChange }: MarketHeaderProps
   const cartCount = useCartStore((s) =>
     s.items.reduce((sum, item) => sum + item.quantity, 0),
   );
-  const badge = cartCount > 0 ? cartCount : 2;
 
   return (
     <View style={styles.header}>
@@ -58,46 +57,62 @@ export function MarketHeader({ activeFilter, onFilterChange }: MarketHeaderProps
 
       <View style={styles.topRow}>
         <Pressable
-          style={styles.iconBtn}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           onPress={() => {
             if (router.canGoBack()) router.back();
             else router.replace('/(main)/(tabs)');
           }}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
         >
           <MarketBackIcon />
         </Pressable>
         <View style={styles.titleBlock}>
           <Text style={styles.eyebrow}>Nearby & online</Text>
-          <Text style={styles.title}>Marketplace</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            Marketplace
+          </Text>
         </View>
         <View style={styles.spacer} />
         <Pressable
-          style={styles.iconBtn}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           onPress={() => router.push('/(main)/market/orders')}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel="Orders and subscriptions"
+          accessibilityHint="Opens your orders"
         >
           <MarketBookmarkIcon />
         </Pressable>
         <Pressable
-          style={styles.iconBtn}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           onPress={() => router.push('/(main)/market/cart')}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
-          accessibilityLabel="Cart"
+          accessibilityLabel={
+            cartCount > 0 ? `Cart, ${cartCount} items` : 'Cart, empty'
+          }
+          accessibilityHint="Opens your cart"
         >
           <MarketCartIcon />
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-          </View>
+          {cartCount > 0 ? (
+            <View style={styles.badge} importantForAccessibility="no-hide-descendants">
+              <Text style={styles.badgeText}>
+                {cartCount > 99 ? '99+' : cartCount}
+              </Text>
+            </View>
+          ) : null}
         </Pressable>
       </View>
 
       <Pressable
-        style={styles.search}
+        style={({ pressed }) => [styles.search, pressed && styles.searchPressed]}
         onPress={() => router.push('/(main)/search-data')}
         accessibilityRole="button"
+        accessibilityLabel="Search"
+        accessibilityHint="Search businesses, products or services"
       >
         <MarketSearchIcon />
         <Text style={styles.searchText}>Businesses, products or services</Text>
@@ -116,6 +131,9 @@ export function MarketHeader({ activeFilter, onFilterChange }: MarketHeaderProps
                 key={filter}
                 style={[styles.chip, active && styles.chipActive]}
                 onPress={() => onFilterChange(filter)}
+                accessibilityRole="button"
+                accessibilityLabel={`Filter: ${filter}`}
+                accessibilityState={{ selected: active }}
               >
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>
                   {filter}
@@ -153,6 +171,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   titleBlock: {
     flexShrink: 1,
@@ -201,6 +222,9 @@ const styles = StyleSheet.create({
   searchText: {
     fontSize: NU.link,
     color: 'rgba(255,255,255,0.8)',
+  },
+  searchPressed: {
+    backgroundColor: 'rgba(255,255,255,0.24)',
   },
   filtersRow: {
     marginTop: NU.cardGap,

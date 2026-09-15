@@ -52,31 +52,45 @@ export function HwiDashboardHeader() {
 
       <View style={styles.topRow}>
         <Pressable
-          style={styles.backBtn}
+          style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
           onPress={() => {
             if (router.canGoBack()) router.back();
             else router.replace('/(main)/(tabs)');
           }}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
         >
           <BackChevron />
         </Pressable>
         <View style={styles.titleBlock}>
           <Text style={styles.eyebrow}>Health & Wellness Index</Text>
-          <Text style={styles.title}>Your HWI™</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            Your HWI™
+          </Text>
         </View>
       </View>
 
       <View style={styles.scoreBlock}>
-        <HwiScoreRing
-          score={HWI_SCORE}
-          size={c(132, 110)}
-          strokeWidth={c(9, 7)}
-          scoreFontSize={c(46, 38)}
-          labelFontSize={NU.bodySm}
-        />
-        <View style={styles.deltaPill}>
+        <View
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel={`HWI score ${HWI_SCORE} out of 100`}
+        >
+          <HwiScoreRing
+            score={HWI_SCORE}
+            size={c(132, 110)}
+            strokeWidth={c(9, 7)}
+            scoreFontSize={c(46, 38)}
+            labelFontSize={NU.bodySm}
+          />
+        </View>
+        <View
+          style={styles.deltaPill}
+          accessible
+          accessibilityLabel={HWI_WEEK_DELTA}
+        >
           <HomeTrendIcon color="#a1ffa7" size={16} />
           <Text style={styles.deltaText}>{HWI_WEEK_DELTA}</Text>
         </View>
@@ -90,7 +104,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: HOME_DASH_GREEN,
     paddingHorizontal: NU.hPad,
-    paddingTop: c(10, 8),
+    paddingTop: NU.headerPadTopHome,
     paddingBottom: NU.headerPadBottomHome,
     borderBottomLeftRadius: c(30, 26),
     borderBottomRightRadius: c(30, 26),
@@ -110,6 +124,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  backBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   titleBlock: {
     flex: 1,

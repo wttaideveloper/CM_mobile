@@ -31,16 +31,20 @@ export function ConsultHeader() {
       />
       <View style={styles.topRow}>
         <Pressable
-          style={styles.backBtn}
+          style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
           onPress={() => router.back()}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
         >
           <MarketBackIcon />
         </Pressable>
         <View style={styles.titleBlock}>
           <Text style={styles.eyebrow}>Lifestyle physicians</Text>
-          <Text style={styles.title}>Book a Consult</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            Book a Consult
+          </Text>
         </View>
       </View>
     </View>
@@ -71,6 +75,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  backBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   titleBlock: {
     flex: 1,

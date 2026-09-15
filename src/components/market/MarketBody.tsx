@@ -69,13 +69,16 @@ function FeaturedBusinessCard({ biz }: { biz: MarketBusiness }) {
 
   return (
     <Pressable
-      style={styles.bizCard}
+      style={({ pressed }) => [styles.bizCard, pressed && styles.cardPressed]}
       onPress={() =>
         router.push({
           pathname: '/(main)/market/business-profile',
           params: { id: biz.id },
         })
       }
+      accessibilityRole="button"
+      accessibilityLabel={`${biz.name}${biz.verified ? ', verified' : ''}, ${biz.subtitle}, rated ${biz.rating} with ${biz.reviews}, ${biz.meta}`}
+      accessibilityHint="Opens business profile"
     >
       <View style={[styles.bizAvatar, { backgroundColor: biz.avatarBg }]}>
         <Text style={[styles.bizInitials, { color: biz.avatarColor }]}>
@@ -101,7 +104,11 @@ function FeaturedBusinessCard({ biz }: { biz: MarketBusiness }) {
   );
 }
 
-export function MarketBody() {
+type MarketBodyProps = {
+  filter: string;
+};
+
+export function MarketBody({ filter }: MarketBodyProps) {
   const router = useRouter();
   const { data, isLoading } = useFeaturedMarketEnterprises(2);
   const featuredBusinesses =
@@ -111,6 +118,23 @@ export function MarketBody() {
         ? []
         : MARKET_BUSINESSES;
 
+  const showBusinesses = filter === 'All' || filter === 'Businesses';
+  const showProducts = filter === 'All' || filter === 'Products';
+  const showServices = filter === 'All' || filter === 'Services';
+  const showEvents = filter === 'All' || filter === 'Events';
+
+  const offers = MARKET_OFFERS.filter((offer) => {
+    if (filter === 'Products') return offer.kind === 'PRODUCT';
+    if (filter === 'Services') return offer.kind === 'SERVICE';
+    return true;
+  });
+  const offersTitle =
+    filter === 'Products'
+      ? 'Products'
+      : filter === 'Services'
+        ? 'Services'
+        : 'Products & services';
+
   return (
     <View style={styles.body}>
       <View style={styles.section}>
@@ -119,13 +143,18 @@ export function MarketBody() {
           {MARKET_PILLARS.map((pillar) => (
             <Pressable
               key={pillar.id}
-              style={styles.pillarItem}
+              style={({ pressed }) => [
+                styles.pillarItem,
+                pressed && styles.pillarItemPressed,
+              ]}
               onPress={() =>
                 router.push({
                   pathname: '/(main)/market/pillar',
                   params: { id: pillar.id },
                 })
               }
+              accessibilityRole="button"
+              accessibilityLabel={`Browse ${pillar.title}`}
             >
               <View style={[styles.pillarTile, { backgroundColor: pillar.bg }]}>
                 <PillarIcon pillar={pillar} />
@@ -136,123 +165,145 @@ export function MarketBody() {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <SectionLabel
-          title="Featured businesses"
-          action="See all"
-          onActionPress={() => router.push('/(main)/market/businesses')}
-        />
-        {isLoading ? (
-          <View style={styles.bizLoading}>
-            <ActivityIndicator color={MARKET_GREEN} />
-          </View>
-        ) : featuredBusinesses.length === 0 ? (
-          <Text style={styles.bizEmpty}>No businesses available yet.</Text>
-        ) : (
-          featuredBusinesses.map((biz) => (
-            <FeaturedBusinessCard key={biz.id} biz={biz} />
-          ))
-        )}
-      </View>
+      {showBusinesses ? (
+        <View style={styles.section}>
+          <SectionLabel
+            title="Featured businesses"
+            action="See all"
+            onActionPress={() => router.push('/(main)/market/businesses')}
+          />
+          {isLoading ? (
+            <View style={styles.bizLoading}>
+              <ActivityIndicator color={MARKET_GREEN} />
+            </View>
+          ) : featuredBusinesses.length === 0 ? (
+            <Text style={styles.bizEmpty}>No businesses available yet.</Text>
+          ) : (
+            featuredBusinesses.map((biz) => (
+              <FeaturedBusinessCard key={biz.id} biz={biz} />
+            ))
+          )}
+        </View>
+      ) : null}
 
-      <View style={styles.section}>
-        <SectionLabel
-          title="Products & services"
-          action="See all"
-          onActionPress={() => router.push('/(main)/market/offers')}
-        />
-        <View style={styles.offerGrid}>
-          {MARKET_OFFERS.map((offer) => (
+      {showProducts || showServices ? (
+        <View style={styles.section}>
+          <SectionLabel
+            title={offersTitle}
+            action="See all"
+            onActionPress={() => router.push('/(main)/market/offers')}
+          />
+          {offers.length === 0 ? (
+            <Text style={styles.bizEmpty}>Nothing here yet.</Text>
+          ) : (
+            <View style={styles.offerGrid}>
+              {offers.map((offer) => (
+                <Pressable
+                  key={offer.id}
+                  style={({ pressed }) => [
+                    styles.offerCard,
+                    pressed && styles.cardPressed,
+                  ]}
+                  onPress={() =>
+                    router.push(
+                      offer.kind === 'SERVICE'
+                        ? {
+                            pathname: '/(main)/market/service-detail',
+                            params: { id: offer.id },
+                          }
+                        : '/(main)/market/listing',
+                    )
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`${offer.kind === 'PRODUCT' ? 'Product' : 'Service'}: ${offer.title}, ${offer.vendor}, ${offer.price}${offer.priceSuffix ?? ''}`}
+                >
+                  <View
+                    style={[styles.offerMedia, { backgroundColor: offer.mediaBg }]}
+                  >
+                    {offer.icon === 'bag' ? (
+                      <MarketBagIcon color={offer.iconColor} />
+                    ) : (
+                      <MarketUserIcon color={offer.iconColor} />
+                    )}
+                  </View>
+                  <View style={styles.offerCopy}>
+                    <Text
+                      style={[
+                        styles.offerKind,
+                        { color: offer.kindColor, backgroundColor: offer.kindBg },
+                      ]}
+                    >
+                      {offer.kind}
+                    </Text>
+                    <Text style={styles.offerTitle}>{offer.title}</Text>
+                    <Text style={styles.offerVendor}>{offer.vendor}</Text>
+                    <Text style={styles.offerPrice}>
+                      {offer.price}
+                      {offer.priceSuffix ? (
+                        <Text style={styles.offerSuffix}>{offer.priceSuffix}</Text>
+                      ) : null}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+      ) : null}
+
+      {showEvents ? (
+        <View style={styles.section}>
+          <SectionLabel
+            title="Events & courses"
+            action="See all"
+            onActionPress={() => router.push('/(main)/market/events')}
+          />
+          {MARKET_EVENTS.map((item) => (
             <Pressable
-              key={offer.id}
-              style={styles.offerCard}
+              key={item.id}
+              style={({ pressed }) => [
+                styles.eventCard,
+                pressed && styles.cardPressed,
+              ]}
               onPress={() =>
                 router.push(
-                  offer.kind === 'SERVICE'
-                    ? {
-                        pathname: '/(main)/market/service-detail',
-                        params: { id: offer.id },
-                      }
-                    : '/(main)/market/listing',
+                  item.id === 'metabolic'
+                    ? '/(main)/market/course-learning'
+                    : '/(main)/market/event-detail',
                 )
               }
+              accessibilityRole="button"
+              accessibilityLabel={`${item.badge}, ${item.title}, ${item.when}, ${item.detail}`}
             >
-              <View style={[styles.offerMedia, { backgroundColor: offer.mediaBg }]}>
-                {offer.icon === 'bag' ? (
-                  <MarketBagIcon color={offer.iconColor} />
-                ) : (
-                  <MarketUserIcon color={offer.iconColor} />
-                )}
-              </View>
-              <View style={styles.offerCopy}>
+              <View style={[styles.eventSide, { backgroundColor: item.sideBg }]}>
+                <Text style={[styles.eventSideTop, { color: item.sideTopColor }]}>
+                  {item.sideTop}
+                </Text>
                 <Text
-                  style={[
-                    styles.offerKind,
-                    { color: offer.kindColor, backgroundColor: offer.kindBg },
-                  ]}
+                  style={[styles.eventSideBottom, { color: item.sideBottomColor }]}
                 >
-                  {offer.kind}
+                  {item.sideBottom}
                 </Text>
-                <Text style={styles.offerTitle}>{offer.title}</Text>
-                <Text style={styles.offerVendor}>{offer.vendor}</Text>
-                <Text style={styles.offerPrice}>
-                  {offer.price}
-                  {offer.priceSuffix ? (
-                    <Text style={styles.offerSuffix}>{offer.priceSuffix}</Text>
-                  ) : null}
-                </Text>
+              </View>
+              <View style={styles.eventCopy}>
+                <View style={styles.eventBadgeRow}>
+                  <Text
+                    style={[
+                      styles.eventBadge,
+                      { color: item.badgeColor, backgroundColor: item.badgeBg },
+                    ]}
+                  >
+                    {item.badge}
+                  </Text>
+                  <Text style={styles.eventWhen}>{item.when}</Text>
+                </View>
+                <Text style={styles.eventTitle}>{item.title}</Text>
+                <Text style={styles.eventDetail}>{item.detail}</Text>
               </View>
             </Pressable>
           ))}
         </View>
-      </View>
-
-      <View style={styles.section}>
-        <SectionLabel
-          title="Events & courses"
-          action="See all"
-          onActionPress={() => router.push('/(main)/market/events')}
-        />
-        {MARKET_EVENTS.map((item) => (
-          <Pressable
-            key={item.id}
-            style={styles.eventCard}
-            onPress={() =>
-              router.push(
-                item.id === 'metabolic'
-                  ? '/(main)/market/course-learning'
-                  : '/(main)/market/event-detail',
-              )
-            }
-          >
-            <View style={[styles.eventSide, { backgroundColor: item.sideBg }]}>
-              <Text style={[styles.eventSideTop, { color: item.sideTopColor }]}>
-                {item.sideTop}
-              </Text>
-              <Text
-                style={[styles.eventSideBottom, { color: item.sideBottomColor }]}
-              >
-                {item.sideBottom}
-              </Text>
-            </View>
-            <View style={styles.eventCopy}>
-              <View style={styles.eventBadgeRow}>
-                <Text
-                  style={[
-                    styles.eventBadge,
-                    { color: item.badgeColor, backgroundColor: item.badgeBg },
-                  ]}
-                >
-                  {item.badge}
-                </Text>
-                <Text style={styles.eventWhen}>{item.when}</Text>
-              </View>
-              <Text style={styles.eventTitle}>{item.title}</Text>
-              <Text style={styles.eventDetail}>{item.detail}</Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
+      ) : null}
 
       <View style={styles.cta}>
         <View style={styles.ctaCopy}>
@@ -318,6 +369,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: MARKET_TEAL,
     textAlign: 'center',
+  },
+  pillarItemPressed: {
+    opacity: 0.7,
+  },
+  cardPressed: {
+    opacity: 0.85,
   },
   bizLoading: {
     paddingVertical: c(20, 16),

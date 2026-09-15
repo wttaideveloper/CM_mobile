@@ -154,12 +154,16 @@ export function ShopScreen() {
                 <MessageSquareIcon size={20} color={PRIMARY} />
               </Pressable>
               <Pressable
+                disabled
                 style={({ pressed }) => [
                   styles.nearMeBtn,
+                  styles.nearMeBtnDisabled,
                   pressed && styles.pressed,
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={t("shop.nearMe")}
+                accessibilityState={{ disabled: true }}
+                accessibilityHint="Not available yet"
               >
                 <MapPinIcon size={14} color={PRIMARY} />
                 <Text style={styles.nearMeText}>{t("shop.nearMe")}</Text>
@@ -199,14 +203,18 @@ export function ShopScreen() {
                 <SearchIcon size={18} color={TEXT_MUTED} />
               </Pressable>
               <Pressable
+                disabled
                 style={({ pressed }) => [
                   styles.headerIconBtn,
                   styles.filterBtn,
+                  styles.filterBtnDisabled,
                   pressed && styles.pressed,
                 ]}
                 hitSlop={6}
                 accessibilityRole="button"
                 accessibilityLabel={t("shop.filterProducts")}
+                accessibilityState={{ disabled: true }}
+                accessibilityHint="Not available yet"
               >
                 <FunnelIcon size={16} color={PRIMARY} />
               </Pressable>

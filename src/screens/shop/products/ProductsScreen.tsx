@@ -55,9 +55,16 @@ export function ProductsScreen() {
             <Text style={styles.title}>Products</Text>
           </View>
           <Pressable
+            disabled
             accessibilityRole="button"
             accessibilityLabel="Filter products"
-            style={({ pressed }) => [styles.filterBtn, pressed && styles.pressed]}
+            accessibilityState={{ disabled: true }}
+            accessibilityHint="Not available yet"
+            style={({ pressed }) => [
+              styles.filterBtn,
+              styles.filterBtnDisabled,
+              pressed && styles.pressed,
+            ]}
             hitSlop={8}
           >
             <FunnelIcon size={16} color={PRIMARY} />

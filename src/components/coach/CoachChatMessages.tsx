@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   COACH_CHAT_BORDER,
   COACH_CHAT_CHIP_BG,
+  COACH_CHAT_CONTACT,
   COACH_CHAT_DATE,
   COACH_CHAT_INCOMING,
   COACH_CHAT_SOFT,
@@ -32,10 +33,13 @@ export function CoachChatMessages({ messages, listRef }: CoachChatMessagesProps)
 
       {messages.map((message) => {
         const mine = message.from === 'me';
+        const sender = mine ? 'You' : COACH_CHAT_CONTACT.name;
         return (
           <View
             key={message.id}
             style={[styles.row, mine ? styles.rowMe : styles.rowThem]}
+            accessible
+            accessibilityLabel={`${sender}, ${message.time}: ${message.text}`}
           >
             <View
               style={[styles.bubble, mine ? styles.bubbleMe : styles.bubbleThem]}
@@ -50,12 +54,6 @@ export function CoachChatMessages({ messages, listRef }: CoachChatMessagesProps)
           </View>
         );
       })}
-
-      <View style={styles.typing}>
-        <View style={[styles.dot, { backgroundColor: COACH_CHAT_SOFT }]} />
-        <View style={[styles.dot, { backgroundColor: '#c6d8ca' }]} />
-        <View style={[styles.dot, { backgroundColor: '#dce9de' }]} />
-      </View>
     </ScrollView>
   );
 }
@@ -133,23 +131,5 @@ const styles = StyleSheet.create({
   },
   timeMe: {
     alignSelf: 'flex-end',
-  },
-  typing: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: c(5, 4),
-    paddingVertical: NU.cardPadXs,
-    paddingHorizontal: NU.cardPad,
-    borderRadius: c(18, 16),
-    borderBottomLeftRadius: c(6, 5),
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: COACH_CHAT_BORDER,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
   },
 });

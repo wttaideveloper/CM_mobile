@@ -18,10 +18,15 @@ export function HwiTrendCard() {
   const [range, setRange] = useState<HwiTrendRange>('7D');
   const bars = range === '7D' ? HWI_TREND_7D : HWI_TREND_30D;
 
+  const activeBar = bars.find((bar) => bar.active);
+  const chartSummary = activeBar
+    ? `HWI trend chart, ${range === '7D' ? 'last 7 days' : 'last 4 weeks'}. Most recent point: ${activeBar.label}.`
+    : `HWI trend chart, ${range === '7D' ? 'last 7 days' : 'last 4 weeks'}.`;
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.title}>HWI™ Trend ›</Text>
+        <Text style={styles.title}>HWI™ Trend</Text>
         <View style={styles.toggle}>
           {(['7D', '30D'] as const).map((key) => {
             const active = range === key;
@@ -30,7 +35,11 @@ export function HwiTrendCard() {
                 key={key}
                 style={[styles.toggleBtn, active && styles.toggleBtnActive]}
                 onPress={() => setRange(key)}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                 accessibilityRole="button"
+                accessibilityLabel={
+                  key === '7D' ? 'Show 7 day trend' : 'Show 30 day trend'
+                }
                 accessibilityState={{ selected: active }}
               >
                 <Text style={[styles.toggleText, active && styles.toggleTextActive]}>
@@ -42,9 +51,18 @@ export function HwiTrendCard() {
         </View>
       </View>
 
-      <View style={styles.chart}>
+      <View
+        style={styles.chart}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={chartSummary}
+      >
         {bars.map((bar, index) => (
-          <View key={`${bar.label}-${index}`} style={styles.barCol}>
+          <View
+            key={`${bar.label}-${index}`}
+            style={styles.barCol}
+            importantForAccessibility="no-hide-descendants"
+          >
             <View
               style={[
                 styles.bar,
@@ -60,15 +78,23 @@ export function HwiTrendCard() {
       </View>
 
       <View style={styles.stats}>
-        <View>
+        <View accessible accessibilityLabel={`Lowest score: ${HWI_TREND_STATS.lowest}`}>
           <Text style={styles.statLabel}>Lowest</Text>
           <Text style={styles.statValue}>{HWI_TREND_STATS.lowest}</Text>
         </View>
-        <View style={styles.statCenter}>
+        <View
+          style={styles.statCenter}
+          accessible
+          accessibilityLabel={`Average score: ${HWI_TREND_STATS.average}`}
+        >
           <Text style={styles.statLabel}>Average</Text>
           <Text style={styles.statValue}>{HWI_TREND_STATS.average}</Text>
         </View>
-        <View style={styles.statRight}>
+        <View
+          style={styles.statRight}
+          accessible
+          accessibilityLabel={`Highest score: ${HWI_TREND_STATS.highest}`}
+        >
           <Text style={styles.statLabel}>Highest</Text>
           <Text style={styles.statValue}>{HWI_TREND_STATS.highest}</Text>
         </View>

@@ -37,22 +37,28 @@ export function MarketBusinessListHeader({
       />
       <View style={styles.topRow}>
         <Pressable
-          style={styles.iconBtn}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
           onPress={() => router.back()}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          accessibilityHint="Returns to the previous screen"
         >
           <MarketBackIcon />
         </Pressable>
         <View style={styles.titleBlock}>
           <Text style={styles.eyebrow}>Marketplace</Text>
-          <Text style={styles.title}>Featured businesses</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            Featured businesses
+          </Text>
         </View>
       </View>
       <Pressable
-        style={styles.search}
+        style={({ pressed }) => [styles.search, pressed && styles.searchPressed]}
         onPress={() => router.push('/(main)/search-data')}
         accessibilityRole="button"
+        accessibilityLabel="Search"
+        accessibilityHint="Search businesses nearby"
       >
         <MarketSearchIcon />
         <Text style={styles.searchText}>Search businesses nearby</Text>
@@ -87,6 +93,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
+  },
   titleBlock: {
     flex: 1,
   },
@@ -116,6 +125,9 @@ const styles = StyleSheet.create({
   searchText: {
     fontSize: NU.link,
     color: 'rgba(255,255,255,0.78)',
+  },
+  searchPressed: {
+    backgroundColor: 'rgba(255,255,255,0.24)',
   },
   count: {
     marginTop: NU.cardGap,

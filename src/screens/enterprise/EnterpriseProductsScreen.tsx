@@ -70,7 +70,9 @@ export function EnterpriseProductsScreen() {
           <ChevronLeftIcon size={22} color={PRIMARY} />
         </Pressable>
         <View style={styles.headerText}>
-          <Text style={styles.title}>Products</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            Products
+          </Text>
           {!isEnterpriseLoading && enterprise ? (
             <Text style={styles.subtitle} numberOfLines={1}>
               {enterprise.name}

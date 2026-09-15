@@ -60,6 +60,9 @@ export function MarketBusinessListBody({
                 key={item}
                 style={[styles.chip, active && styles.chipActive]}
                 onPress={() => onSortChange(item)}
+                accessibilityRole="button"
+                accessibilityLabel={`Sort by ${item}`}
+                accessibilityState={{ selected: active }}
               >
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>
                   {item}
@@ -74,9 +77,16 @@ export function MarketBusinessListBody({
         {businesses.map((biz) => (
           <Pressable
             key={biz.id}
-            style={styles.card}
-            onPress={() => router.push('/(main)/market/business-profile')}
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+            onPress={() =>
+              router.push({
+                pathname: '/(main)/market/business-profile',
+                params: { id: biz.id },
+              })
+            }
             accessibilityRole="button"
+            accessibilityLabel={`${biz.name}${biz.verified ? ', verified' : ''}, ${biz.subtitle}, rated ${biz.rating} with ${biz.reviews}, ${biz.meta}`}
+            accessibilityHint="Opens business profile"
           >
             <View style={[styles.avatar, { backgroundColor: biz.avatarBg }]}>
               <Text style={[styles.initials, { color: biz.avatarColor }]}>
@@ -155,6 +165,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: c(13, 11),
     alignItems: 'center',
+  },
+  cardPressed: {
+    opacity: 0.85,
   },
   avatar: {
     width: c(56, 48),

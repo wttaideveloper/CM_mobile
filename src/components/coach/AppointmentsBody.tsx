@@ -27,9 +27,10 @@ export function AppointmentsBody({ appointments }: AppointmentsBodyProps) {
             Book a consult with your care team and it will show up here.
           </Text>
           <Pressable
-            style={styles.emptyCta}
+            style={({ pressed }) => [styles.emptyCta, pressed && styles.ctaPressed]}
             onPress={() => router.push('/(main)/coach/consults')}
             accessibilityRole="button"
+            accessibilityHint="Opens the consult booking screen"
           >
             <Text style={styles.emptyCtaText}>Book a consult</Text>
           </Pressable>
@@ -43,7 +44,12 @@ export function AppointmentsBody({ appointments }: AppointmentsBodyProps) {
       <Text style={styles.sectionLabel}>Upcoming</Text>
       <View style={styles.list}>
         {appointments.map((appt) => (
-          <View key={appt.id} style={styles.card}>
+          <View
+            key={appt.id}
+            style={styles.card}
+            accessible
+            accessibilityLabel={`${appt.providerName}, ${appt.status === 'confirmed' ? 'Booked' : 'Next'}, ${appt.mode}, ${appt.duration}, ${appt.when}`}
+          >
             <View style={[styles.avatar, { backgroundColor: appt.avatarBg }]}>
               <Text style={[styles.initials, { color: appt.avatarColor }]}>
                 {appt.initials}
@@ -82,9 +88,10 @@ export function AppointmentsBody({ appointments }: AppointmentsBodyProps) {
       </View>
 
       <Pressable
-        style={styles.bookBtn}
+        style={({ pressed }) => [styles.bookBtn, pressed && styles.ctaPressed]}
         onPress={() => router.push('/(main)/coach/consults')}
         accessibilityRole="button"
+        accessibilityHint="Opens the consult booking screen"
       >
         <Text style={styles.bookText}>Book another consult</Text>
       </Pressable>
@@ -183,6 +190,9 @@ const styles = StyleSheet.create({
     backgroundColor: APPT_TEAL,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  ctaPressed: {
+    opacity: 0.88,
   },
   bookText: {
     fontSize: NU.cardTitle,

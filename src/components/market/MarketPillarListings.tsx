@@ -57,8 +57,19 @@ export function MarketPillarListings({
           {pillar.businesses.map((biz) => (
             <Pressable
               key={biz.id}
-              style={styles.bizCard}
-              onPress={() => router.push('/(main)/market/business-profile')}
+              style={({ pressed }) => [
+                styles.bizCard,
+                pressed && styles.cardPressed,
+              ]}
+              onPress={() =>
+                router.push({
+                  pathname: '/(main)/market/business-profile',
+                  params: { id: biz.id },
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`${biz.name}${biz.verified ? ', verified' : ''}, ${biz.subtitle}, rated ${biz.rating}, ${biz.meta}`}
+              accessibilityHint="Opens business profile"
             >
               <View
                 style={[styles.bizAvatar, { backgroundColor: biz.avatarBg }]}
@@ -90,7 +101,10 @@ export function MarketPillarListings({
           {offers.map((offer) => (
             <Pressable
               key={offer.id}
-              style={styles.offerCard}
+              style={({ pressed }) => [
+                styles.offerCard,
+                pressed && styles.cardPressed,
+              ]}
               onPress={() =>
                 router.push(
                   offer.route === 'service'
@@ -101,6 +115,8 @@ export function MarketPillarListings({
                     : '/(main)/market/listing',
                 )
               }
+              accessibilityRole="button"
+              accessibilityLabel={`${offer.kind === 'PRODUCT' ? 'Product' : 'Service'}: ${offer.title}, ${offer.vendor}, ${offer.price}${offer.priceSuffix ?? ''}`}
             >
               <View
                 style={[styles.offerMedia, { backgroundColor: offer.mediaBg }]}
@@ -140,7 +156,10 @@ export function MarketPillarListings({
           {pillar.events.map((event) => (
             <Pressable
               key={event.id}
-              style={styles.eventCard}
+              style={({ pressed }) => [
+                styles.eventCard,
+                pressed && styles.cardPressed,
+              ]}
               onPress={() =>
                 router.push(
                   event.route === 'course'
@@ -148,6 +167,8 @@ export function MarketPillarListings({
                     : '/(main)/market/event-detail',
                 )
               }
+              accessibilityRole="button"
+              accessibilityLabel={`${event.badge}, ${event.title}, ${event.when}, ${event.detail}`}
             >
               <View style={[styles.eventSide, { backgroundColor: event.sideBg }]}>
                 <Text style={[styles.eventTop, { color: event.sideTopColor }]}>
@@ -205,6 +226,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: NU.cardGap,
     alignItems: 'center',
+  },
+  cardPressed: {
+    opacity: 0.85,
   },
   bizAvatar: {
     width: c(48, 42),

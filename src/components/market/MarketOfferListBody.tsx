@@ -72,6 +72,9 @@ export function MarketOfferListBody({
                 key={item}
                 style={[styles.chip, active && styles.chipActive]}
                 onPress={() => onFilterChange(item)}
+                accessibilityRole="button"
+                accessibilityLabel={`Filter: ${item}`}
+                accessibilityState={{ selected: active }}
               >
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>
                   {item}
@@ -88,7 +91,7 @@ export function MarketOfferListBody({
             {row.map((offer) => (
               <Pressable
                 key={offer.id}
-                style={styles.card}
+                style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
                 onPress={() =>
                   router.push(
                     offer.route === 'service'
@@ -100,6 +103,7 @@ export function MarketOfferListBody({
                   )
                 }
                 accessibilityRole="button"
+                accessibilityLabel={`${offer.kind === 'PRODUCT' ? 'Product' : 'Service'}: ${offer.title}, ${offer.vendor}, ${offer.price}${offer.priceSuffix ?? ''}`}
               >
                 <View style={[styles.media, { backgroundColor: offer.mediaBg }]}>
                   <OfferGlyph item={offer} />
@@ -189,6 +193,9 @@ const styles = StyleSheet.create({
     borderColor: OFFER_LIST_BORDER,
     borderRadius: NU.cardRadius,
     overflow: 'hidden',
+  },
+  cardPressed: {
+    opacity: 0.85,
   },
   cardSpacer: {
     flex: 1,
