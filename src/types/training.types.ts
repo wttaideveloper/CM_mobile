@@ -14,6 +14,19 @@ export type TrainingLessonApi = {
   is_downloadable?: boolean | null;
   file_size?: string | null;
   topics?: { id: string; title?: string | null }[] | null;
+  assessment_id?: string | null;
+  assessment?: {
+    id?: string;
+    type?: string | null;
+    title?: string | null;
+    questions?:
+      | {
+          id?: string;
+          question_text?: string | null;
+          question_type?: string | null;
+        }[]
+      | null;
+  } | null;
 };
 
 export type TrainingSectionApi = {
@@ -24,6 +37,7 @@ export type TrainingSectionApi = {
   lessons?: TrainingLessonApi[] | null;
   schedule?: string | null;
   instructor_id?: string | null;
+  assessment?: TrainingLessonApi['assessment'];
 };
 
 export type TrainingDocumentApi = {
@@ -265,6 +279,7 @@ export type TrainingContentLessonApi = {
   detail?: string | null;
   thumbnail_url?: string | null;
   content_url?: string | null;
+  video_url?: string | null;
   is_preview?: boolean | null;
   is_mandatory?: boolean | null;
   is_downloadable?: boolean | null;

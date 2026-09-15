@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -121,6 +122,12 @@ function FeaturedBusinessCard({ biz }: { biz: MarketBusiness }) {
 
 function FeaturedOfferCard({ offer }: { offer: MarketOffer }) {
   const router = useRouter();
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(offer.imageUrl) && !imageFailed;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [offer.imageUrl, offer.id]);
 
   return (
     <Pressable
@@ -140,12 +147,14 @@ function FeaturedOfferCard({ offer }: { offer: MarketOffer }) {
       }
     >
       <View style={[styles.offerMedia, { backgroundColor: offer.mediaBg }]}>
-        {offer.imageUrl ? (
+        {showImage ? (
           <Image
-            source={{ uri: offer.imageUrl }}
+            source={{ uri: offer.imageUrl! }}
             style={styles.offerImage}
             contentFit="cover"
             transition={0}
+            recyclingKey={offer.imageUrl!}
+            onError={() => setImageFailed(true)}
           />
         ) : offer.icon === 'bag' ? (
           <MarketBagIcon color={offer.iconColor} />

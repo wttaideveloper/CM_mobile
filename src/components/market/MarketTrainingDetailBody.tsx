@@ -293,11 +293,20 @@ function CurriculumBlock({
                   {expanded ? (
                     <View style={styles.conceptsBox}>
                       <Text style={styles.conceptsLabel}>
-                        {preferApiSessions ? 'Lessons' : 'Concepts covered'}
+                        {preferApiSessions
+                          ? 'Lessons & quizzes'
+                          : 'Concepts covered'}
                       </Text>
-                      {concepts.map((concept) => (
-                        <Text key={concept} style={styles.conceptItem}>
-                          •  {concept}
+                      {concepts.map((concept, conceptIndex) => (
+                        <Text
+                          key={`${session.id}-${conceptIndex}`}
+                          style={styles.conceptItem}
+                        >
+                          {concept.startsWith('Quiz ·')
+                            ? `✎  ${concept}`
+                            : concept.startsWith('Lesson ·')
+                              ? `•  ${concept}`
+                              : `•  ${concept}`}
                         </Text>
                       ))}
                     </View>
@@ -486,7 +495,8 @@ export function MarketTrainingDetailBody() {
             <BizProfilePinIcon />
             <View style={styles.infoCopy}>
               <Text style={styles.infoTitle}>
-                {d.deliveryMode === 'In-Person'
+                {d.deliveryMode === 'In-Person' ||
+                d.deliveryMode === 'Physical'
                   ? 'Physical venue'
                   : d.deliveryMode === 'Hybrid'
                     ? 'Hybrid delivery'
@@ -585,6 +595,42 @@ export function MarketTrainingDetailBody() {
           </Card>
         </Section>
 
+        <Section label="Offline & notes">
+          <Card>
+            <MetaRow
+              label="Offline access"
+              value={d.offlineEnabled ? 'Enabled for enrolled learners' : 'Not enabled'}
+            />
+            <MetaRow
+              label="Auto notes PDF"
+              value={d.notesPdfAvailable ? 'Available after enroll' : 'Not available'}
+            />
+            <MetaRow
+              label="Instructor notes"
+              value={`${d.instructorNotes.length} file(s)`}
+              last
+            />
+            <ActionLink
+              label="Offline downloads"
+              onPress={() =>
+                router.push({
+                  pathname: '/(main)/market/training-offline',
+                  params: { id: d.id },
+                })
+              }
+            />
+            <ActionLink
+              label="Course notes"
+              onPress={() =>
+                router.push({
+                  pathname: '/(main)/market/training-notes',
+                  params: { id: d.id },
+                })
+              }
+            />
+          </Card>
+        </Section>
+
         <Section label="Ratings & reviews">
           {averageRating != null && averageRating > 0 ? (
             <View style={styles.ratingHero}>
@@ -646,42 +692,6 @@ export function MarketTrainingDetailBody() {
               }
             />
           </View>
-        </Section>
-
-        <Section label="Offline & notes">
-          <Card>
-            <MetaRow
-              label="Offline access"
-              value={d.offlineEnabled ? 'Enabled for enrolled learners' : 'Not enabled'}
-            />
-            <MetaRow
-              label="Auto notes PDF"
-              value={d.notesPdfAvailable ? 'Available after enroll' : 'Not available'}
-            />
-            <MetaRow
-              label="Instructor notes"
-              value={`${d.instructorNotes.length} file(s)`}
-              last
-            />
-            <ActionLink
-              label="Offline downloads"
-              onPress={() =>
-                router.push({
-                  pathname: '/(main)/market/training-offline',
-                  params: { id: d.id },
-                })
-              }
-            />
-            <ActionLink
-              label="Course notes"
-              onPress={() =>
-                router.push({
-                  pathname: '/(main)/market/training-notes',
-                  params: { id: d.id },
-                })
-              }
-            />
-          </Card>
         </Section>
       </View>
     </View>

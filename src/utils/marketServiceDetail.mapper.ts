@@ -98,6 +98,7 @@ export function mapServiceDetailToMarketUI(
       },
       { id: 'pillar', label: 'Pillar', value: category },
     ],
+    availabilitySlots: item.availabilitySlots ?? [],
     // Reviews API not available — keep static review card.
     review: fallback.review,
     enterpriseId: item.enterpriseId || undefined,

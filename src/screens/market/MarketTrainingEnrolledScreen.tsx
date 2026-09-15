@@ -160,10 +160,7 @@ export function MarketTrainingEnrolledScreen() {
         <Pressable
           style={styles.secondary}
           onPress={() =>
-            router.replace({
-              pathname: '/(main)/market/orders',
-              params: { tab: 'Trainings' },
-            })
+            router.replace('/(main)/market/my-trainings')
           }
           accessibilityRole="button"
         >

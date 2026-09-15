@@ -23,8 +23,8 @@ export const TRAINING_ENROLLED_STATIC = {
   details: [
     {
       id: 'access',
-      title: 'Find it under Orders',
-      subtitle: 'Market bookmark icon → Trainings tab',
+      title: 'Find it under My Trainings',
+      subtitle: 'Profile → My Trainings shows your enrolled list',
       iconBg: '#e6f4e8',
       iconColor: '#257d3f',
     },

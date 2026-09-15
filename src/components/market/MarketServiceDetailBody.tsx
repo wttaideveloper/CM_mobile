@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 
 import { BizProfileMonitorIcon } from '@/components/market/MarketBusinessProfileIcons';
 import { ListingChevronIcon } from '@/components/market/MarketListingIcons';
+import { MarketServiceDetailAvailability } from '@/components/market/MarketServiceDetailAvailability';
 import { MarketServiceDetailSections } from '@/components/market/MarketServiceDetailSections';
 import {
   MarketBowlIcon,
@@ -21,10 +22,18 @@ import { c, NU } from '@/utils/newUiCompact';
 
 type MarketServiceDetailBodyProps = {
   service: MarketServiceDetail;
+  selectedDateId?: string | null;
+  selectedTimeSlot?: string | null;
+  onDateSelect?: (dateId: string) => void;
+  onTimeSlotSelect?: (timeSlot: string) => void;
 };
 
 export function MarketServiceDetailBody({
   service,
+  selectedDateId = null,
+  selectedTimeSlot = null,
+  onDateSelect,
+  onTimeSlotSelect,
 }: MarketServiceDetailBodyProps) {
   const router = useRouter();
 
@@ -87,7 +96,19 @@ export function MarketServiceDetailBody({
           <Text style={styles.description}>{service.description}</Text>
         </View>
 
-        <MarketServiceDetailSections service={service} />
+        <MarketServiceDetailSections service={service} parts="details" />
+
+        {onDateSelect && onTimeSlotSelect ? (
+          <MarketServiceDetailAvailability
+            slots={service.availabilitySlots}
+            selectedDateId={selectedDateId}
+            selectedTimeSlot={selectedTimeSlot}
+            onDateSelect={onDateSelect}
+            onTimeSlotSelect={onTimeSlotSelect}
+          />
+        ) : null}
+
+        <MarketServiceDetailSections service={service} parts="reviews" />
       </View>
     </View>
   );

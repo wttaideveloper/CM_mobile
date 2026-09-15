@@ -62,19 +62,49 @@ function pickFormat(item: ServiceApiResponse): string {
 }
 
 function pickBannerImage(item: ServiceApiResponse): string {
+  // Market / list: use banner_image only (no placeholder so cards can fall back to icon).
   const raw = item.banner_image ?? item.bannerImage ?? item.image;
   if (raw?.trim()) {
     return raw.trim();
   }
-  return DEFAULT_BANNER_IMAGE;
+  return '';
+}
+
+function pickBannerImageOrDefault(item: ServiceApiResponse): string {
+  return pickBannerImage(item) || DEFAULT_BANNER_IMAGE;
 }
 
 function toDayShort(day: string): string {
   const trimmed = day.trim();
-  if (trimmed.length <= 3) {
-    return trimmed;
+  const short = trimmed.length <= 3 ? trimmed : trimmed.slice(0, 3);
+  return short.charAt(0).toUpperCase() + short.slice(1).toLowerCase();
+}
+
+/** Parse YYYY-MM-DD as local calendar date (avoid UTC shift). */
+function parseLocalDateId(dateStr: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (match) {
+    return new Date(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]),
+    );
   }
-  return trimmed.slice(0, 3);
+  const parsed = new Date(dateStr);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+}
+
+function isDatedAvailabilityDay(
+  item: ServiceAvailabilityDay | Record<string, unknown>,
+): item is ServiceAvailabilityDay {
+  return (
+    typeof item.date === 'string' &&
+    item.date.trim().length > 0 &&
+    Array.isArray(item.slots)
+  );
 }
 
 export function normalizeDetailSlot(
@@ -86,8 +116,8 @@ export function normalizeDetailSlot(
   today.setHours(0, 0, 0, 0);
 
   let isPast = false;
-  const slotDate = new Date(slot.id);
-  if (!Number.isNaN(slotDate.getTime())) {
+  const slotDate = parseLocalDateId(slot.id);
+  if (slotDate) {
     slotDate.setHours(0, 0, 0, 0);
     isPast = slotDate < today;
   }
@@ -104,17 +134,16 @@ export function normalizeDetailSlot(
 }
 
 function mapAvailabilityDay(item: ServiceAvailabilityDay): Omit<ServiceDetailSlot, 'isPast'> {
-  const parsedDate = new Date(item.date);
+  const parsedDate = parseLocalDateId(item.date);
+  const slotTimes = (item.slots ?? []).map((s) => String(s).trim()).filter(Boolean);
 
   return {
     id: item.date,
     dayShort: toDayShort(item.day),
     dayLabel: item.day.trim(),
-    date: Number.isNaN(parsedDate.getTime())
-      ? 0
-      : parsedDate.getDate(),
-    slots: item.slots?.length ?? 0,
-    slotTimes: item.slots ?? [],
+    date: parsedDate ? parsedDate.getDate() : 0,
+    slots: slotTimes.length,
+    slotTimes,
   };
 }
 
@@ -122,27 +151,9 @@ export function mapApiAvailabilityToSlots(
   availability?: ServiceAvailabilityDay[] | null,
   referenceDate = new Date(),
 ): ServiceDetailSlot[] {
-  const today = new Date(referenceDate);
-  today.setHours(0, 0, 0, 0);
+  const datedDays = (availability ?? []).filter(isDatedAvailabilityDay);
 
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay());
-  weekStart.setHours(0, 0, 0, 0);
-
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
-  weekEnd.setHours(23, 59, 59, 999);
-
-  const isInCurrentWeek = (slot: ServiceDetailSlot) => {
-    const slotDate = new Date(slot.id);
-    if (Number.isNaN(slotDate.getTime())) {
-      return true;
-    }
-    slotDate.setHours(0, 0, 0, 0);
-    return slotDate >= weekStart && slotDate <= weekEnd;
-  };
-
-  if (!availability?.length) {
+  if (!datedDays.length) {
     return getFullWeekSlots(referenceDate).map((slot) =>
       normalizeDetailSlot(
         {
@@ -158,26 +169,16 @@ export function mapApiAvailabilityToSlots(
     );
   }
 
-  const weekSlots = availability
+  return datedDays
     .map(mapAvailabilityDay)
     .map((slot) => normalizeDetailSlot(slot, referenceDate))
-    .filter(isInCurrentWeek)
+    .filter((slot) => slot.slotTimes.length > 0)
     .sort((a, b) => {
-      const aTime = new Date(a.id).getTime();
-      const bTime = new Date(b.id).getTime();
-      if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
-        return 0;
-      }
-      return aTime - bTime;
+      const aDate = parseLocalDateId(a.id);
+      const bDate = parseLocalDateId(b.id);
+      if (!aDate || !bDate) return 0;
+      return aDate.getTime() - bDate.getTime();
     });
-
-  if (weekSlots.length > 0) {
-    return weekSlots;
-  }
-
-  return availability
-    .map(mapAvailabilityDay)
-    .map((slot) => normalizeDetailSlot(slot, referenceDate));
 }
 
 function pickDuration(item: ServiceApiResponse): string {
@@ -238,7 +239,7 @@ export function mapServiceApiToDetailItem(item: ServiceApiResponse): ServiceDeta
     enterpriseName: textOrNa(item.enterprise_name ?? item.enterpriseName),
     sessionType: pickSessionType(item),
     format: pickFormat(item),
-    bannerImage: pickBannerImage(item),
+    bannerImage: pickBannerImageOrDefault(item),
     availabilitySlots: pickAvailabilitySlots(item),
     cancellationPolicy: textOrNa(item.cancellation_policy ?? item.cancellationPolicy),
     maxParticipants: item.max_participants ?? item.maxParticipants ?? null,

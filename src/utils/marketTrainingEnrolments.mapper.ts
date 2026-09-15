@@ -19,6 +19,8 @@ export type MyEnrolmentCardView = {
   completedLessons: number;
   totalLessons: number;
   status: string;
+  statusLabel: string;
+  disabled: boolean;
 };
 
 const MODE_STYLES: Record<
@@ -54,7 +56,10 @@ function text(value: string | null | undefined, fallback = ''): string {
 
 function parseNumber(value: string | number | null | undefined): number {
   if (value == null || value === '') return 0;
-  const num = typeof value === 'number' ? value : Number(String(value).trim());
+  const num =
+    typeof value === 'number'
+      ? value
+      : Number(String(value).trim().replace(/,/g, ''));
   return Number.isFinite(num) ? num : 0;
 }
 
@@ -72,6 +77,29 @@ function resolveMode(
     return 'In-Person';
   }
   return 'Virtual';
+}
+
+function formatStatusLabel(status: string): string {
+  const key = status.toLowerCase();
+  if (key === 'pending_approval' || key === 'pending') {
+    return 'Pending approval';
+  }
+  if (key === 'enrolled' || key === 'active' || key === 'approved') {
+    return 'Enrolled';
+  }
+  if (key === 'completed') return 'Completed';
+  if (key === 'cancelled' || key === 'canceled') return 'Cancelled';
+  if (!status) return 'Enrolled';
+  return status
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function isEnrolmentDisabled(status: string): boolean {
+  const key = status.toLowerCase();
+  return key === 'pending_approval' || key === 'pending';
 }
 
 export function mapEnrolmentApiToCard(
@@ -102,6 +130,8 @@ export function mapEnrolmentApiToCard(
 
   const duration = text(item.duration);
   const status = text(item.status, 'enrolled');
+  const disabled = isEnrolmentDisabled(status);
+  const statusLabel = formatStatusLabel(status);
 
   return {
     id,
@@ -125,15 +155,17 @@ export function mapEnrolmentApiToCard(
     bannerUrl:
       text(item.primary_image || item.training?.primary_image) ||
       FALLBACK_BANNER,
-    nextSession: duration
-      ? `${duration} · Continue in course`
-      : status === 'pending_approval'
-        ? 'Pending approval'
+    nextSession: disabled
+      ? 'Waiting for approval before you can start'
+      : duration
+        ? `${duration} · Continue in course`
         : 'Open course to continue',
     progressPercent,
     completedLessons,
     totalLessons,
     status,
+    statusLabel,
+    disabled,
   };
 }
 

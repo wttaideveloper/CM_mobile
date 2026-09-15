@@ -93,6 +93,16 @@ export function MarketTrainingDetailScreen() {
     setPopupVisible(true);
   };
 
+  const modeLabel = isApiId ? training?.deliveryMode : staticItem.mode;
+  const eyebrow =
+    modeLabel === 'In-Person' || modeLabel === 'Physical'
+      ? 'Physical training'
+      : modeLabel === 'Hybrid'
+        ? 'Hybrid training'
+        : modeLabel === 'Virtual'
+          ? 'Virtual training'
+          : 'Training';
+
   return (
     <View style={styles.screen}>
       <AppStatusBar variant="light" backgroundColor={TRAINING_GREEN} />
@@ -104,15 +114,7 @@ export function MarketTrainingDetailScreen() {
         contentContainerStyle={styles.content}
       >
         <MarketTrainingHeader
-          eyebrow={
-            isApiId
-              ? 'Training'
-              : staticItem.mode === 'In-Person'
-                ? 'Physical training'
-                : staticItem.mode === 'Hybrid'
-                  ? 'Hybrid training'
-                  : 'Virtual training'
-          }
+          eyebrow={eyebrow}
           title={title}
         />
         <MarketTrainingDetailBody />

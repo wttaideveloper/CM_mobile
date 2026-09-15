@@ -121,6 +121,8 @@ function EnrolmentCardShell({
   nextSession,
   onPress,
   progress,
+  disabled = false,
+  statusLabel,
 }: {
   bannerUrl: string;
   mode: string;
@@ -133,18 +135,22 @@ function EnrolmentCardShell({
   nextSession: string;
   onPress: () => void;
   progress: ReactNode;
+  disabled?: boolean;
+  statusLabel?: string;
 }) {
   return (
     <Pressable
-      style={styles.courseCard}
-      onPress={onPress}
+      style={[styles.courseCard, disabled && styles.courseCardDisabled]}
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
     >
       <View style={styles.bannerWrap}>
         {bannerUrl ? (
           <Image
             source={{ uri: bannerUrl }}
-            style={styles.banner}
+            style={[styles.banner, disabled && styles.bannerDimmed]}
             contentFit="cover"
             transition={0}
             cachePolicy="memory-disk"
@@ -164,15 +170,46 @@ function EnrolmentCardShell({
       </View>
 
       <View style={styles.cardBody}>
-        <Text style={styles.title}>{title}</Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, disabled && styles.titleDisabled]}>
+            {title}
+          </Text>
+          {statusLabel ? (
+            <View
+              style={[
+                styles.statusPill,
+                disabled ? styles.statusPillPending : styles.statusPillActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusPillText,
+                  disabled
+                    ? styles.statusPillTextPending
+                    : styles.statusPillTextActive,
+                ]}
+              >
+                {statusLabel}
+              </Text>
+            </View>
+          ) : null}
+        </View>
         <Text style={styles.meta}>{meta}</Text>
         {progress}
-        <View style={styles.nextBox}>
+        <View style={[styles.nextBox, disabled && styles.nextBoxDisabled]}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.nextLabel}>Continue learning</Text>
-            <Text style={styles.nextValue}>{nextSession}</Text>
+            <Text style={styles.nextLabel}>
+              {disabled ? 'Status' : 'Continue learning'}
+            </Text>
+            <Text style={[styles.nextValue, disabled && styles.nextValueMuted]}>
+              {nextSession}
+            </Text>
           </View>
-          <Text style={[styles.cta, { color: accent }]}>Continue ›</Text>
+          {!disabled ? (
+            <Text style={[styles.cta, { color: accent }]}>Continue ›</Text>
+          ) : (
+            <Text style={styles.ctaDisabled}>Locked</Text>
+          )}
         </View>
       </View>
     </Pressable>
@@ -257,6 +294,8 @@ export function MarketMyTrainingsScreen() {
           accent={item.accent}
           nextSession={item.nextSession}
           progress={<ApiProgressBar item={item} />}
+          disabled={item.disabled}
+          statusLabel={item.statusLabel}
           onPress={() =>
             router.push({
               pathname: '/(main)/market/my-training-progress',
@@ -345,6 +384,9 @@ const styles = StyleSheet.create({
     borderRadius: NU.cardRadius,
     overflow: 'hidden',
   },
+  courseCardDisabled: {
+    opacity: 0.72,
+  },
   bannerWrap: {
     height: c(148, 128),
     width: '100%',
@@ -360,6 +402,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     height: '100%',
+  },
+  bannerDimmed: {
+    opacity: 0.85,
   },
   bannerScrim: {
     position: 'absolute',
@@ -396,10 +441,42 @@ const styles = StyleSheet.create({
     padding: c(15, 12),
     gap: c(4, 3),
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: c(8, 6),
+  },
   title: {
+    flex: 1,
     fontSize: NU.cardTitle,
     fontWeight: '700',
     color: TRAINING_TEAL,
+  },
+  titleDisabled: {
+    color: '#5a6b60',
+  },
+  statusPill: {
+    paddingVertical: c(4, 3),
+    paddingHorizontal: c(8, 6),
+    borderRadius: c(5, 4),
+    marginTop: c(2, 1),
+  },
+  statusPillPending: {
+    backgroundColor: '#fff4e5',
+  },
+  statusPillActive: {
+    backgroundColor: '#e6f4e8',
+  },
+  statusPillText: {
+    fontSize: c(11, 10),
+    fontWeight: '700',
+  },
+  statusPillTextPending: {
+    color: '#b86a00',
+  },
+  statusPillTextActive: {
+    color: TRAINING_GREEN,
   },
   meta: {
     fontSize: c(12.5, 11.5),
@@ -446,6 +523,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: c(10, 8),
   },
+  nextBoxDisabled: {
+    backgroundColor: '#f7f7f5',
+  },
   nextLabel: {
     fontSize: c(11.5, 10.5),
     color: TRAINING_MUTED,
@@ -456,8 +536,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: TRAINING_TEAL,
   },
+  nextValueMuted: {
+    color: '#6b736e',
+  },
   cta: {
     fontSize: NU.link,
     fontWeight: '800',
+  },
+  ctaDisabled: {
+    fontSize: NU.link,
+    fontWeight: '700',
+    color: TRAINING_MUTED,
   },
 });

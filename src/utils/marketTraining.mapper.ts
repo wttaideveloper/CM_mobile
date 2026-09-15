@@ -62,14 +62,6 @@ function parseCount(value: string | number | null | undefined): number | null {
   return parseAmount(value);
 }
 
-function formatDeliveryMode(mode: string): string {
-  return mode
-    .split('_')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
 function sideLabel(duration: string, courseType: string): { top: string; bottom: string } {
   if (duration) {
     const parts = duration.split(/\s+/);
@@ -214,23 +206,69 @@ export function mapTrainingApiToDetailView(item: TrainingApiItem): TrainingDetai
   const sessions =
     item.sections?.map((section, sectionIndex) => {
       const lessons = Array.isArray(section.lessons) ? section.lessons : [];
-      const lessonTitles = lessons
-        .map((lesson) => text(lesson.title))
-        .filter(Boolean);
+      const curriculumLines: string[] = [];
+      let quizCount = 0;
+
+      for (const lesson of lessons) {
+        const lessonTitle = text(lesson.title);
+        if (lessonTitle) {
+          curriculumLines.push(`Lesson · ${lessonTitle}`);
+        }
+
+        const assessment = lesson.assessment;
+        const quizTitle = text(assessment?.title);
+        if (assessment && (quizTitle || assessment.id)) {
+          quizCount += 1;
+          const questionCount = Array.isArray(assessment.questions)
+            ? assessment.questions.length
+            : 0;
+          curriculumLines.push(
+            questionCount > 0
+              ? `Quiz · ${quizTitle || 'Assessment'} (${questionCount} questions)`
+              : `Quiz · ${quizTitle || 'Assessment'}`,
+          );
+        }
+      }
+
+      // Section-level assessment (if any) after all lessons
+      const sectionQuiz = section.assessment;
+      const sectionQuizTitle = text(sectionQuiz?.title);
+      if (sectionQuiz && (sectionQuizTitle || sectionQuiz.id)) {
+        quizCount += 1;
+        const questionCount = Array.isArray(sectionQuiz.questions)
+          ? sectionQuiz.questions.length
+          : 0;
+        curriculumLines.push(
+          questionCount > 0
+            ? `Quiz · ${sectionQuizTitle || 'Section assessment'} (${questionCount} questions)`
+            : `Quiz · ${sectionQuizTitle || 'Section assessment'}`,
+        );
+      }
+
+      const lessonCount = lessons.filter((lesson) => text(lesson.title)).length;
+      const metaParts = [
+        lessonCount > 0
+          ? `${lessonCount} lesson${lessonCount === 1 ? '' : 's'}`
+          : null,
+        quizCount > 0
+          ? `${quizCount} quiz${quizCount === 1 ? '' : 'zes'}`
+          : null,
+      ].filter(Boolean);
+
       return {
         id: section.id || `section-${sectionIndex}`,
         name: text(section.title, `Section ${sectionIndex + 1}`),
         when:
           text(section.schedule) ||
-          (lessonTitles.length > 0
-            ? `${lessonTitles.length} lesson${lessonTitles.length === 1 ? '' : 's'}`
+          (metaParts.length > 0
+            ? metaParts.join(' · ')
             : text(item.duration, 'Curriculum section')),
         duration:
-          lessonTitles.length > 0
-            ? `${lessonTitles.length} lesson${lessonTitles.length === 1 ? '' : 's'}`
+          metaParts.length > 0
+            ? metaParts.join(' · ')
             : text(item.duration, '—'),
         status: text(item.status, 'Open'),
-        concepts: lessonTitles,
+        concepts: curriculumLines,
       };
     }) ?? [];
 
@@ -310,7 +348,10 @@ export function mapTrainingApiToDetailView(item: TrainingApiItem): TrainingDetai
     endTime: text(item.end_time),
     recurring: text(item.recurring),
     exceptions: text(item.schedule_exceptions),
-    deliveryMode: formatDeliveryMode(text(item.delivery_mode, 'training')),
+    deliveryMode: resolveTrainingMode(
+      text(item.delivery_mode).toLowerCase(),
+      item,
+    ),
     deliveryInstructions: text(item.delivery_instructions),
     accessInfo: text(item.access_information),
     meetingProvider: text(item.meeting_provider),

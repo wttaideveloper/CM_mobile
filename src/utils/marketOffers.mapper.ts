@@ -78,7 +78,7 @@ export function mapProductToMarketOffer(
     vendor: textOrFallback(item.enterpriseName, fallback.vendor),
     price: formatMoney(item.price ?? 0, item.currency),
     ...PRODUCT_DASHBOARD_STYLE,
-    // product_images / image_urls → item.image (must come after style spread)
+    // product_images / image_urls → ProductListItem.image
     imageUrl: pickOfferImageUrl(item.image),
   };
 }
@@ -97,6 +97,7 @@ export function mapServiceToMarketOffer(
     ),
     price: formatMoney(item.price ?? 0, item.currency),
     ...SERVICE_DASHBOARD_STYLE,
+    // banner_image → ServiceListItem.image
     imageUrl: pickOfferImageUrl(item.image),
   };
 }

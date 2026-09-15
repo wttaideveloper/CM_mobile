@@ -23,6 +23,16 @@ export type MarketServiceDetail = {
   mediaIcon: string;
   icon: 'bowl' | 'monitor' | 'user';
   details: { id: string; label: string; value: string }[];
+  /** Bookable days + time ranges from GET /services/:id availability. */
+  availabilitySlots: {
+    id: string;
+    dayShort: string;
+    dayLabel: string;
+    date: number;
+    slots: number;
+    slotTimes: string[];
+    isPast: boolean;
+  }[];
   review: {
     initials: string;
     name: string;
@@ -57,6 +67,7 @@ export const MARKET_SERVICE_DETAILS: Record<string, MarketServiceDetail> = {
       { id: 'group', label: 'Group size', value: 'Up to 8' },
       { id: 'pillar', label: 'Pillar', value: 'Nutrition' },
     ],
+    availabilitySlots: [],
     review: {
       initials: 'SK',
       name: 'Sam K.',
@@ -88,6 +99,7 @@ export const MARKET_SERVICE_DETAILS: Record<string, MarketServiceDetail> = {
       { id: 'follow', label: 'Follow-up', value: 'Notes in app' },
       { id: 'pillar', label: 'Pillar', value: 'Nutrition' },
     ],
+    availabilitySlots: [],
     review: {
       initials: 'AL',
       name: 'Alex L.',
@@ -119,6 +131,7 @@ export const MARKET_SERVICE_DETAILS: Record<string, MarketServiceDetail> = {
       { id: 'cadence', label: 'Cadence', value: 'Weekly' },
       { id: 'pillar', label: 'Pillar', value: 'Rest' },
     ],
+    availabilitySlots: [],
     review: {
       initials: 'JR',
       name: 'Jordan R.',
@@ -150,6 +163,7 @@ export const MARKET_SERVICE_DETAILS: Record<string, MarketServiceDetail> = {
       { id: 'cadence', label: 'Cadence', value: '2× weekly' },
       { id: 'pillar', label: 'Pillar', value: 'Movement' },
     ],
+    availabilitySlots: [],
     review: {
       initials: 'TM',
       name: 'Taylor M.',

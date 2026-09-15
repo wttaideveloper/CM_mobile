@@ -51,9 +51,10 @@ function pickProductImages(
     }
   }
 
+  // Prefer product_images, then image_urls (API market fields).
   const raw = productImages?.trim() || imageUrls?.trim() || '';
   if (!raw) {
-    return [DEFAULT_PRODUCT_IMAGE];
+    return [];
   }
 
   if (raw.startsWith('[')) {
@@ -77,20 +78,22 @@ function pickProductImages(
     .split(/[,;|]/)
     .map((part) => part.trim())
     .filter(Boolean)
-    .map(pickProductImage);
+    .map(pickProductImage)
+    .filter((url) => Boolean(url.trim()));
 
-  return urls.length > 0 ? urls : [DEFAULT_PRODUCT_IMAGE];
+  return urls;
 }
 
 function pickProductImage(url?: string | null): string {
   if (!url?.trim()) {
-    return DEFAULT_PRODUCT_IMAGE;
+    return '';
   }
 
   const trimmed = url.trim();
 
+  // Unsplash share pages are not direct image files.
   if (trimmed.includes('unsplash.com/photos/')) {
-    return DEFAULT_PRODUCT_IMAGE;
+    return '';
   }
 
   return trimmed;
@@ -183,7 +186,8 @@ export function mapProductApiToListItem(item: ProductApiResponse): ProductListIt
     description: textOrNa(item.product_description ?? item.description),
     category: textOrNa(item.product_category ?? item.category),
     price,
-    image: images[0],
+    // Market / listing: first product_images (or image_urls) entry.
+    image: images[0] || DEFAULT_PRODUCT_IMAGE,
     isActive: Boolean(isActive),
     rating: formatProductRating(item.rating),
     stockCount: pickStockCount(item),
@@ -196,6 +200,11 @@ export function mapProductApiToListItem(item: ProductApiResponse): ProductListIt
 
 export function mapProductApiToDetailItem(item: ProductApiResponse): ProductDetailItem {
   const base = mapProductApiToListItem(item);
+  const images = pickProductImages(
+    item.product_images,
+    item.image_urls,
+    item.images,
+  );
 
   return {
     ...base,
@@ -208,7 +217,7 @@ export function mapProductApiToDetailItem(item: ProductApiResponse): ProductDeta
     publishStatus: textOrNa(item.publish_status),
     lowStockThreshold: item.low_stock_alert_threshold ?? null,
     stockManagement: textOrNa(item.stock_management),
-    images: pickProductImages(item.product_images, item.image_urls, item.images),
+    images: images.length > 0 ? images : [DEFAULT_PRODUCT_IMAGE],
   };
 }
 

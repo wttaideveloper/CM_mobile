@@ -74,12 +74,25 @@ function RatingStars({
 }
 
 function reviewErrorMessage(error: unknown): string {
-  const axiosData = (
-    error as { response?: { data?: Parameters<typeof getApiErrorMessage>[0] } }
-  )?.response?.data;
+  const normalized = error as {
+    message?: string;
+    response?: { data?: Parameters<typeof getApiErrorMessage>[0] };
+  };
+
+  const fromMessage = normalized?.message?.trim();
+  if (
+    fromMessage &&
+    fromMessage !== 'Network Error' &&
+    !fromMessage.toLowerCase().includes('request failed')
+  ) {
+    return fromMessage;
+  }
+
+  const axiosData = normalized?.response?.data;
   if (axiosData) {
     return getApiErrorMessage(axiosData, 'Could not submit review.');
   }
+
   return 'Could not submit review. Try again.';
 }
 

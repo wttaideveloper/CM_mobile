@@ -34,12 +34,28 @@ function resolveDeliveryMode(raw?: string | null): TrainingDeliveryMode {
   return 'Virtual';
 }
 
-/** Infer UI lesson kind when API sends type "text" or empty. */
-function resolveLessonKind(lesson: TrainingContentLessonApi): LessonKind {
+/** Infer UI lesson kind when API sends type "text", "other", or empty. */
+function resolveLessonKind(
+  lesson: TrainingContentLessonApi,
+  deliveryMode: TrainingDeliveryMode,
+): LessonKind {
   const type = text(lesson.type).toLowerCase();
   if (type === 'exam' || type === 'quiz' || type === 'assessment') return 'exam';
-  if (type === 'live' || type === 'zoom' || type === 'meeting') return 'live';
-  if (type === 'venue' || type === 'in_person' || type === 'physical') {
+  if (
+    type === 'live' ||
+    type === 'zoom' ||
+    type === 'meeting' ||
+    type === 'google_meet'
+  ) {
+    return 'live';
+  }
+  // Content API uses "other" for in-person / venue lessons (show QR, not meeting link).
+  if (
+    type === 'other' ||
+    type === 'venue' ||
+    type === 'in_person' ||
+    type === 'physical'
+  ) {
     return 'venue';
   }
   if (
@@ -54,6 +70,11 @@ function resolveLessonKind(lesson: TrainingContentLessonApi): LessonKind {
   if (lesson.assessment || lesson.assessment_id) return 'exam';
   if (text(lesson.meeting_link) || text(lesson.join_meta)) return 'live';
   if (text(lesson.venue) || text(lesson.pass_code) || text(lesson.address)) {
+    return 'venue';
+  }
+
+  // Physical trainings default to venue QR when there is no online join link.
+  if (deliveryMode === 'Physical' && !text(lesson.meeting_link)) {
     return 'venue';
   }
 
@@ -112,8 +133,10 @@ function mapLesson(
   lesson: TrainingContentLessonApi,
   sectionLocked: boolean,
   exams: Record<string, TrainingExam>,
+  deliveryMode: TrainingDeliveryMode,
+  trainingQrCode: string,
 ): TrainingLesson {
-  const kind = resolveLessonKind(lesson);
+  const kind = resolveLessonKind(lesson, deliveryMode);
   const assessment = lesson.assessment;
   if (assessment?.id) {
     exams[assessment.id] = mapAssessmentToExam(assessment);
@@ -137,12 +160,16 @@ function mapLesson(
     duration,
     detail,
     imageUrl: text(lesson.thumbnail_url) || undefined,
-    videoUrl: text(lesson.content_url) || undefined,
-    joinUrl: text(lesson.meeting_link) || undefined,
-    joinMeta: text(lesson.join_meta) || undefined,
+    videoUrl:
+      text(lesson.content_url) || text(lesson.video_url) || undefined,
+    joinUrl: text(lesson.meeting_link),
+    joinMeta: text(lesson.join_meta),
     venue: text(lesson.venue) || undefined,
     address: text(lesson.address) || undefined,
-    passCode: text(lesson.pass_code) || undefined,
+    passCode:
+      text(lesson.pass_code) ||
+      (kind === 'venue' ? trainingQrCode : '') ||
+      undefined,
     checkInWindow: text(lesson.check_in_window) || undefined,
     examId: assessment?.id || text(lesson.assessment_id) || undefined,
     locked: Boolean(lesson.is_locked) || sectionLocked,
@@ -166,12 +193,14 @@ function mapSection(
   section: TrainingContentSectionApi,
   index: number,
   exams: Record<string, TrainingExam>,
+  deliveryMode: TrainingDeliveryMode,
+  trainingQrCode: string,
 ): TrainingDay {
   const title = text(section.title, `Session ${index + 1}`);
   const { dayLabel, name } = splitSectionTitle(title);
   const sectionLocked = section.is_unlocked === false;
   const lessons = (section.lessons ?? []).map((lesson) =>
-    mapLesson(lesson, sectionLocked, exams),
+    mapLesson(lesson, sectionLocked, exams, deliveryMode, trainingQrCode),
   );
 
   const nestedAssessments = [
@@ -215,9 +244,11 @@ export function mapTrainingContentToProgressPath(
   const exams: Record<string, TrainingExam> = {};
   const sections = Array.isArray(data.sections) ? [...data.sections] : [];
   sections.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const deliveryMode = resolveDeliveryMode(data.delivery_mode);
+  const trainingQrCode = text(data.qr_code);
 
   const days = sections.map((section, index) =>
-    mapSection(section, index, exams),
+    mapSection(section, index, exams, deliveryMode, trainingQrCode),
   );
 
   return {
@@ -226,7 +257,7 @@ export function mapTrainingContentToProgressPath(
     vendor: text(data.enterprise_name, 'Training'),
     instructor: text(data.instructor_name, 'Instructor'),
     bannerUrl: text(data.primary_image) || FALLBACK_BANNER,
-    deliveryMode: resolveDeliveryMode(data.delivery_mode),
+    deliveryMode,
     days,
     exams,
   };

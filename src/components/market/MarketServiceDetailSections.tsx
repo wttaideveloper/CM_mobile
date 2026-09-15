@@ -12,53 +12,63 @@ import { c, NU } from '@/utils/newUiCompact';
 
 type MarketServiceDetailSectionsProps = {
   service: MarketServiceDetail;
+  /** Default: both. Use to place availability between Details and Reviews. */
+  parts?: 'details' | 'reviews' | 'all';
 };
 
 export function MarketServiceDetailSections({
   service,
+  parts = 'all',
 }: MarketServiceDetailSectionsProps) {
+  const showDetails = parts === 'all' || parts === 'details';
+  const showReviews = parts === 'all' || parts === 'reviews';
+
   return (
     <>
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Details</Text>
-        <View style={styles.detailsGrid}>
-          {service.details.map((item) => (
-            <View key={item.id} style={styles.detailCard}>
-              <Text style={styles.detailLabel}>{item.label}</Text>
-              <Text style={styles.detailValue}>{item.value}</Text>
-            </View>
-          ))}
+      {showDetails ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Details</Text>
+          <View style={styles.detailsGrid}>
+            {service.details.map((item) => (
+              <View key={item.id} style={styles.detailCard}>
+                <Text style={styles.detailLabel}>{item.label}</Text>
+                <Text style={styles.detailValue}>{item.value}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-      </View>
+      ) : null}
 
-      <View style={styles.reviews}>
-        <Text style={styles.sectionLabel}>Reviews</Text>
-        <View style={styles.reviewCard}>
-          <View style={styles.reviewHeader}>
-            <View
-              style={[
-                styles.reviewAvatar,
-                { backgroundColor: service.review.avatarBg },
-              ]}
-            >
-              <Text
+      {showReviews ? (
+        <View style={styles.reviews}>
+          <Text style={styles.sectionLabel}>Reviews</Text>
+          <View style={styles.reviewCard}>
+            <View style={styles.reviewHeader}>
+              <View
                 style={[
-                  styles.reviewInitials,
-                  { color: service.review.avatarColor },
+                  styles.reviewAvatar,
+                  { backgroundColor: service.review.avatarBg },
                 ]}
               >
-                {service.review.initials}
-              </Text>
+                <Text
+                  style={[
+                    styles.reviewInitials,
+                    { color: service.review.avatarColor },
+                  ]}
+                >
+                  {service.review.initials}
+                </Text>
+              </View>
+              <Text style={styles.reviewName}>{service.review.name}</Text>
+              <View style={styles.reviewRating}>
+                <MarketStarIcon size={11} />
+                <Text style={styles.reviewScore}>{service.review.rating}</Text>
+              </View>
             </View>
-            <Text style={styles.reviewName}>{service.review.name}</Text>
-            <View style={styles.reviewRating}>
-              <MarketStarIcon size={11} />
-              <Text style={styles.reviewScore}>{service.review.rating}</Text>
-            </View>
+            <Text style={styles.reviewBody}>{service.review.body}</Text>
           </View>
-          <Text style={styles.reviewBody}>{service.review.body}</Text>
         </View>
-      </View>
+      ) : null}
     </>
   );
 }

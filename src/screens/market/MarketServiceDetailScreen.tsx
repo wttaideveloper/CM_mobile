@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 
@@ -24,6 +25,8 @@ export function MarketServiceDetailScreen() {
   const { service: apiService, isLoading, isError } = useService(serviceId, {
     enabled: Boolean(serviceId),
   });
+  const [selectedDateId, setSelectedDateId] = useState<string | null>(null);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
 
   const service =
     apiService != null
@@ -31,6 +34,33 @@ export function MarketServiceDetailScreen() {
       : !serviceId || isError
         ? staticFallback
         : null;
+
+  const availabilitySlots = service?.availabilitySlots ?? [];
+  const requiresSlot = availabilitySlots.some(
+    (slot) => !slot.isPast && slot.slotTimes.length > 0,
+  );
+
+  useEffect(() => {
+    setSelectedDateId(null);
+    setSelectedTimeSlot(null);
+  }, [service?.id]);
+
+  useEffect(() => {
+    if (!requiresSlot || selectedDateId) {
+      return;
+    }
+    const firstAvailable = availabilitySlots.find(
+      (slot) => !slot.isPast && slot.slotTimes.length > 0,
+    );
+    if (firstAvailable) {
+      setSelectedDateId(firstAvailable.id);
+    }
+  }, [availabilitySlots, requiresSlot, selectedDateId]);
+
+  const handleDateSelect = (dateId: string) => {
+    setSelectedDateId(dateId);
+    setSelectedTimeSlot(null);
+  };
 
   return (
     <View style={styles.screen}>
@@ -53,9 +83,19 @@ export function MarketServiceDetailScreen() {
             contentContainerStyle={styles.content}
           >
             <MarketServiceDetailHeader service={service} />
-            <MarketServiceDetailBody service={service} />
+            <MarketServiceDetailBody
+              service={service}
+              selectedDateId={selectedDateId}
+              selectedTimeSlot={selectedTimeSlot}
+              onDateSelect={handleDateSelect}
+              onTimeSlotSelect={setSelectedTimeSlot}
+            />
           </ScrollView>
-          <MarketServiceDetailFooter service={service} />
+          <MarketServiceDetailFooter
+            service={service}
+            selectedTimeSlot={selectedTimeSlot}
+            requiresSlot={requiresSlot}
+          />
         </>
       ) : null}
     </View>

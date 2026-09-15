@@ -71,6 +71,52 @@ const EMPTY_BUCKET = {
   activeLessonId: undefined as string | undefined,
 };
 
+function FieldRow({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <View style={styles.fieldRow}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={styles.fieldValue}>{value ?? ''}</Text>
+    </View>
+  );
+}
+
+function ApiLessonJoinPanel({
+  lesson,
+  onJoin,
+}: {
+  lesson: TrainingLesson;
+  onJoin: () => void;
+}) {
+  const meetingLink = lesson.joinUrl ?? '';
+  const contentUrl = lesson.videoUrl ?? '';
+  const canJoin = Boolean(meetingLink.trim());
+
+  return (
+    <View style={styles.inlineLive}>
+      <View style={styles.liveJoinCard}>
+        <Text style={styles.liveJoinEyebrow}>Session details</Text>
+        <Text style={styles.liveJoinTitle}>{lesson.title}</Text>
+        <FieldRow label="meeting_link" value={meetingLink} />
+        <FieldRow label="content_url" value={contentUrl} />
+        <FieldRow label="join_meta" value={lesson.joinMeta ?? ''} />
+        <FieldRow
+          label="duration"
+          value={lesson.duration === '—' ? '' : lesson.duration}
+        />
+        {canJoin ? (
+          <Pressable style={styles.primaryBtn} onPress={onJoin}>
+            <Text style={styles.primaryBtnText}>Join session</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.inlineHint}>
+            Join when meeting_link is available from the API.
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
 function ProgressTracker({
   percent,
   label,
@@ -265,6 +311,7 @@ export function MarketMyTrainingProgressScreen() {
 
   /** Simulate watch progress while playing (demo — no real video file). */
   useEffect(() => {
+    if (isApiId) return;
     if (!playing || !openLessonId) return;
 
     const lesson = path.days
@@ -298,6 +345,7 @@ export function MarketMyTrainingProgressScreen() {
 
     return () => clearInterval(timer);
   }, [
+    isApiId,
     playing,
     openLessonId,
     path.days,
@@ -505,7 +553,7 @@ export function MarketMyTrainingProgressScreen() {
 
     const done = Boolean(bucket.completedLessons[lesson.id]);
 
-    if (lesson.kind === 'video' && done) {
+    if (lesson.kind === 'video' && done && !isApiId) {
       Alert.alert(
         'Already completed',
         'You finished this video. The checkbox stays checked — open the next unfinished lesson.',
@@ -550,14 +598,6 @@ export function MarketMyTrainingProgressScreen() {
     }
 
     // Video / text content — open inline under this session row
-    if (isApiId && !lesson.videoUrl) {
-      setExpandedDayId(day.id);
-      setOpenLessonId(lesson.id);
-      setPlaying(false);
-      setActiveLesson(trainingId, lesson.id);
-      return;
-    }
-
     setExpandedDayId(day.id);
     setOpenLessonId((current) => (current === lesson.id ? null : lesson.id));
     setPlaying(false);
@@ -565,33 +605,22 @@ export function MarketMyTrainingProgressScreen() {
   };
 
   const joinLive = async (lesson: TrainingLesson) => {
-    if (lesson.kind !== 'live') return;
-    if (!lesson.joinUrl) {
-      Alert.alert(
-        'Join link',
-        'Meeting link is not available from the API yet.',
-      );
+    const link = (lesson.joinUrl ?? '').trim();
+    if (!link) {
+      Alert.alert('Join link', 'meeting_link is empty.');
       return;
     }
     try {
-      await Linking.openURL(lesson.joinUrl);
+      await Linking.openURL(link);
     } catch {
-      Alert.alert('Join link', lesson.joinUrl);
+      Alert.alert('Join link', link);
     }
-    completeLesson(trainingId, lesson.id);
-    setOpenLessonId(null);
-    setActiveLesson(trainingId, undefined);
-  };
-
-  const markVenueCheckIn = (lesson: TrainingLesson) => {
-    if (lesson.kind !== 'venue') return;
-    completeLesson(trainingId, lesson.id);
-    setOpenLessonId(null);
-    setActiveLesson(trainingId, undefined);
-    Alert.alert(
-      'Checked in',
-      'Venue QR marked complete. Take the quiz when you’re ready.',
-    );
+    // API enrolments: do not locally mark complete — wait for backend progress.
+    if (!isApiId) {
+      completeLesson(trainingId, lesson.id);
+      setOpenLessonId(null);
+      setActiveLesson(trainingId, undefined);
+    }
   };
 
   const dayStatusLabel = (
@@ -784,10 +813,15 @@ export function MarketMyTrainingProgressScreen() {
             {expanded ? (
               <View style={styles.lessonList}>
                 {day.lessons.map((lesson, index) => {
-                  const done = Boolean(bucket.completedLessons[lesson.id]);
+                  const done = Boolean(
+                    bucket.completedLessons[lesson.id] || lesson.apiCompleted,
+                  );
                   const lockedExam =
                     lesson.kind === 'exam' && !examOpen && !done;
-                  const open = openLessonId === lesson.id && !done;
+                  // API lessons stay openable even when incomplete; no local mark-complete.
+                  const open =
+                    openLessonId === lesson.id &&
+                    !(done && lesson.kind === 'video' && !isApiId);
                   const watchPercent = watchPercentFor(lesson.id);
 
                   return (
@@ -850,46 +884,27 @@ export function MarketMyTrainingProgressScreen() {
                         <DoneCheckbox checked={done} />
                       </Pressable>
 
-                      {open && lesson.kind === 'video' ? (
-                        lesson.videoUrl ? (
-                          <InlineVideoPlayer
-                            lesson={lesson}
-                            watchPercent={watchPercent}
-                            playing={playing}
-                            onTogglePlay={() => setPlaying((p) => !p)}
-                          />
-                        ) : (
-                          <View style={styles.inlineLive}>
-                            <View style={styles.liveJoinCard}>
-                              <Text style={styles.liveJoinEyebrow}>
-                                Lesson content
-                              </Text>
-                              <Text style={styles.liveJoinTitle}>
-                                {lesson.title}
-                              </Text>
-                              <Text style={styles.lessonMeta}>
-                                {lesson.detail ||
-                                  'Media URL is not available from the API yet. You can still mark this lesson complete.'}
-                              </Text>
-                              <Pressable
-                                style={styles.primaryBtn}
-                                onPress={() => {
-                                  completeLesson(trainingId, lesson.id);
-                                  setOpenLessonId(null);
-                                  setActiveLesson(trainingId, undefined);
-                                }}
-                                accessibilityRole="button"
-                              >
-                                <Text style={styles.primaryBtnText}>
-                                  Mark complete
-                                </Text>
-                              </Pressable>
-                            </View>
-                          </View>
-                        )
+                      {open &&
+                      (lesson.kind === 'video' || lesson.kind === 'live') &&
+                      isApiId ? (
+                        <ApiLessonJoinPanel
+                          lesson={lesson}
+                          onJoin={() => {
+                            void joinLive(lesson);
+                          }}
+                        />
                       ) : null}
 
-                      {open && lesson.kind === 'live' ? (
+                      {open && lesson.kind === 'video' && !isApiId ? (
+                        <InlineVideoPlayer
+                          lesson={lesson}
+                          watchPercent={watchPercent}
+                          playing={playing}
+                          onTogglePlay={() => setPlaying((p) => !p)}
+                        />
+                      ) : null}
+
+                      {open && lesson.kind === 'live' && !isApiId ? (
                         <View style={styles.inlineLive}>
                           <View style={styles.liveJoinCard}>
                             <Text style={styles.liveJoinEyebrow}>
@@ -934,14 +949,21 @@ export function MarketMyTrainingProgressScreen() {
                               contentFit="cover"
                             />
                           ) : null}
+                          <Text style={styles.liveJoinEyebrow}>
+                            Venue check-in
+                          </Text>
                           <Text style={styles.venueName}>
-                            {lesson.venue ?? lesson.title}
+                            {lesson.venue ?? path.title}
                           </Text>
                           {lesson.address ? (
                             <Text style={styles.lessonMeta}>
                               {lesson.address}
                             </Text>
-                          ) : null}
+                          ) : (
+                            <Text style={styles.lessonMeta}>
+                              Show this QR at the door for in-person attendance
+                            </Text>
+                          )}
                           {lesson.checkInWindow ? (
                             <Text style={styles.lessonMeta}>
                               {lesson.checkInWindow}
@@ -955,14 +977,6 @@ export function MarketMyTrainingProgressScreen() {
                               Pass {lesson.passCode}
                             </Text>
                           ) : null}
-                          <Pressable
-                            style={styles.primaryBtn}
-                            onPress={() => markVenueCheckIn(lesson)}
-                          >
-                            <Text style={styles.primaryBtnText}>
-                              Showed QR · mark checked in
-                            </Text>
-                          </Pressable>
                         </View>
                       ) : null}
                     </View>
@@ -1354,6 +1368,21 @@ const styles = StyleSheet.create({
     borderRadius: NU.cardRadiusSm,
     padding: c(14, 12),
     gap: c(6, 5),
+  },
+  fieldRow: {
+    gap: c(2, 1),
+  },
+  fieldLabel: {
+    fontSize: c(11, 10),
+    fontWeight: '700',
+    color: TRAINING_MUTED,
+    letterSpacing: 0.3,
+  },
+  fieldValue: {
+    minHeight: c(18, 16),
+    fontSize: c(13, 12),
+    color: TRAINING_TEAL,
+    lineHeight: c(18, 16),
   },
   liveJoinEyebrow: {
     fontSize: c(11, 10),
