@@ -36,10 +36,7 @@ export function EventsScreen() {
     const byFilter = filterEventsByTag(events ?? [], activeFilter);
     return byFilter.filter((event) => matchesEventSearch(event, routeSearch));
   }, [events, activeFilter, routeSearch]);
-  const listEvents = useMemo(
-    () => filteredEvents.filter((event) => event.id !== featuredEvent?.id),
-    [filteredEvents, featuredEvent],
-  );
+  const listEvents = filteredEvents;
   const showFeatured =
     featuredEvent &&
     (activeFilter === 'All' || filteredEvents.some((event) => event.id === featuredEvent.id));
