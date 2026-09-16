@@ -11,22 +11,34 @@ import type { Event } from '@/constants/events';
 import type {
   EventCancelRegistrationResponse,
   EventCheckoutRequest,
+  EventContactOrganizerRequest,
+  EventContactOrganizerResult,
+  EventFeedbackRequest,
+  EventFeedbackResult,
+  EventMeetingAccess,
   EventOrderApiResponse,
+  EventRegistrationForm,
   EventRegistrationRequest,
   EventRegistrationResult,
   EventWaitlistEntryResult,
   EventWaitlistJoinRequest,
   MyEventRegistration,
+  MyWaitlistEntry,
 } from '@/types/event.types';
 
 export const eventKeys = {
   all: ['events'] as const,
   list: () => [...eventKeys.all, 'list'] as const,
   detail: (id: string) => [...eventKeys.all, 'detail', id] as const,
+  registrationForm: (eventId: string) =>
+    [...eventKeys.all, 'registration-form', eventId] as const,
   myRegistrations: (status?: string) =>
     [...eventKeys.all, 'my-registrations', status ?? 'all'] as const,
+  myWaitlist: (status?: string) =>
+    [...eventKeys.all, 'my-waitlist', status ?? 'all'] as const,
   registrationQr: (eventId: string, registrationId: string) =>
     [...eventKeys.all, 'qr', eventId, registrationId] as const,
+  meetingLink: (eventId: string) => [...eventKeys.all, 'meeting-link', eventId] as const,
 };
 
 type UseEventsOptions = Omit<UseQueryOptions<Event[], ApiError>, 'queryKey' | 'queryFn'>;
@@ -61,6 +73,46 @@ export function useEvent(id: string, options?: UseEventOptions) {
   };
 }
 
+/**
+ * GET /api/v1/events/{id}/registration-form — the event's dynamic
+ * registration questions (Phase 5B). Form config changes rarely, so it's
+ * cached longer than event/registration data.
+ */
+export function useEventRegistrationForm(eventId: string, options?: { enabled?: boolean }) {
+  const query = useQuery<EventRegistrationForm, ApiError>({
+    queryKey: eventKeys.registrationForm(eventId),
+    queryFn: () => eventService.getRegistrationForm(eventId),
+    enabled: Boolean(eventId) && (options?.enabled ?? true),
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    retry: 1,
+  });
+
+  return {
+    ...query,
+    form: query.data ?? null,
+  };
+}
+
+/**
+ * GET /api/v1/events/{id}/meeting-link — the event's protected meeting link
+ * (Phase 5C). Deliberately cached far shorter than every other Events query:
+ * staleTime 0 means eligibility is re-checked on every mount rather than
+ * served from a stale cache, and a short gcTime drops the fetched URL from
+ * memory soon after nothing is reading it. Only network failures (statusCode
+ * 0) are retried — a 403 means "not eligible" and retrying changes nothing.
+ */
+export function useEventMeetingLink(eventId: string, options?: { enabled?: boolean }) {
+  return useQuery<EventMeetingAccess, ApiError>({
+    queryKey: eventKeys.meetingLink(eventId),
+    queryFn: () => eventService.getMeetingLink(eventId),
+    enabled: Boolean(eventId) && (options?.enabled ?? true),
+    staleTime: 0,
+    gcTime: 30_000,
+    retry: (failureCount, error) => error.statusCode === 0 && failureCount < 1,
+  });
+}
+
 /** POST /api/v1/events/{id}/registrations — free registration only (Phase 1). */
 export function useRegisterForEvent() {
   const queryClient = useQueryClient();
@@ -93,6 +145,23 @@ export function useMyRegistrations(status?: string) {
   return {
     ...query,
     registrations: query.data ?? [],
+  };
+}
+
+/** GET /api/v1/events/my/waitlist — backs the "My Waitlist" screen (Phase 5A). */
+export function useMyWaitlist(status?: string, options?: { enabled?: boolean }) {
+  const query = useQuery<MyWaitlistEntry[], ApiError>({
+    queryKey: eventKeys.myWaitlist(status),
+    queryFn: () => eventService.getMyWaitlist(status),
+    enabled: options?.enabled ?? true,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+
+  return {
+    ...query,
+    entries: query.data ?? [],
   };
 }
 
@@ -138,6 +207,8 @@ export function useCancelRegistration() {
       void queryClient.invalidateQueries({ queryKey: eventKeys.myRegistrations() });
       void queryClient.invalidateQueries({ queryKey: eventKeys.detail(variables.eventId) });
       void queryClient.invalidateQueries({ queryKey: eventKeys.list() });
+      // Cancelling can free a seat and trigger backend waitlist promotion.
+      void queryClient.invalidateQueries({ queryKey: eventKeys.myWaitlist() });
     },
   });
 }
@@ -179,6 +250,7 @@ export function useJoinWaitlist() {
       // Joining doesn't change capacity, but keep event/list data fresh regardless.
       void queryClient.invalidateQueries({ queryKey: eventKeys.detail(variables.id) });
       void queryClient.invalidateQueries({ queryKey: eventKeys.list() });
+      void queryClient.invalidateQueries({ queryKey: eventKeys.myWaitlist() });
     },
   });
 }
@@ -196,6 +268,39 @@ export function useLeaveWaitlist() {
     onSuccess: (_result, variables) => {
       void queryClient.invalidateQueries({ queryKey: eventKeys.detail(variables.eventId) });
       void queryClient.invalidateQueries({ queryKey: eventKeys.list() });
+      void queryClient.invalidateQueries({ queryKey: eventKeys.myWaitlist() });
     },
+  });
+}
+
+/**
+ * POST /api/v1/events/{id}/contact — one-way message to the organiser
+ * (Phase 5D-2), not a conversation. Nothing else in the app reads "was the
+ * organiser contacted" state, so there is no query key and nothing to
+ * invalidate here.
+ */
+export function useContactOrganizer() {
+  return useMutation<
+    EventContactOrganizerResult,
+    ApiError,
+    { id: string; payload: EventContactOrganizerRequest }
+  >({
+    mutationFn: ({ id, payload }) => eventService.contactOrganizer(id, payload),
+  });
+}
+
+/**
+ * POST /api/v1/events/{id}/feedback or /reviews (Phase 5D-3). No customer-
+ * facing endpoint exists to list/read feedback back (GET /{id}/feedback is
+ * admin/provider-only), so there is no query key and nothing to invalidate.
+ */
+export function useSubmitEventFeedback() {
+  return useMutation<
+    EventFeedbackResult,
+    ApiError,
+    { id: string; payload: EventFeedbackRequest; asReview: boolean }
+  >({
+    mutationFn: ({ id, payload, asReview }) =>
+      eventService.submitFeedback(id, payload, asReview),
   });
 }

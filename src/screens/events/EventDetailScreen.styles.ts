@@ -316,4 +316,116 @@ export const styles = StyleSheet.create({
   pressed: {
     opacity: 0.9,
   },
+
+  // ---- Event Experience (Phase 5C): Sessions, Meeting Info, Resources, Instructions, Location ----
+  experienceSection: {
+    marginBottom: isSmallDevice ? 14 : 18,
+  },
+  experienceCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: isSmallDevice ? 14 : 16,
+    overflow: 'hidden',
+  },
+  experienceCardPad: {
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    paddingVertical: isSmallDevice ? 12 : 14,
+  },
+  experienceRow: {
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    paddingVertical: isSmallDevice ? 10 : 12,
+    gap: 3,
+  },
+  experienceRowBorder: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: BORDER,
+  },
+  experienceRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  experienceRowTitle: {
+    flex: 1,
+    fontSize: isSmallDevice ? 13 : 14,
+    lineHeight: isSmallDevice ? 17 : 19,
+    fontWeight: '700',
+    color: TEXT_BLACK,
+  },
+  experienceRowMeta: {
+    fontSize: isSmallDevice ? 11.5 : 12.5,
+    lineHeight: isSmallDevice ? 16 : 18,
+    color: TEXT_MUTED,
+  },
+  experienceBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: MINT,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  experienceBadgeText: {
+    fontSize: isSmallDevice ? 9.5 : 10.5,
+    fontWeight: '800',
+    color: PRIMARY,
+    letterSpacing: 0.2,
+  },
+  experienceActionText: {
+    fontSize: isSmallDevice ? 12 : 13,
+    fontWeight: '800',
+    color: PRIMARY,
+  },
+  experienceBodyText: {
+    fontSize: isSmallDevice ? 12.5 : 13.5,
+    lineHeight: isSmallDevice ? 19 : 21,
+    color: TEXT_MUTED,
+  },
+  experienceStateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  joinMeetingBtn: {
+    marginTop: isSmallDevice ? 10 : 12,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: PRIMARY,
+    paddingHorizontal: isSmallDevice ? 14 : 16,
+    paddingVertical: isSmallDevice ? 9 : 10,
+    borderRadius: isSmallDevice ? 10 : 12,
+  },
+  joinMeetingBtnText: {
+    fontSize: isSmallDevice ? 12.5 : 13.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  meetingRetryBtn: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  meetingRetryText: {
+    fontSize: isSmallDevice ? 12 : 13,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
+
+  // ---- Add to Calendar (Phase 5D-1) ----
+  addToCalendarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 8,
+    backgroundColor: CARD_BG,
+    borderRadius: isSmallDevice ? 12 : 14,
+    paddingHorizontal: isSmallDevice ? 14 : 16,
+    paddingVertical: isSmallDevice ? 10 : 11,
+    marginBottom: isSmallDevice ? 14 : 18,
+  },
+  addToCalendarBtnText: {
+    fontSize: isSmallDevice ? 12.5 : 13.5,
+    fontWeight: '800',
+    color: PRIMARY,
+  },
 });

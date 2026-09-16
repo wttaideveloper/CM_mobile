@@ -1,4 +1,4 @@
-import type { EventTicketOption } from '@/types/event.types';
+import type { EventResource, EventSessionSummary, EventTicketOption } from '@/types/event.types';
 
 export const EVENT_FILTERS = ['All', 'Upcoming', 'This Week', 'Online', 'Free'] as const;
 
@@ -34,6 +34,26 @@ export type Event = {
   registrationOpen?: boolean;
   /** Empty when the event has no ticket_types — checkout falls back to the flat event price. */
   ticketOptions?: EventTicketOption[];
+  /** Agenda/session list (Phase 5C) — empty when the event has no sessions. */
+  sessions?: EventSessionSummary[];
+  /** Documents/resources attached to the event (Phase 5C) — empty when none. */
+  resources?: EventResource[];
+  /** Raw backend delivery_mode ("in_person"|"online"|"hybrid") — decides which detail sections apply. */
+  deliveryMode?: string;
+  /** Human-readable delivery mode label ("In Person"|"Online"|"Hybrid"). */
+  deliveryModeLabel?: string;
+  /** Combined venue address + city, only set when the event has an in-person/hybrid venue. */
+  venueAddress?: string | null;
+  /** Venue arrival/joining instructions, when the backend provides them. */
+  venueInstructions?: string | null;
+  /** External map link for the venue, when the backend provides one. */
+  venueMapUrl?: string | null;
+  /** Parsed start_date (Phase 5D-1) — null when the backend omitted it or it failed to parse. */
+  startDate?: Date | null;
+  /** Parsed end_date (Phase 5D-1) — null when the backend omitted it or it failed to parse. */
+  endDate?: Date | null;
+  /** Backend's time_zone label (e.g. "Asia/Kolkata") — display-only; see eventCalendar.ts for why it isn't applied as an offset. */
+  timeZone?: string | null;
 };
 
 const SUMMIT_DETAIL_IMAGE =

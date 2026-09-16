@@ -7,7 +7,7 @@ import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar'
 import { CircleCheckIcon, ChevronLeftIcon } from '@/components/dashboard/DashboardIcons';
 import { EmptyState } from '@/components/EmptyState';
 import { LeafyGradientButton } from '@/components/LeafyGradientButton';
-import { useEvent, useJoinWaitlist, useLeaveWaitlist } from '@/hooks/useEvents';
+import { useEvent, useJoinWaitlist, useLeaveWaitlist, useMyWaitlist } from '@/hooks/useEvents';
 import { useAuthStore } from '@/stores/auth.store';
 import type { ApiError } from '@/types/api.types';
 import { getEventAvailability } from '@/utils/event.mapper';
@@ -39,6 +39,11 @@ export function EventWaitlistScreen() {
   const user = useAuthStore((state) => state.user);
 
   const { event, isLoading, isError } = useEvent(id, { enabled: Boolean(id) });
+  // Now that persistent waitlist status is queryable, avoid ever letting the
+  // user submit a join that the backend would reject as a duplicate (409).
+  const { entries: waitingEntries } = useMyWaitlist('waiting', {
+    enabled: Boolean(event?.isFull),
+  });
   const joinMutation = useJoinWaitlist();
   const leaveMutation = useLeaveWaitlist();
 
@@ -109,6 +114,23 @@ export function EventWaitlistScreen() {
               : goBack
           }
           actionLabel={isAvailable ? 'Register Now' : 'Go back'}
+        />
+      </View>
+    );
+  }
+
+  const isAlreadyWaiting = waitingEntries.some((entry) => entry.eventId === id);
+
+  if (phase === 'confirm' && isAlreadyWaiting) {
+    return (
+      <View style={styles.screen}>
+        <AppStatusBar />
+        <EmptyState
+          variant="empty"
+          title="You're already on the waitlist"
+          description={`We'll email ${participantEmail} if a spot opens up for ${event.detailTitle}.`}
+          onAction={() => router.push('/(main)/event/my-waitlist')}
+          actionLabel="View My Waitlist"
         />
       </View>
     );

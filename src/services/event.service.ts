@@ -4,10 +4,20 @@ import type {
   EventApiResponse,
   EventCancelRegistrationResponse,
   EventCheckoutRequest,
+  EventContactOrganizerApiResponse,
+  EventContactOrganizerRequest,
+  EventContactOrganizerResult,
+  EventFeedbackApiResponse,
+  EventFeedbackRequest,
+  EventFeedbackResult,
   EventListQuery,
+  EventMeetingAccess,
+  EventMeetingLinkApiResponse,
   EventMyRegistrationApiResponse,
   EventOrderApiResponse,
   EventRegistrationApiResponse,
+  EventRegistrationForm,
+  EventRegistrationFormApiResponse,
   EventRegistrationRequest,
   EventRegistrationResult,
   EventsPaginatedApiResponse,
@@ -15,11 +25,16 @@ import type {
   EventWaitlistEntryResult,
   EventWaitlistJoinRequest,
   MyEventRegistration,
+  MyWaitlistApiResponse,
+  MyWaitlistEntry,
 } from '@/types/event.types';
 import {
   mapEventApiToItem,
+  mapEventMeetingLink,
+  mapEventRegistrationForm,
   mapEventsApiResponse,
   mapMyRegistrationsApiResponse,
+  mapMyWaitlistApiResponse,
 } from '@/utils/event.mapper';
 import type { Event } from '@/constants/events';
 import { API_CONFIG } from '@/config';
@@ -95,6 +110,22 @@ export const eventService = {
   },
 
   /**
+   * GET /api/v1/events/{id}/registration-form — the event's dynamic
+   * registration questions (Phase 5B). Customer-safe: 403 for non-published
+   * events, 404 if the event doesn't exist.
+   */
+  getRegistrationForm: async (id: string): Promise<EventRegistrationForm> => {
+    if (__DEV__) {
+      console.log('[Events API] GET registration-form:', id);
+    }
+
+    const response = await apiClient.get<EventRegistrationFormApiResponse>(
+      ENDPOINTS.EVENTS.REGISTRATION_FORM(id),
+    );
+    return mapEventRegistrationForm(response.data);
+  },
+
+  /**
    * POST /api/v1/events/{id}/registrations — free registration only.
    * No response_model on the backend, so parse the body defensively rather
    * than trusting a specific shape (same approach as trainingService.enroll).
@@ -134,6 +165,24 @@ export const eventService = {
     return mapMyRegistrationsApiResponse(
       Array.isArray(response.data) ? response.data : [],
     );
+  },
+
+  /**
+   * GET /api/v1/events/my/waitlist — the signed-in user's own waitlist
+   * entries (waiting/promoted/left). Real response_model on the backend,
+   * unlike getMyRegistrations' underlying endpoint — trusted directly.
+   */
+  getMyWaitlist: async (status?: string): Promise<MyWaitlistEntry[]> => {
+    if (__DEV__) {
+      console.log('[Events API] GET my/waitlist, status:', status);
+    }
+
+    const response = await apiClient.get<MyWaitlistApiResponse[]>(
+      ENDPOINTS.EVENTS.MY_WAITLIST,
+      { params: status ? { status } : undefined },
+    );
+
+    return mapMyWaitlistApiResponse(Array.isArray(response.data) ? response.data : []);
   },
 
   /** DELETE /api/v1/events/{id}/registrations/{registrationId} — cancel own registration. */
@@ -229,5 +278,88 @@ export const eventService = {
     );
 
     return { message: response.data?.message ?? 'Removed from waitlist' };
+  },
+
+  /**
+   * GET /api/v1/events/{id}/meeting-link — registered-participant/admin/
+   * provider only; the backend 403s everyone else (Phase 5C). This is the
+   * ONLY meeting-link source the app trusts — the general event detail/list
+   * responses also carry a raw meeting_link field, but that one is returned
+   * unauthenticated with no eligibility check, so it is never mapped or
+   * displayed anywhere (see event.mapper.ts, mapEventApiToItem).
+   *
+   * Deliberately logs only the event id, never response.data — that body
+   * carries the real meeting URL and must not reach logs/analytics.
+   */
+  getMeetingLink: async (id: string): Promise<EventMeetingAccess> => {
+    if (__DEV__) {
+      console.log('[Events API] GET meeting-link:', id);
+    }
+
+    const response = await apiClient.get<EventMeetingLinkApiResponse>(
+      ENDPOINTS.EVENTS.MEETING_LINK(id),
+    );
+    return mapEventMeetingLink(response.data);
+  },
+
+  /**
+   * POST /api/v1/events/{id}/contact — one-way message relay to the event
+   * organiser (Phase 5D-2). This is NOT a chat/conversation: the backend
+   * (event_service.py, contact_organiser_service) only best-effort emails/
+   * notifies the organiser and records an audit row — there is no thread
+   * the customer can revisit, so this deliberately does not touch the
+   * app's existing conversation/chat architecture. No response_model on
+   * the backend, so parse the body defensively.
+   *
+   * Deliberately logs only the event id — never the message body (may
+   * contain whatever the user wrote) and never response.data (which
+   * includes the organiser's raw contact string).
+   */
+  contactOrganizer: async (
+    id: string,
+    payload: EventContactOrganizerRequest,
+  ): Promise<EventContactOrganizerResult> => {
+    if (__DEV__) {
+      console.log('[Events API] POST contact:', id);
+    }
+
+    const response = await apiClient.post<EventContactOrganizerApiResponse>(
+      ENDPOINTS.EVENTS.CONTACT(id),
+      payload,
+    );
+
+    return { message: String(response.data?.message ?? 'Message sent to organiser') };
+  },
+
+  /**
+   * POST /api/v1/events/{id}/feedback (open to any authenticated user) or
+   * POST /api/v1/events/{id}/reviews (requires participant_email to match a
+   * confirmed/attended registration — the backend 403s otherwise)
+   * (Phase 5D-3). Both routes are backed by the identical
+   * create_feedback_service; only the URL (and therefore is_review)
+   * differs. No response_model on either, so parse the body defensively.
+   *
+   * Deliberately logs only the event id and which endpoint was used —
+   * never the rating/comment content.
+   */
+  submitFeedback: async (
+    id: string,
+    payload: EventFeedbackRequest,
+    asReview: boolean,
+  ): Promise<EventFeedbackResult> => {
+    if (__DEV__) {
+      console.log('[Events API] POST', asReview ? 'reviews' : 'feedback', ':', id);
+    }
+
+    const response = await apiClient.post<EventFeedbackApiResponse>(
+      asReview ? ENDPOINTS.EVENTS.REVIEWS(id) : ENDPOINTS.EVENTS.FEEDBACK(id),
+      payload,
+    );
+    const data = response.data ?? {};
+
+    return {
+      id: data.id != null ? String(data.id) : null,
+      isReview: Boolean(data.is_review ?? asReview),
+    };
   },
 };

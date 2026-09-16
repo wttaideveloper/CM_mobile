@@ -4,7 +4,7 @@ import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
 import { EmptyState } from '@/components/EmptyState';
-import { useEvent } from '@/hooks/useEvents';
+import { useEvent, useMyWaitlist } from '@/hooks/useEvents';
 import { useDetailBack } from '@/hooks/useDetailBack';
 import {
   EventDetailContent,
@@ -25,6 +25,9 @@ export function EventDetailScreen() {
   const [isFavorite, setIsFavorite] = useState(false);
 
   const { event, isLoading, isError } = useEvent(id, { enabled: Boolean(id) });
+  // Only fetch once we know the event is actually full — this is the only
+  // case the CTA needs to know the user's own persistent waitlist status.
+  const { entries: waitingEntries } = useMyWaitlist('waiting', { enabled: Boolean(event?.isFull) });
 
   if (isLoading) {
     return (
@@ -63,10 +66,17 @@ export function EventDetailScreen() {
       ctaLabel = getEventRegisterLabel(event);
       onCtaPress = () => router.push({ pathname: '/(main)/event/register', params: { id } });
       break;
-    case 'full':
-      ctaLabel = 'Join Waitlist';
-      onCtaPress = () => router.push({ pathname: '/(main)/event/waitlist', params: { id } });
+    case 'full': {
+      const alreadyWaiting = waitingEntries.some((entry) => entry.eventId === id);
+      if (alreadyWaiting) {
+        ctaLabel = "You're on the Waitlist";
+        onCtaPress = () => router.push('/(main)/event/my-waitlist');
+      } else {
+        ctaLabel = 'Join Waitlist';
+        onCtaPress = () => router.push({ pathname: '/(main)/event/waitlist', params: { id } });
+      }
       break;
+    }
     default:
       ctaLabel = availability.label;
       onCtaPress = undefined;
@@ -94,6 +104,7 @@ export function EventDetailScreen() {
             event={event}
             fillPercent={fillPercent}
             spotsRemaining={spotsRemaining}
+            availability={availability}
           />
         </ScrollView>
 
@@ -101,6 +112,7 @@ export function EventDetailScreen() {
           ctaLabel={ctaLabel}
           paddingBottom={insets.bottom + 10}
           onPress={onCtaPress}
+          onContactPress={() => router.push({ pathname: '/(main)/event/contact', params: { id } })}
         />
       </View>
     </View>

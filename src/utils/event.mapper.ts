@@ -1,11 +1,27 @@
 import type { Event, EventFilterTag } from '@/constants/events';
 import type {
   EventApiResponse,
+  EventFormField,
+  EventFormFieldApiResponse,
+  EventFormFieldOption,
+  EventFormFieldRenderer,
+  EventFormSection,
+  EventFormSectionApiResponse,
+  EventMeetingAccess,
+  EventMeetingLinkApiResponse,
   EventMyRegistrationApiResponse,
+  EventRegistrationForm,
+  EventRegistrationFormApiResponse,
+  EventResource,
+  EventSessionApiResponse,
+  EventSessionSummary,
   EventTicketOption,
   EventTicketTypeApiResponse,
   MyEventBucket,
   MyEventRegistration,
+  MyWaitlistApiResponse,
+  MyWaitlistEntry,
+  MyWaitlistStatus,
 } from '@/types/event.types';
 import { formatMoney } from '@/utils/currency';
 import {
@@ -91,6 +107,37 @@ function deriveEventLocation(api: EventApiResponse): string {
   }
 
   return address || city || 'NA';
+}
+
+/** Same address/city combination as deriveEventLocation, but null (not 'NA') when absent — used to decide whether the Location Details card renders at all (Phase 5C). */
+function deriveVenueAddress(api: EventApiResponse): string | null {
+  const city = api.venue?.city?.trim();
+  const address = api.venue?.address?.trim();
+
+  if (address && city) {
+    return `${address}, ${city}`;
+  }
+
+  return address || city || null;
+}
+
+const DELIVERY_MODE_LABELS: Record<string, string> = {
+  in_person: 'In Person',
+  online: 'Online',
+  hybrid: 'Hybrid',
+};
+
+/** Mirrors the backend's own delivery_mode_display map (response_mappers.py, _event_base_fields) as a fallback for when that field is missing. */
+function deriveDeliveryModeLabel(api: EventApiResponse): string {
+  const display = api.delivery_mode_display?.trim();
+  if (display) {
+    return display;
+  }
+  const mode = api.delivery_mode?.trim();
+  if (mode && DELIVERY_MODE_LABELS[mode]) {
+    return DELIVERY_MODE_LABELS[mode];
+  }
+  return mode || 'NA';
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -276,6 +323,16 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
     isFull,
     registrationOpen,
     ticketOptions,
+    sessions: mapEventSessions(api.sessions),
+    resources: mapEventDocuments(api.documents),
+    deliveryMode: api.delivery_mode ?? '',
+    deliveryModeLabel: deriveDeliveryModeLabel(api),
+    startDate: start,
+    endDate: end,
+    timeZone: api.time_zone?.trim() || null,
+    venueAddress: deriveVenueAddress(api),
+    venueInstructions: api.venue?.instructions?.trim() || null,
+    venueMapUrl: api.venue?.map_url?.trim() || null,
   };
 }
 
@@ -398,4 +455,276 @@ export function mapMyRegistrationsApiResponse(
   items: EventMyRegistrationApiResponse[],
 ): MyEventRegistration[] {
   return items.map(mapMyRegistrationApiToItem);
+}
+
+const WAITLIST_STATUS_LABELS: Record<MyWaitlistStatus, string> = {
+  waiting: "You're on the waitlist",
+  promoted: "You've been promoted",
+  left: 'Left waitlist',
+};
+
+const KNOWN_WAITLIST_STATUSES = new Set<MyWaitlistStatus>(['waiting', 'promoted', 'left']);
+
+function normalizeWaitlistStatus(status: string): MyWaitlistStatus {
+  const normalized = status.trim().toLowerCase();
+  return KNOWN_WAITLIST_STATUSES.has(normalized as MyWaitlistStatus)
+    ? (normalized as MyWaitlistStatus)
+    : 'waiting';
+}
+
+export function mapMyWaitlistApiToItem(api: MyWaitlistApiResponse): MyWaitlistEntry {
+  const eventStart = safeParseDate(api.event_start_date);
+  const status = normalizeWaitlistStatus(api.status);
+
+  return {
+    id: String(api.id),
+    eventId: String(api.event_id),
+    eventTitle: textOrNa(api.event_title),
+    eventStatus: api.event_status ?? null,
+    eventStart,
+    eventStartLabel: formatEventDateTime(eventStart),
+    status,
+    statusLabel: WAITLIST_STATUS_LABELS[status],
+    registrationId: api.registration_id != null ? String(api.registration_id) : null,
+  };
+}
+
+export function mapMyWaitlistApiResponse(items: MyWaitlistApiResponse[]): MyWaitlistEntry[] {
+  return items.map(mapMyWaitlistApiToItem);
+}
+
+/** Every renderer app/services/event_form_registry.py's CUSTOM_RENDERERS actually supports. */
+const CUSTOM_FIELD_RENDERERS = new Set<EventFormFieldRenderer>([
+  'text',
+  'textarea',
+  'number',
+  'url',
+  'date',
+  'datetime',
+  'select',
+  'multi_select',
+  'checkbox',
+]);
+
+// The app already collects these as dedicated Full Name / Email fields — if a
+// configured custom field duplicates one of them by label, skip it rather
+// than asking the same question twice.
+const BUILT_IN_FIELD_LABEL_PATTERNS = [
+  /^full ?name$/i,
+  /^name$/i,
+  /^participant ?name$/i,
+  /^email( ?address)?$/i,
+  /^participant ?email$/i,
+];
+
+function isBuiltInFieldLabel(label: string): boolean {
+  const trimmed = label.trim();
+  return BUILT_IN_FIELD_LABEL_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
+function normalizeFormFieldOptions(raw: unknown): EventFormFieldOption[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((item): EventFormFieldOption | null => {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        return trimmed ? { label: trimmed, value: trimmed } : null;
+      }
+      if (item && typeof item === 'object') {
+        const obj = item as Record<string, unknown>;
+        const rawLabel = obj.label ?? obj.name ?? obj.value;
+        const label = typeof rawLabel === 'string' ? rawLabel.trim() : String(rawLabel ?? '').trim();
+        if (!label) return null;
+        const rawValue = obj.value ?? obj.label ?? obj.name;
+        const value = typeof rawValue === 'string' ? rawValue : String(rawValue ?? label);
+        return { label, value };
+      }
+      return null;
+    })
+    .filter((option): option is EventFormFieldOption => option !== null)
+    .map((option, index) => (option.value ? option : { ...option, value: `option-${index}` }));
+}
+
+function mapRegistrationFormField(api: EventFormFieldApiResponse): EventFormField | null {
+  // Only "custom" fields are participant-facing registration questions —
+  // "core" fields (category, venue, ticket_types, ...) describe the Event
+  // itself and are already shown elsewhere in the app, not asked again here.
+  if (api.source !== 'custom') return null;
+  if (api.is_enabled === false) return null;
+  if (isBuiltInFieldLabel(api.label ?? '')) return null;
+
+  const renderer = CUSTOM_FIELD_RENDERERS.has(api.renderer as EventFormFieldRenderer)
+    ? (api.renderer as EventFormFieldRenderer)
+    : 'text';
+
+  return {
+    id: String(api.id),
+    label: api.label?.trim() || 'Question',
+    renderer,
+    required: Boolean(api.required),
+    placeholder: api.placeholder?.trim() || null,
+    helpText: api.help_text?.trim() || null,
+    options: normalizeFormFieldOptions(api.options),
+    validation:
+      api.validation && typeof api.validation === 'object' ? api.validation : {},
+  };
+}
+
+function mapRegistrationFormSection(
+  api: EventFormSectionApiResponse,
+): EventFormSection | null {
+  if (api.is_enabled === false) return null;
+
+  const fields = (api.fields ?? [])
+    .map(mapRegistrationFormField)
+    .filter((field): field is EventFormField => field !== null);
+
+  if (fields.length === 0) return null;
+
+  return {
+    id: String(api.id),
+    label: api.label?.trim() || '',
+    fields,
+  };
+}
+
+/**
+ * Maps GET /events/{id}/registration-form into the sections/fields the
+ * mobile form renders. Order is preserved exactly as returned — the backend
+ * (normalize_sections) already sorts sections and fields by "position".
+ */
+export function mapEventRegistrationForm(
+  api: EventRegistrationFormApiResponse,
+): EventRegistrationForm {
+  const sections = (api.sections ?? [])
+    .map(mapRegistrationFormSection)
+    .filter((section): section is EventFormSection => section !== null);
+
+  return { sections };
+}
+
+/**
+ * "HH:MM" (24-hour, possibly "24:00" — the CM_Web session editor allows it as
+ * end-of-day) wall-clock string → "2:00 PM" label. Sessions' start_time/
+ * end_time are plain time-of-day strings with no date/timezone component
+ * (HTML <input type="time"> on the admin side), so none of the existing
+ * Date-based formatters in dateTime.ts apply — this is intentionally a small
+ * local parser rather than routing through Date/parseApiDate.
+ */
+function formatTimeOfDay(time?: string | null): string | null {
+  if (!time) return null;
+  const match = /^(\d{1,2}):(\d{2})/.exec(time.trim());
+  if (!match) return null;
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (Number.isNaN(hour) || Number.isNaN(minute) || hour > 24 || minute > 59) {
+    return null;
+  }
+  if (hour === 24) {
+    hour = 0;
+  }
+
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:${String(minute).padStart(2, '0')} ${period}`;
+}
+
+function buildSessionDateTimeLabel(session: EventSessionApiResponse): string {
+  // session_date is a date-only string (YYYY-MM-DD, no time/timezone) — safe
+  // to parse as UTC midnight and display in IST, since IST is ahead of UTC
+  // and can only push the displayed calendar date forward within the same day.
+  const date = safeParseDate(session.session_date);
+  const dateLabel = date ? formatISTShortDate(date) : null;
+  const startLabel = formatTimeOfDay(session.start_time);
+  const endLabel = formatTimeOfDay(session.end_time);
+  const timeLabel = startLabel && endLabel ? `${startLabel} – ${endLabel}` : startLabel;
+
+  if (dateLabel && timeLabel) return `${dateLabel} · ${timeLabel}`;
+  if (dateLabel) return dateLabel;
+  if (timeLabel) return timeLabel;
+  return 'Time TBA';
+}
+
+function mapEventSession(
+  session: EventSessionApiResponse,
+  index: number,
+): EventSessionSummary | null {
+  const title = session.title?.trim();
+  if (!title) return null;
+
+  return {
+    id: session.id ? String(session.id) : `session-${index}`,
+    title,
+    speaker: session.speaker?.trim() || null,
+    location: session.location?.trim() || null,
+    dateTimeLabel: buildSessionDateTimeLabel(session),
+    // Boolean signal only — see EventSessionSummary's doc comment for why the
+    // raw session.meeting_link is never carried past this function.
+    hasMeetingInfo: Boolean(session.meeting_link?.trim()),
+  };
+}
+
+/** Maps the sessions embedded on GET /events/{id} (event.sessions) into the agenda the app renders. Respects backend ordering — sessions are already sorted server-side (event_service.py, _sort_sessions). */
+export function mapEventSessions(
+  sessions?: EventSessionApiResponse[] | null,
+): EventSessionSummary[] {
+  if (!Array.isArray(sessions)) return [];
+  return sessions
+    .map((session, index) => mapEventSession(session, index))
+    .filter((session): session is EventSessionSummary => session !== null);
+}
+
+/**
+ * Each raw document entry is untyped JSONB (app/models/event_model.py,
+ * `documents` column) — the CM_Web builder's composite field allows a plain
+ * URL string or an object with url/upload/title subfields, so parse
+ * defensively rather than assuming one shape (same approach as
+ * normalizeFormFieldOptions above).
+ */
+function mapEventDocument(raw: unknown, index: number): EventResource | null {
+  if (typeof raw === 'string') {
+    const url = raw.trim();
+    return url ? { id: `doc-${index}`, title: 'Document', type: null, url } : null;
+  }
+
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    const rawUrl = obj.url ?? obj.link;
+    const url = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+    if (!url) return null;
+
+    const rawTitle = obj.title ?? obj.name;
+    const title = typeof rawTitle === 'string' && rawTitle.trim() ? rawTitle.trim() : 'Document';
+    const rawType = obj.type;
+    const type = typeof rawType === 'string' && rawType.trim() ? rawType.trim() : null;
+    const id = typeof obj.id === 'string' && obj.id.trim() ? obj.id.trim() : `doc-${index}`;
+
+    return { id, title, type, url };
+  }
+
+  return null;
+}
+
+/** Maps the raw `documents` JSONB list embedded on GET /events/{id} into the Resources section. No backend visibility/access-control field exists on this field today — every item returned is already public on a published event. */
+export function mapEventDocuments(documents?: unknown[] | null): EventResource[] {
+  if (!Array.isArray(documents)) return [];
+  return documents
+    .map((doc, index) => mapEventDocument(doc, index))
+    .filter((doc): doc is EventResource => doc !== null);
+}
+
+/**
+ * Maps GET /events/{id}/meeting-link's 200 response. This function is only
+ * ever called with a response that already passed the backend's own
+ * registered-participant/admin/provider check — see event.service.ts,
+ * getMeetingLink.
+ */
+export function mapEventMeetingLink(api: EventMeetingLinkApiResponse): EventMeetingAccess {
+  const link = api.meeting_link?.trim();
+  return {
+    meetingLink: link ? link : null,
+    meetingProvider: api.meeting_provider?.trim() || null,
+  };
 }

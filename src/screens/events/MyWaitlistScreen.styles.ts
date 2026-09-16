@@ -9,12 +9,11 @@ export const TEXT_MUTED = '#6B7280';
 const TEXT_BLACK = '#111111';
 const PAGE_BG = '#FFFFFF';
 const BODY_BG = '#F5F7F5';
-const CHIP_INACTIVE_BG = '#F3F4F6';
 const BORDER = '#E8EDEA';
-const CANCELLED = '#DC2626';
-const CANCELLED_BG = '#FEF2F2';
-const COMPLETED_BG = '#EEF2FF';
-const COMPLETED = '#4338CA';
+const PROMOTED_BG = '#E2F2E7';
+const PROMOTED = '#1F7A45';
+const LEFT_BG = '#F3F4F6';
+const LEFT = '#6B7280';
 const H_PAD = isSmallDevice ? 16 : 20;
 
 export const styles = StyleSheet.create({
@@ -34,7 +33,6 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: isSmallDevice ? 12 : 14,
   },
   backBtn: {
     width: isSmallDevice ? 32 : 36,
@@ -51,56 +49,20 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
     color: TEXT_BLACK,
   },
-  waitlistBtn: {
-    backgroundColor: MINT,
-    paddingHorizontal: isSmallDevice ? 12 : 14,
-    paddingVertical: isSmallDevice ? 6 : 8,
-    borderRadius: isSmallDevice ? 8 : 10,
-    flexShrink: 0,
-  },
-  waitlistBtnText: {
-    fontSize: isSmallDevice ? 12 : 13,
-    lineHeight: isSmallDevice ? 14 : 16,
-    fontWeight: '700',
-    color: PRIMARY,
-  },
-  tabRow: {
-    flexDirection: 'row',
-    backgroundColor: CHIP_INACTIVE_BG,
-    borderRadius: 12,
-    padding: 3,
-    gap: 3,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: isSmallDevice ? 8 : 9,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  tabActive: {
-    backgroundColor: PAGE_BG,
-    ...shadowSm,
-  },
-  tabText: {
-    fontSize: isSmallDevice ? 12.5 : 13.5,
-    fontWeight: '600',
-    color: TEXT_MUTED,
-  },
-  tabTextActive: {
-    color: PRIMARY,
-    fontWeight: '700',
-  },
-  listContent: {
-    paddingHorizontal: H_PAD,
-    paddingTop: isSmallDevice ? 14 : 16,
-    paddingBottom: isSmallDevice ? 24 : 32,
-    gap: isSmallDevice ? 10 : 12,
+  pressed: {
+    opacity: 0.9,
   },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: H_PAD,
+  },
+  listContent: {
+    paddingHorizontal: H_PAD,
+    paddingTop: isSmallDevice ? 14 : 16,
+    paddingBottom: isSmallDevice ? 24 : 32,
+    gap: isSmallDevice ? 10 : 12,
   },
   card: {
     backgroundColor: PAGE_BG,
@@ -129,22 +91,22 @@ export const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: MINT,
   },
-  statusPillCancelled: {
-    backgroundColor: CANCELLED_BG,
+  statusPillPromoted: {
+    backgroundColor: PROMOTED_BG,
   },
-  statusPillCompleted: {
-    backgroundColor: COMPLETED_BG,
+  statusPillLeft: {
+    backgroundColor: LEFT_BG,
   },
   statusPillText: {
     fontSize: isSmallDevice ? 11 : 12,
     fontWeight: '800',
     color: PRIMARY,
   },
-  statusPillTextCancelled: {
-    color: CANCELLED,
+  statusPillTextPromoted: {
+    color: PROMOTED,
   },
-  statusPillTextCompleted: {
-    color: COMPLETED,
+  statusPillTextLeft: {
+    color: LEFT,
   },
   cardMeta: {
     fontSize: isSmallDevice ? 12 : 13,
@@ -184,8 +146,5 @@ export const styles = StyleSheet.create({
     fontSize: isSmallDevice ? 12.5 : 13.5,
     fontWeight: '700',
     color: '#FFFFFF',
-  },
-  pressed: {
-    opacity: 0.9,
   },
 });

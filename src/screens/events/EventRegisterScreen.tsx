@@ -16,15 +16,24 @@ import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar'
 import { CircleCheckIcon, ChevronLeftIcon } from '@/components/dashboard/DashboardIcons';
 import { EmptyState } from '@/components/EmptyState';
 import { LeafyGradientButton } from '@/components/LeafyGradientButton';
-import { useEvent, useRegisterForEvent } from '@/hooks/useEvents';
+import { useEvent, useEventRegistrationForm, useRegisterForEvent } from '@/hooks/useEvents';
 import { useAuthStore } from '@/stores/auth.store';
 import type { ApiError } from '@/types/api.types';
-import type { EventRegistrationResult } from '@/types/event.types';
+import type {
+  EventFormField,
+  EventFormFieldValue,
+  EventFormSection,
+  EventRegistrationResult,
+} from '@/types/event.types';
 import { getEventAvailability } from '@/utils/event.mapper';
+import { EventRegisterFormField } from '@/screens/events/EventRegisterFormField';
 import { InfoCard } from '@/screens/events/EventDetailScreenParts.shared';
 import { PRIMARY, styles } from '@/screens/events/EventRegisterScreen.styles';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const URL_PATTERN = /^https?:\/\/\S+$/i;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}$/;
 
 function buildErrorMessage(error: ApiError): string {
   const raw = error.message?.trim();
@@ -32,8 +41,14 @@ function buildErrorMessage(error: ApiError): string {
   if (error.statusCode === 401) {
     return 'Please sign in again to register for this event.';
   }
+  if (error.statusCode === 403) {
+    return raw || "You don't have access to register for this event.";
+  }
   if (error.statusCode === 404) {
     return 'This event could not be found — it may have been removed.';
+  }
+  if (error.statusCode === 409) {
+    return raw || 'You are already registered for this event.';
   }
   if (error.statusCode === 0) {
     return 'Network error. Please check your connection and try again.';
@@ -41,6 +56,103 @@ function buildErrorMessage(error: ApiError): string {
   // 400 (closed/full/cutoff) and 422 (validation) already carry a specific,
   // human-readable detail from the backend — surface it directly.
   return raw || 'Something went wrong while registering. Please try again.';
+}
+
+/** Field is empty in the sense that matters for required-field checks. */
+function isFieldEmpty(field: EventFormField, value: EventFormFieldValue | undefined): boolean {
+  if (value == null) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (Array.isArray(value)) return value.length === 0;
+  if (field.renderer === 'checkbox') return value !== true;
+  return false;
+}
+
+/**
+ * Client-side validation only — the backend applies no shape/format
+ * validation to custom_fields on POST /registrations today (it's stored as
+ * a free-form dict), so these checks are purely for a better mobile UX, not
+ * a substitute for a backend contract that doesn't exist yet.
+ */
+function validateDynamicField(
+  field: EventFormField,
+  value: EventFormFieldValue | undefined,
+): string | null {
+  const empty = isFieldEmpty(field, value);
+
+  if (field.required && empty) {
+    return field.renderer === 'checkbox' ? 'This must be checked to continue.' : 'This field is required.';
+  }
+  if (empty) return null;
+
+  const validation = field.validation;
+
+  if (field.renderer === 'number') {
+    const num = Number(value);
+    if (typeof value !== 'string' || Number.isNaN(num)) return 'Enter a valid number.';
+    const min = validation.min;
+    const max = validation.max;
+    if (typeof min === 'number' && num < min) return `Must be at least ${min}.`;
+    if (typeof max === 'number' && num > max) return `Must be at most ${max}.`;
+    return null;
+  }
+
+  if (field.renderer === 'url' && typeof value === 'string' && !URL_PATTERN.test(value.trim())) {
+    return 'Enter a valid URL (starting with http:// or https://).';
+  }
+  if (field.renderer === 'date' && typeof value === 'string' && !DATE_PATTERN.test(value.trim())) {
+    return 'Enter a date as YYYY-MM-DD.';
+  }
+  if (
+    field.renderer === 'datetime' &&
+    typeof value === 'string' &&
+    !DATETIME_PATTERN.test(value.trim())
+  ) {
+    return 'Enter a date and time as YYYY-MM-DD HH:MM.';
+  }
+  if ((field.renderer === 'text' || field.renderer === 'textarea') && typeof value === 'string') {
+    const minLength = validation.min_length;
+    const maxLength = validation.max_length;
+    if (typeof minLength === 'number' && value.trim().length < minLength) {
+      return `Must be at least ${minLength} characters.`;
+    }
+    if (typeof maxLength === 'number' && value.trim().length > maxLength) {
+      return `Must be at most ${maxLength} characters.`;
+    }
+    const pattern = validation.pattern;
+    if (typeof pattern === 'string' && pattern) {
+      try {
+        if (!new RegExp(pattern).test(value)) {
+          return "This doesn't match the expected format.";
+        }
+      } catch {
+        // Backend-supplied pattern isn't a valid RegExp — ignore rather than block submission.
+      }
+    }
+  }
+
+  return null;
+}
+
+function buildCustomFieldsPayload(
+  sections: EventFormSection[],
+  answers: Record<string, EventFormFieldValue>,
+): Record<string, string | boolean | string[]> {
+  const payload: Record<string, string | boolean | string[]> = {};
+
+  for (const section of sections) {
+    for (const field of section.fields) {
+      const value = answers[field.id];
+      if (field.renderer === 'checkbox') {
+        payload[field.id] = value === true;
+      } else if (field.renderer === 'multi_select') {
+        payload[field.id] = Array.isArray(value) ? value : [];
+      } else {
+        payload[field.id] = typeof value === 'string' ? value.trim() : '';
+      }
+    }
+  }
+
+  return payload;
 }
 
 export function EventRegisterScreen() {
@@ -52,12 +164,19 @@ export function EventRegisterScreen() {
   const user = useAuthStore((state) => state.user);
 
   const { event, isLoading, isError } = useEvent(id, { enabled: Boolean(id) });
+  // Dynamic questions only apply to the free-registration flow — the paid
+  // checkout endpoint has no field to carry them (see Phase 5B report).
+  const { form, isLoading: isFormLoading } = useEventRegistrationForm(id, {
+    enabled: Boolean(event?.isFree),
+  });
   const registerMutation = useRegisterForEvent();
 
   const [name, setName] = useState(user?.fullName?.trim() ?? '');
   const [email, setEmail] = useState(user?.email?.trim() ?? '');
   const [nameError, setNameError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Record<string, EventFormFieldValue>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<EventRegistrationResult | null>(null);
 
@@ -108,6 +227,10 @@ export function EventRegisterScreen() {
   }
 
   const spotsRemaining = Math.max(0, event.capacity - event.registered);
+  // Empty when paid, still loading, or the form legitimately has no custom
+  // questions — the basic Full Name / Email fields always work regardless.
+  const formSections = !isPaid ? (form?.sections ?? []) : [];
+  const isFormLoadingVisible = !isPaid && isFormLoading;
 
   function validate(): boolean {
     let valid = true;
@@ -130,6 +253,18 @@ export function EventRegisterScreen() {
     } else {
       setEmailError(null);
     }
+
+    const nextFieldErrors: Record<string, string> = {};
+    for (const section of formSections) {
+      for (const field of section.fields) {
+        const error = validateDynamicField(field, answers[field.id]);
+        if (error) {
+          nextFieldErrors[field.id] = error;
+          valid = false;
+        }
+      }
+    }
+    setFieldErrors(nextFieldErrors);
 
     return valid;
   }
@@ -159,6 +294,9 @@ export function EventRegisterScreen() {
         payload: {
           participant_name: name.trim(),
           participant_email: email.trim(),
+          ...(formSections.length > 0
+            ? { custom_fields: buildCustomFieldsPayload(formSections, answers) }
+            : {}),
         },
       },
       {
@@ -355,9 +493,41 @@ export function EventRegisterScreen() {
               )}
             </View>
 
+            {isFormLoadingVisible ? (
+              <View style={styles.formLoadingRow}>
+                <ActivityIndicator color={PRIMARY} size="small" />
+                <Text style={styles.formLoadingText}>Loading registration questions…</Text>
+              </View>
+            ) : (
+              formSections.map((section) => (
+                <View key={section.id}>
+                  {section.label ? (
+                    <Text style={styles.formSectionTitle}>{section.label}</Text>
+                  ) : null}
+                  {section.fields.map((field) => (
+                    <EventRegisterFormField
+                      key={field.id}
+                      field={field}
+                      value={answers[field.id]}
+                      error={fieldErrors[field.id]}
+                      onChange={(value) => {
+                        setAnswers((current) => ({ ...current, [field.id]: value }));
+                        setFieldErrors((current) => {
+                          if (!current[field.id]) return current;
+                          const next = { ...current };
+                          delete next[field.id];
+                          return next;
+                        });
+                      }}
+                    />
+                  ))}
+                </View>
+              ))
+            )}
+
             <LeafyGradientButton
               onPress={handleSubmit}
-              disabled={registerMutation.isPending}
+              disabled={registerMutation.isPending || isFormLoadingVisible}
               style={styles.submitBtn}
               borderRadius={14}
             >

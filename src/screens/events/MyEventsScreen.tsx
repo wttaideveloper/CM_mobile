@@ -77,6 +77,28 @@ function MyEventCard({ item }: { item: MyEventRegistration }) {
         >
           <Text style={styles.actionBtnFilledText}>View Ticket</Text>
         </Pressable>
+
+        {item.bucket === 'completed' ? (
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/(main)/event/feedback',
+                params: { id: item.eventId, registrationStatus: item.registrationStatus },
+              })
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Leave feedback"
+            style={({ pressed }) => [
+              styles.actionBtn,
+              styles.actionBtnOutline,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.actionBtnOutlineText} numberOfLines={1}>
+              Feedback
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -114,6 +136,15 @@ export function MyEventsScreen() {
           <Text style={styles.title} accessibilityRole="header">
             My Events
           </Text>
+          <Pressable
+            onPress={() => router.push('/(main)/event/my-waitlist')}
+            accessibilityRole="button"
+            accessibilityLabel="My Waitlist"
+            accessibilityHint="Shows events you're waitlisted for"
+            style={({ pressed }) => [styles.waitlistBtn, pressed && styles.pressed]}
+          >
+            <Text style={styles.waitlistBtnText}>My Waitlist</Text>
+          </Pressable>
         </View>
 
         <View style={styles.tabRow}>
