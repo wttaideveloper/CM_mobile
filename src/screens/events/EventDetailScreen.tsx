@@ -76,7 +76,7 @@ export function EventDetailScreen() {
     case 'available':
       if (isRegistered) {
         ctaLabel = 'View Ticket';
-        onCtaPress = () => router.push({ pathname: '/(main)/event/ticket', params: { id, registrationId: myRegistration!.registrationId } });
+        onCtaPress = () => router.push({ pathname: '/(main)/event/ticket', params: { eventId: id, registrationId: myRegistration!.registrationId } });
       } else {
         ctaLabel = getEventRegisterLabel(event);
         onCtaPress = () => router.push({ pathname: '/(main)/event/register', params: { id } });
@@ -85,7 +85,7 @@ export function EventDetailScreen() {
     case 'full': {
       if (isRegistered) {
         ctaLabel = 'View Ticket';
-        onCtaPress = () => router.push({ pathname: '/(main)/event/ticket', params: { id, registrationId: myRegistration!.registrationId } });
+        onCtaPress = () => router.push({ pathname: '/(main)/event/ticket', params: { eventId: id, registrationId: myRegistration!.registrationId } });
       } else {
         const alreadyWaiting = waitingEntries.some((entry) => entry.eventId === id);
         if (alreadyWaiting) {
@@ -101,7 +101,7 @@ export function EventDetailScreen() {
     default:
       if (isRegistered) {
         ctaLabel = 'View Ticket';
-        onCtaPress = () => router.push({ pathname: '/(main)/event/ticket', params: { id, registrationId: myRegistration!.registrationId } });
+        onCtaPress = () => router.push({ pathname: '/(main)/event/ticket', params: { eventId: id, registrationId: myRegistration!.registrationId } });
       } else {
         ctaLabel = availability.label;
         onCtaPress = undefined;

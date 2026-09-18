@@ -238,7 +238,9 @@ export function EventDetailFooter({
         style={styles.registerBtn}
         borderRadius={14}
       >
-        <Text style={styles.registerBtnText}>{ctaLabel}</Text>
+        <Text style={styles.registerBtnText} numberOfLines={1} adjustsFontSizeToFit>
+          {ctaLabel}
+        </Text>
       </LeafyGradientButton>
     </View>
   );
