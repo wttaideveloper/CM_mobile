@@ -203,11 +203,13 @@ export function EventMeetingSection({
               : 'This event has ended — meeting details are no longer available.'}
           </Text>
         ) : !isRegistered ? (
-          <View style={styles.experienceStateRow}>
-            <LockIcon size={14} color={TEXT_MUTED} />
-            <Text style={styles.experienceBodyText}>
-              Register to access the meeting link.
-            </Text>
+          <View>
+            <View style={styles.experienceStateRow}>
+              <LockIcon size={14} color={TEXT_MUTED} />
+              <Text style={[styles.experienceBodyText, { flex: 1 }]}>
+                Register to access the meeting link.
+              </Text>
+            </View>
             <Pressable
               onPress={handleRegisterToJoin}
               style={({ pressed }) => [
