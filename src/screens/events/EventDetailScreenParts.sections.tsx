@@ -191,7 +191,7 @@ export function EventDetailContent({
       ) : null}
 
       <EventLocationSection event={event} />
-      <EventSessionsSection sessions={event.sessions} />
+      <EventSessionsSection event={event} availability={availability} />
       <EventMeetingSection event={event} availability={availability} />
       <EventResourcesSection resources={event.resources} />
       <EventInstructionsSection event={event} />

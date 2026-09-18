@@ -2,8 +2,9 @@ import { ActivityIndicator, Alert, Linking, Pressable, Text, View } from 'react-
 
 import { CalendarIcon, LockIcon, MapPinIcon } from '@/components/dashboard/DashboardIcons';
 import { EmptyState } from '@/components/EmptyState';
-import { useEventMeetingLink } from '@/hooks/useEvents';
+import { useEventMeetingLink, useJoinSessionMeeting } from '@/hooks/useEvents';
 import type { Event } from '@/constants/events';
+import type { EventSessionSummary } from '@/types/event.types';
 import type { EventAvailability } from '@/utils/event.mapper';
 import {
   addEventToDeviceCalendar,
@@ -22,34 +23,104 @@ async function openExternalUrl(url: string): Promise<void> {
   }
 }
 
-export function EventSessionsSection({ sessions }: { sessions: Event['sessions'] }) {
+function EventSessionRow({
+  event,
+  session,
+  isLast,
+  isOnline,
+  isOver,
+}: {
+  event: Event;
+  session: EventSessionSummary;
+  isLast: boolean;
+  isOnline: boolean;
+  isOver: boolean;
+}) {
+  const joinMutation = useJoinSessionMeeting();
+
+  const handleJoin = async () => {
+    try {
+      const access = await joinMutation.mutateAsync({ eventId: event.id, sessionId: session.id });
+      if (access.meetingLink) {
+        openExternalUrl(access.meetingLink);
+      } else {
+        Alert.alert('Not available', "This session doesn't have a meeting link yet.");
+      }
+    } catch (error: any) {
+      if (error.statusCode === 403) {
+        Alert.alert('Access Denied', 'Please register for this event to join the session.');
+      } else if (error.statusCode === 401) {
+        Alert.alert('Session Expired', 'Please sign in again to view meeting details.');
+      } else if (error.statusCode === 404) {
+        Alert.alert('Not available', 'Meeting details are not available for this session.');
+      } else {
+        Alert.alert('Error', error.message || 'Something went wrong. Please try again.');
+      }
+    }
+  };
+
+  return (
+    <View style={[styles.experienceRow, !isLast && styles.experienceRowBorder]}>
+      <View style={styles.experienceRowHeader}>
+        <Text style={styles.experienceRowTitle}>{session.title}</Text>
+      </View>
+      <Text style={styles.experienceRowMeta}>{session.dateTimeLabel}</Text>
+      {session.speaker ? (
+        <Text style={styles.experienceRowMeta}>Speaker: {session.speaker}</Text>
+      ) : null}
+      {session.location ? (
+        <Text style={styles.experienceRowMeta}>📍 {session.location}</Text>
+      ) : null}
+
+      {isOnline && session.hasMeetingInfo && !isOver && (
+        <Pressable
+          onPress={handleJoin}
+          disabled={joinMutation.isPending}
+          accessibilityRole="button"
+          accessibilityLabel="Join Session"
+          style={({ pressed }) => [
+            styles.joinMeetingBtn,
+            { marginTop: 12 },
+            (pressed || joinMutation.isPending) && styles.pressed,
+          ]}
+        >
+          {joinMutation.isPending ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={styles.joinMeetingBtnText}>Join Session</Text>
+          )}
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+export function EventSessionsSection({
+  event,
+  availability,
+}: {
+  event: Event;
+  availability: EventAvailability;
+}) {
+  const sessions = event.sessions;
   if (!sessions || sessions.length === 0) return null;
+
+  const isOnline = event.deliveryMode === 'online' || event.deliveryMode === 'hybrid';
+  const isOver = availability.kind === 'cancelled' || availability.kind === 'completed';
 
   return (
     <View style={styles.experienceSection}>
       <Text style={styles.sectionTitle}>Agenda</Text>
       <View style={[styles.experienceCard, { marginTop: 10 }]}>
         {sessions.map((session, index) => (
-          <View
+          <EventSessionRow
             key={session.id}
-            style={[styles.experienceRow, index > 0 && styles.experienceRowBorder]}
-          >
-            <View style={styles.experienceRowHeader}>
-              <Text style={styles.experienceRowTitle}>{session.title}</Text>
-              {session.hasMeetingInfo ? (
-                <View style={styles.experienceBadge}>
-                  <Text style={styles.experienceBadgeText}>ONLINE</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={styles.experienceRowMeta}>{session.dateTimeLabel}</Text>
-            {session.speaker ? (
-              <Text style={styles.experienceRowMeta}>Speaker: {session.speaker}</Text>
-            ) : null}
-            {session.location ? (
-              <Text style={styles.experienceRowMeta}>📍 {session.location}</Text>
-            ) : null}
-          </View>
+            event={event}
+            session={session}
+            isLast={index === sessions.length - 1}
+            isOnline={isOnline}
+            isOver={isOver}
+          />
         ))}
       </View>
     </View>
@@ -77,6 +148,7 @@ export function EventMeetingSection({
 }) {
   const isOnline = event.deliveryMode === 'online' || event.deliveryMode === 'hybrid';
   const isOver = availability.kind === 'cancelled' || availability.kind === 'completed';
+  const hasSessionMeetings = event.sessions?.some((s) => s.hasMeetingInfo) ?? false;
 
   const { data, isLoading, isError, error, refetch } = useEventMeetingLink(event.id, {
     enabled: isOnline && !isOver,
@@ -86,7 +158,9 @@ export function EventMeetingSection({
 
   return (
     <View style={styles.experienceSection}>
-      <Text style={styles.sectionTitle}>Meeting Information</Text>
+      <Text style={styles.sectionTitle}>
+        {hasSessionMeetings ? 'Main Event Meeting' : 'Meeting Information'}
+      </Text>
       <View style={[styles.experienceCard, styles.experienceCardPad, { marginTop: 10 }]}>
         {isOver ? (
           <Text style={styles.experienceBodyText}>
@@ -131,10 +205,12 @@ export function EventMeetingSection({
             <Pressable
               onPress={() => openExternalUrl(data.meetingLink!)}
               accessibilityRole="button"
-              accessibilityLabel="Join meeting"
+              accessibilityLabel={hasSessionMeetings ? 'Join main event' : 'Join meeting'}
               style={({ pressed }) => [styles.joinMeetingBtn, pressed && styles.pressed]}
             >
-              <Text style={styles.joinMeetingBtnText}>Join Meeting</Text>
+              <Text style={styles.joinMeetingBtnText}>
+                {hasSessionMeetings ? 'Join Main Event' : 'Join Meeting'}
+              </Text>
             </Pressable>
           </>
         ) : (

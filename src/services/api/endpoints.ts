@@ -84,6 +84,8 @@ export const ENDPOINTS = {
     WAITLIST_ENTRY: (id: string, entryId: string) =>
       `/api/v1/events/${id}/waitlist/${entryId}`,
     MEETING_LINK: (id: string) => `/api/v1/events/${id}/meeting-link`,
+    SESSION_MEETING_LINK: (id: string, sessionId: string) =>
+      `/api/v1/events/${id}/sessions/${sessionId}/meeting-link`,
     CONTACT: (id: string) => `/api/v1/events/${id}/contact`,
     FEEDBACK: (id: string) => `/api/v1/events/${id}/feedback`,
     REVIEWS: (id: string) => `/api/v1/events/${id}/reviews`,

@@ -303,6 +303,20 @@ export const eventService = {
   },
 
   /**
+   * GET /api/v1/events/{id}/sessions/{sessionId}/meeting-link
+   */
+  getSessionMeetingLink: async (id: string, sessionId: string): Promise<EventMeetingAccess> => {
+    if (__DEV__) {
+      console.log(`[Events API] GET session meeting-link: event=${id}, session=${sessionId}`);
+    }
+
+    const response = await apiClient.get<EventMeetingLinkApiResponse>(
+      ENDPOINTS.EVENTS.SESSION_MEETING_LINK(id, sessionId),
+    );
+    return mapEventMeetingLink(response.data);
+  },
+
+  /**
    * POST /api/v1/events/{id}/contact — one-way message relay to the event
    * organiser (Phase 5D-2). This is NOT a chat/conversation: the backend
    * (event_service.py, contact_organiser_service) only best-effort emails/

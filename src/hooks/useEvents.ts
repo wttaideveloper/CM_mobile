@@ -113,6 +113,15 @@ export function useEventMeetingLink(eventId: string, options?: { enabled?: boole
   });
 }
 
+/**
+ * Lazy fetch a session meeting link on demand.
+ */
+export function useJoinSessionMeeting() {
+  return useMutation<EventMeetingAccess, ApiError, { eventId: string; sessionId: string }>({
+    mutationFn: ({ eventId, sessionId }) => eventService.getSessionMeetingLink(eventId, sessionId),
+  });
+}
+
 /** POST /api/v1/events/{id}/registrations — free registration only (Phase 1). */
 export function useRegisterForEvent() {
   const queryClient = useQueryClient();
