@@ -1,4 +1,5 @@
 import { ActivityIndicator, Alert, Linking, Pressable, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { CalendarIcon, LockIcon, MapPinIcon } from '@/components/dashboard/DashboardIcons';
 import { EmptyState } from '@/components/EmptyState';
@@ -29,14 +30,21 @@ function EventSessionRow({
   isLast,
   isOnline,
   isOver,
+  isRegistered,
 }: {
   event: Event;
   session: EventSessionSummary;
   isLast: boolean;
   isOnline: boolean;
   isOver: boolean;
+  isRegistered: boolean;
 }) {
+  const router = useRouter();
   const joinMutation = useJoinSessionMeeting();
+  
+  const handleRegisterToJoin = () => {
+    router.push({ pathname: '/(main)/event/register', params: { id: event.id } });
+  };
 
   const handleJoin = async () => {
     try {
@@ -73,23 +81,39 @@ function EventSessionRow({
       ) : null}
 
       {isOnline && session.hasMeetingInfo && !isOver && (
-        <Pressable
-          onPress={handleJoin}
-          disabled={joinMutation.isPending}
-          accessibilityRole="button"
-          accessibilityLabel="Join Session"
-          style={({ pressed }) => [
-            styles.joinMeetingBtn,
-            { marginTop: 12 },
-            (pressed || joinMutation.isPending) && styles.pressed,
-          ]}
-        >
-          {joinMutation.isPending ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Text style={styles.joinMeetingBtnText}>Join Session</Text>
-          )}
-        </Pressable>
+        isRegistered ? (
+          <Pressable
+            onPress={handleJoin}
+            disabled={joinMutation.isPending}
+            accessibilityRole="button"
+            accessibilityLabel="Join Session"
+            style={({ pressed }) => [
+              styles.joinMeetingBtn,
+              { marginTop: 12 },
+              (pressed || joinMutation.isPending) && styles.pressed,
+            ]}
+          >
+            {joinMutation.isPending ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.joinMeetingBtnText}>Join Session</Text>
+            )}
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={handleRegisterToJoin}
+            accessibilityRole="button"
+            accessibilityLabel="Register to join session"
+            style={({ pressed }) => [
+              styles.joinMeetingBtn,
+              { marginTop: 12, backgroundColor: '#f3f4f6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+              pressed && styles.pressed,
+            ]}
+          >
+            <LockIcon size={14} color={TEXT_MUTED} />
+            <Text style={[styles.joinMeetingBtnText, { color: TEXT_MUTED }]}>Register to join</Text>
+          </Pressable>
+        )
       )}
     </View>
   );
@@ -98,9 +122,11 @@ function EventSessionRow({
 export function EventSessionsSection({
   event,
   availability,
+  isRegistered,
 }: {
   event: Event;
   availability: EventAvailability;
+  isRegistered: boolean;
 }) {
   const sessions = event.sessions;
   if (!sessions || sessions.length === 0) return null;
@@ -120,6 +146,7 @@ export function EventSessionsSection({
             isLast={index === sessions.length - 1}
             isOnline={isOnline}
             isOver={isOver}
+            isRegistered={isRegistered}
           />
         ))}
       </View>
@@ -142,16 +169,23 @@ function meetingProviderLabel(provider: string | null): string {
 export function EventMeetingSection({
   event,
   availability,
+  isRegistered,
 }: {
   event: Event;
   availability: EventAvailability;
+  isRegistered: boolean;
 }) {
   const isOnline = event.deliveryMode === 'online' || event.deliveryMode === 'hybrid';
   const isOver = availability.kind === 'cancelled' || availability.kind === 'completed';
   const hasSessionMeetings = event.sessions?.some((s) => s.hasMeetingInfo) ?? false;
+  const router = useRouter();
+
+  const handleRegisterToJoin = () => {
+    router.push({ pathname: '/(main)/event/register', params: { id: event.id } });
+  };
 
   const { data, isLoading, isError, error, refetch } = useEventMeetingLink(event.id, {
-    enabled: isOnline && !isOver,
+    enabled: isOnline && !isOver && isRegistered,
   });
 
   if (!isOnline) return null;
@@ -168,6 +202,23 @@ export function EventMeetingSection({
               ? 'This event has been cancelled — meeting details are no longer available.'
               : 'This event has ended — meeting details are no longer available.'}
           </Text>
+        ) : !isRegistered ? (
+          <View style={styles.experienceStateRow}>
+            <LockIcon size={14} color={TEXT_MUTED} />
+            <Text style={styles.experienceBodyText}>
+              Register to access the meeting link.
+            </Text>
+            <Pressable
+              onPress={handleRegisterToJoin}
+              style={({ pressed }) => [
+                { marginTop: 12, backgroundColor: '#f3f4f6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 8 },
+                pressed && styles.pressed,
+              ]}
+            >
+              <LockIcon size={14} color={TEXT_MUTED} />
+              <Text style={[{ color: TEXT_MUTED, fontWeight: '600' }]}>Register to join</Text>
+            </Pressable>
+          </View>
         ) : isLoading ? (
           <View style={styles.experienceStateRow}>
             <ActivityIndicator color={PRIMARY} size="small" />

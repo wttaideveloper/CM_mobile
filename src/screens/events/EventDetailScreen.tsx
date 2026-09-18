@@ -4,7 +4,7 @@ import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
 import { EmptyState } from '@/components/EmptyState';
-import { useEvent, useMyWaitlist } from '@/hooks/useEvents';
+import { useEvent, useMyRegistrations, useMyWaitlist } from '@/hooks/useEvents';
 import { useDetailBack } from '@/hooks/useDetailBack';
 import {
   EventDetailContent,
@@ -23,6 +23,9 @@ export function EventDetailScreen() {
   const insets = useSafeAreaInsets();
   const statusBarFill = useStatusBarBackground();
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Fetch all registrations to check if user is already registered.
+  const { registrations } = useMyRegistrations();
 
   const { event, isLoading, isError } = useEvent(id, { enabled: Boolean(id) });
   // Only fetch once we know the event is actually full — this is the only
@@ -58,28 +61,51 @@ export function EventDetailScreen() {
     event.capacity > 0 ? Math.round((event.registered / event.capacity) * 100) : 0;
   const spotsRemaining = event.capacity - event.registered;
 
+  const myRegistration = registrations.find(
+    (r) => r.eventId === id && r.registrationStatus !== 'cancelled'
+  );
+  const isRegistered = Boolean(myRegistration);
+  
+  // A waitlist promotion creates a confirmed registration, so it will be caught by isRegistered.
+  // Waitlist entries that are merely "waiting" do not confer registered status.
+
   const availability = getEventAvailability(event);
   let ctaLabel: string;
   let onCtaPress: (() => void) | undefined;
   switch (availability.kind) {
     case 'available':
-      ctaLabel = getEventRegisterLabel(event);
-      onCtaPress = () => router.push({ pathname: '/(main)/event/register', params: { id } });
+      if (isRegistered) {
+        ctaLabel = 'View Ticket';
+        onCtaPress = () => router.push({ pathname: '/(main)/event/ticket', params: { id, registrationId: myRegistration!.registrationId } });
+      } else {
+        ctaLabel = getEventRegisterLabel(event);
+        onCtaPress = () => router.push({ pathname: '/(main)/event/register', params: { id } });
+      }
       break;
     case 'full': {
-      const alreadyWaiting = waitingEntries.some((entry) => entry.eventId === id);
-      if (alreadyWaiting) {
-        ctaLabel = "You're on the Waitlist";
-        onCtaPress = () => router.push('/(main)/event/my-waitlist');
+      if (isRegistered) {
+        ctaLabel = 'View Ticket';
+        onCtaPress = () => router.push({ pathname: '/(main)/event/ticket', params: { id, registrationId: myRegistration!.registrationId } });
       } else {
-        ctaLabel = 'Join Waitlist';
-        onCtaPress = () => router.push({ pathname: '/(main)/event/waitlist', params: { id } });
+        const alreadyWaiting = waitingEntries.some((entry) => entry.eventId === id);
+        if (alreadyWaiting) {
+          ctaLabel = "You're on the Waitlist";
+          onCtaPress = () => router.push('/(main)/event/my-waitlist');
+        } else {
+          ctaLabel = 'Join Waitlist';
+          onCtaPress = () => router.push({ pathname: '/(main)/event/waitlist', params: { id } });
+        }
       }
       break;
     }
     default:
-      ctaLabel = availability.label;
-      onCtaPress = undefined;
+      if (isRegistered) {
+        ctaLabel = 'View Ticket';
+        onCtaPress = () => router.push({ pathname: '/(main)/event/ticket', params: { id, registrationId: myRegistration!.registrationId } });
+      } else {
+        ctaLabel = availability.label;
+        onCtaPress = undefined;
+      }
   }
 
   return (
@@ -105,6 +131,7 @@ export function EventDetailScreen() {
             fillPercent={fillPercent}
             spotsRemaining={spotsRemaining}
             availability={availability}
+            isRegistered={isRegistered}
           />
         </ScrollView>
 

@@ -95,11 +95,13 @@ export function EventDetailContent({
   fillPercent,
   spotsRemaining,
   availability,
+  isRegistered,
 }: {
   event: Event;
   fillPercent: number;
   spotsRemaining: number;
   availability: EventAvailability;
+  isRegistered: boolean;
 }) {
   return (
     <View style={styles.contentSheet}>
@@ -191,8 +193,8 @@ export function EventDetailContent({
       ) : null}
 
       <EventLocationSection event={event} />
-      <EventSessionsSection event={event} availability={availability} />
-      <EventMeetingSection event={event} availability={availability} />
+      <EventSessionsSection event={event} availability={availability} isRegistered={isRegistered} />
+      <EventMeetingSection event={event} availability={availability} isRegistered={isRegistered} />
       <EventResourcesSection resources={event.resources} />
       <EventInstructionsSection event={event} />
     </View>
