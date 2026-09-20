@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
 import { Alert, Linking, Platform } from 'react-native';
 
@@ -129,12 +130,11 @@ export function resolveCalendarEnd(start: Date, end: Date | null | undefined): D
 }
 
 /**
- * Writes a temporary .ics file and opens the OS share sheet (iOS/Android) —
- * the same expo-file-system + expo-sharing pattern already used by
- * openChatAttachment.ts, no new dependency. Web has no filesystem/share
- * API in Expo, so it opens a Google Calendar quick-add link instead
- * (Linking, same as every other external link in this app). Every failure
- * path shows an Alert rather than failing silently.
+ * Android opens the native calendar UI via expo-intent-launcher.
+ * iOS writes a temporary .ics file and opens the OS share sheet,
+ * letting the system process the ICS payload naturally. Web opens a
+ * Google Calendar quick-add link since there's no native calendar app.
+ * Every failure path shows an Alert rather than failing silently.
  */
 export async function addEventToDeviceCalendar(details: EventCalendarDetails): Promise<void> {
   if (Number.isNaN(details.start.getTime()) || Number.isNaN(details.end.getTime())) {
@@ -147,6 +147,35 @@ export async function addEventToDeviceCalendar(details: EventCalendarDetails): P
       await Linking.openURL(buildGoogleCalendarUrl(details));
     } catch {
       Alert.alert('Add to Calendar', 'Could not open Google Calendar. Please try again.');
+    }
+    return;
+  }
+
+  if (Platform.OS === 'android') {
+    try {
+      const extras: Record<string, any> = {
+        title: details.title,
+        beginTime: details.start.getTime(),
+        endTime: details.end.getTime(),
+      };
+
+      const descParts = [details.description, details.meetingUrl].filter(Boolean);
+      if (descParts.length > 0) {
+        extras.description = descParts.join('\n\n');
+      }
+      if (details.location) {
+        extras.eventLocation = details.location;
+      }
+
+      await IntentLauncher.startActivityAsync('android.intent.action.INSERT', {
+        data: 'content://com.android.calendar/events',
+        extra: extras,
+      });
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[eventCalendar] Failed to launch Android calendar intent:', error);
+      }
+      Alert.alert('Add to Calendar', 'Could not open the calendar app.');
     }
     return;
   }
