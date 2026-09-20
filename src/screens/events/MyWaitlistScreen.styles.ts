@@ -12,6 +12,10 @@ const BODY_BG = '#F5F7F5';
 const BORDER = '#E8EDEA';
 const PROMOTED_BG = '#E2F2E7';
 const PROMOTED = '#1F7A45';
+const PENDING_BG = '#FEF3C7';
+const PENDING = '#D97706';
+const EXPIRED_BG = '#FEE2E2';
+const EXPIRED = '#B91C1C';
 const LEFT_BG = '#F3F4F6';
 const LEFT = '#6B7280';
 const H_PAD = isSmallDevice ? 16 : 20;
@@ -94,6 +98,12 @@ export const styles = StyleSheet.create({
   statusPillPromoted: {
     backgroundColor: PROMOTED_BG,
   },
+  statusPillPending: {
+    backgroundColor: PENDING_BG,
+  },
+  statusPillExpired: {
+    backgroundColor: EXPIRED_BG,
+  },
   statusPillLeft: {
     backgroundColor: LEFT_BG,
   },
@@ -101,9 +111,16 @@ export const styles = StyleSheet.create({
     fontSize: isSmallDevice ? 11 : 12,
     fontWeight: '800',
     color: PRIMARY,
+    textTransform: 'uppercase',
   },
   statusPillTextPromoted: {
     color: PROMOTED,
+  },
+  statusPillTextPending: {
+    color: PENDING,
+  },
+  statusPillTextExpired: {
+    color: EXPIRED,
   },
   statusPillTextLeft: {
     color: LEFT,
@@ -143,8 +160,14 @@ export const styles = StyleSheet.create({
     color: PRIMARY,
   },
   actionBtnFilledText: {
-    fontSize: isSmallDevice ? 12.5 : 13.5,
+    fontSize: isSmallDevice ? 12 : 13,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: PAGE_BG,
+  },
+  countdownText: {
+    fontSize: isSmallDevice ? 12 : 13,
+    fontWeight: '700',
+    color: EXPIRED,
+    marginTop: 4,
   },
 });

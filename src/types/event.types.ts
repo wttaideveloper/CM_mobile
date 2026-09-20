@@ -287,6 +287,8 @@ export type EventCheckoutRequest = {
   participant_email: string;
   ticket_type_id: string;
   quantity: number;
+  payment_provider?: string;
+  waitlist_id?: string;
 };
 
 /**
@@ -317,7 +319,7 @@ export type EventWaitlistEntryResult = {
   id: string | null;
 };
 
-export type MyWaitlistStatus = 'waiting' | 'promoted' | 'left';
+export type MyWaitlistStatus = 'waiting' | 'payment_pending' | 'promoted' | 'expired' | 'left';
 
 /**
  * Response of GET /api/v1/events/my/waitlist — has a real response_model
@@ -334,6 +336,7 @@ export type MyWaitlistApiResponse = {
   participant_email: string;
   status: string;
   registration_id: string | null;
+  payment_offer_expires_at: string | null;
   created_at: string;
 };
 
@@ -349,6 +352,7 @@ export type MyWaitlistEntry = {
   statusLabel: string;
   /** Only set once status is "promoted" — the real registration created by the backend promotion. */
   registrationId: string | null;
+  paymentOfferExpiresAt: Date | null;
 };
 
 export type EventOrderApiResponse = {

@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
@@ -10,17 +11,44 @@ import type { MyWaitlistEntry } from '@/types/event.types';
 import { detailHref } from '@/utils/searchNavigation';
 import { PRIMARY, styles } from '@/screens/events/MyWaitlistScreen.styles';
 
+function CountdownTimer({ expiresAt }: { expiresAt: Date }) {
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    function updateTimer() {
+      const now = new Date();
+      const diff = expiresAt.getTime() - now.getTime();
+      if (diff <= 0) {
+        setTimeLeft('Expired');
+        return;
+      }
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setTimeLeft(`Expires in ${mins}:${secs.toString().padStart(2, '0')}`);
+    }
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  return <Text style={styles.countdownText}>{timeLeft}</Text>;
+}
+
 function MyWaitlistCard({ item }: { item: MyWaitlistEntry }) {
   const router = useRouter();
 
   const pillStyle = [
     styles.statusPill,
     item.status === 'promoted' && styles.statusPillPromoted,
+    item.status === 'payment_pending' && styles.statusPillPending,
+    item.status === 'expired' && styles.statusPillExpired,
     item.status === 'left' && styles.statusPillLeft,
   ];
   const pillTextStyle = [
     styles.statusPillText,
     item.status === 'promoted' && styles.statusPillTextPromoted,
+    item.status === 'payment_pending' && styles.statusPillTextPending,
+    item.status === 'expired' && styles.statusPillTextExpired,
     item.status === 'left' && styles.statusPillTextLeft,
   ];
 
@@ -37,6 +65,10 @@ function MyWaitlistCard({ item }: { item: MyWaitlistEntry }) {
         </View>
       </View>
       <Text style={styles.cardMeta}>{item.eventStartLabel}</Text>
+
+      {item.status === 'payment_pending' && item.paymentOfferExpiresAt ? (
+        <CountdownTimer expiresAt={item.paymentOfferExpiresAt} />
+      ) : null}
 
       <View style={styles.cardActions}>
         <Pressable

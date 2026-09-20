@@ -156,8 +156,9 @@ function buildCustomFieldsPayload(
 }
 
 export function EventRegisterScreen() {
-  const { id: rawId } = useLocalSearchParams<{ id: string }>();
+  const { id: rawId, waitlist_id: rawWaitlistId } = useLocalSearchParams<{ id: string; waitlist_id?: string }>();
   const id = Array.isArray(rawId) ? rawId[0] : rawId ?? '';
+  const waitlist_id = Array.isArray(rawWaitlistId) ? rawWaitlistId[0] : rawWaitlistId;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const statusBarFill = useStatusBarBackground();
@@ -229,7 +230,9 @@ export function EventRegisterScreen() {
   const spotsRemaining = Math.max(0, event.capacity - event.registered);
   // Empty when paid, still loading, or the form legitimately has no custom
   // questions — the basic Full Name / Email fields always work regardless.
-  const formSections = !isPaid ? (form?.sections ?? []) : [];
+  // UPDATE: As per product requirement, we currently hide dynamic custom fields
+  // from the mobile customer flow to keep it clean.
+  const formSections: EventFormSection[] = [];
   const isFormLoadingVisible = !isPaid && isFormLoading;
 
   function validate(): boolean {
@@ -283,7 +286,7 @@ export function EventRegisterScreen() {
     if (isPaid) {
       router.push({
         pathname: '/(main)/event/checkout',
-        params: { id, participantName: name.trim(), participantEmail: email.trim() },
+        params: { id, participantName: name.trim(), participantEmail: email.trim(), waitlist_id },
       });
       return;
     }

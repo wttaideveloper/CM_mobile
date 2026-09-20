@@ -459,11 +459,13 @@ export function mapMyRegistrationsApiResponse(
 
 const WAITLIST_STATUS_LABELS: Record<MyWaitlistStatus, string> = {
   waiting: "You're on the waitlist",
+  payment_pending: 'Payment Required',
   promoted: "You've been promoted",
+  expired: 'Offer Expired',
   left: 'Left waitlist',
 };
 
-const KNOWN_WAITLIST_STATUSES = new Set<MyWaitlistStatus>(['waiting', 'promoted', 'left']);
+const KNOWN_WAITLIST_STATUSES = new Set<MyWaitlistStatus>(['waiting', 'payment_pending', 'promoted', 'expired', 'left']);
 
 function normalizeWaitlistStatus(status: string): MyWaitlistStatus {
   const normalized = status.trim().toLowerCase();
@@ -486,6 +488,7 @@ export function mapMyWaitlistApiToItem(api: MyWaitlistApiResponse): MyWaitlistEn
     status,
     statusLabel: WAITLIST_STATUS_LABELS[status],
     registrationId: api.registration_id != null ? String(api.registration_id) : null,
+    paymentOfferExpiresAt: api.payment_offer_expires_at ? new Date(api.payment_offer_expires_at + 'Z') : null,
   };
 }
 

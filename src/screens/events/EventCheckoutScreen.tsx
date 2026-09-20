@@ -42,10 +42,13 @@ export function EventCheckoutScreen() {
     id: string;
     participantName: string;
     participantEmail: string;
+    waitlist_id?: string;
   }>();
   const id = Array.isArray(rawId) ? rawId[0] : rawId ?? '';
   const participantName = Array.isArray(rawName) ? rawName[0] : rawName ?? '';
   const participantEmail = Array.isArray(rawEmail) ? rawEmail[0] : rawEmail ?? '';
+  const { waitlist_id: rawWaitlistId } = useLocalSearchParams<{ waitlist_id?: string }>();
+  const waitlist_id = Array.isArray(rawWaitlistId) ? rawWaitlistId[0] : rawWaitlistId;
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -118,6 +121,7 @@ export function EventCheckoutScreen() {
           participant_email: participantEmail,
           ticket_type_id: selectedTicket ? selectedTicket.id : '',
           quantity: 1,
+          ...(waitlist_id ? { waitlist_id } : {}),
         },
       },
       {

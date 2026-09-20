@@ -28,9 +28,7 @@ export function EventDetailScreen() {
   const { registrations } = useMyRegistrations();
 
   const { event, isLoading, isError } = useEvent(id, { enabled: Boolean(id) });
-  // Only fetch once we know the event is actually full — this is the only
-  // case the CTA needs to know the user's own persistent waitlist status.
-  const { entries: waitingEntries } = useMyWaitlist('waiting', { enabled: Boolean(event?.isFull) });
+  const { entries: waitlistEntries } = useMyWaitlist(undefined, { enabled: Boolean(event?.isFull) });
 
   if (isLoading) {
     return (
@@ -87,10 +85,16 @@ export function EventDetailScreen() {
         ctaLabel = 'View Ticket';
         onCtaPress = () => router.push({ pathname: '/(main)/event/ticket', params: { eventId: id, registrationId: myRegistration!.registrationId } });
       } else {
-        const alreadyWaiting = waitingEntries.some((entry) => entry.eventId === id);
-        if (alreadyWaiting) {
-          ctaLabel = "You're on the Waitlist";
-          onCtaPress = () => router.push('/(main)/event/my-waitlist');
+        const activeWaitlist = waitlistEntries.find((entry) => entry.eventId === id && (entry.status === 'waiting' || entry.status === 'payment_pending'));
+        if (activeWaitlist) {
+          if (activeWaitlist.status === 'payment_pending') {
+            ctaLabel = `Pay ${event.priceLabel} & Confirm`;
+            // Navigate to register (checkout) with waitlist_id
+            onCtaPress = () => router.push({ pathname: '/(main)/event/register', params: { id, waitlist_id: activeWaitlist.id } });
+          } else {
+            ctaLabel = "You're on the Waitlist";
+            onCtaPress = () => router.push('/(main)/event/my-waitlist');
+          }
         } else {
           ctaLabel = 'Join Waitlist';
           onCtaPress = () => router.push({ pathname: '/(main)/event/waitlist', params: { id } });
