@@ -312,6 +312,8 @@ export const styles = StyleSheet.create({
     lineHeight: isSmallDevice ? 17 : 19,
     fontWeight: '900',
     color: '#FFFFFF',
+    alignSelf: 'stretch',
+    textAlign: 'center',
   },
   pressed: {
     opacity: 0.9,
