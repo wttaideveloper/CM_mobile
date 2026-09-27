@@ -18,15 +18,6 @@ const TAB_ICON_SIZE = 22;
 /** First viewport shows exactly these many tabs edge-to-edge */
 const VISIBLE_TABS = 5;
 
-/** Keep the route files; just hide these from the bottom bar. */
-const HIDDEN_TAB_NAMES = new Set([
-  'coach',
-  'explore',
-  'shop',
-  'events',
-  'profile',
-]);
-
 type TabName =
   | 'home'
   | 'enterprises'
@@ -115,7 +106,6 @@ export function ScrollableMainTabBar({
   const visibleRoutes = useMemo(
     () =>
       state.routes.filter((route) => {
-        if (HIDDEN_TAB_NAMES.has(route.name)) return false;
         const href = descriptors[route.key]?.options?.href;
         return href !== null;
       }),
