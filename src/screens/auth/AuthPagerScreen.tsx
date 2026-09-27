@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import {
   Dimensions,
   FlatList,
+  Keyboard,
   StyleSheet,
   View,
   type ListRenderItem,
@@ -26,6 +27,7 @@ export function AuthPagerScreen() {
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   const goToLogin = useCallback(() => {
+    Keyboard.dismiss();
     listRef.current?.scrollToIndex({ index: 1, animated: true });
     setPageIndex(1);
   }, []);
@@ -52,11 +54,14 @@ export function AuthPagerScreen() {
         {item.key === 'onboarding' ? (
           <OnboardingScreen onNavigateToLogin={goToLogin} />
         ) : (
-          <LoginScreen onKeyboardVisibilityChange={handleKeyboardVisibilityChange} />
+          <LoginScreen
+            isActive={pageIndex === 1}
+            onKeyboardVisibilityChange={handleKeyboardVisibilityChange}
+          />
         )}
       </View>
     ),
-    [goToLogin, handleKeyboardVisibilityChange],
+    [goToLogin, handleKeyboardVisibilityChange, pageIndex],
   );
 
   return (
@@ -71,6 +76,7 @@ export function AuthPagerScreen() {
         bounces={false}
         scrollEnabled={canSwipeHorizontally}
         showsHorizontalScrollIndicator={false}
+        extraData={pageIndex}
         keyboardShouldPersistTaps="handled"
         scrollEventThrottle={16}
         onMomentumScrollEnd={handleMomentumScrollEnd}

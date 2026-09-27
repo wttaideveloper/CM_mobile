@@ -71,8 +71,8 @@ export function MarketTrainingListScreen() {
     <MarketTrainingScreenShell eyebrow="Browse" title="Trainings">
       <TrainingSection label="Choose training type">
         <Text style={styles.helper}>
-          Pick Virtual, Hybrid, or Physical — same types as on the training
-          detail screen.
+          Pick Virtual, Self-paced, Hybrid, or Physical — same types as on the
+          training detail screen.
         </Text>
         <View style={styles.typeRow}>
           {TRAINING_TYPE_CARDS.map((type) => {
@@ -173,10 +173,12 @@ const styles = StyleSheet.create({
   },
   typeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: c(8, 6),
   },
   typeCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '47%',
     borderRadius: NU.cardRadiusSm,
     borderWidth: 1,
     paddingVertical: c(12, 10),

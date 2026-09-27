@@ -234,7 +234,12 @@ export function MarketMyTrainingsScreen() {
   return (
     <MarketTrainingScreenShell
       eyebrow="Enrolled"
-      title="My Trainings"
+      title="My Trainings and Courses"
+      flatBottom
+      rightLabel="Downloads"
+      onRightPress={() =>
+        router.push('/(main)/market/my-training-downloads')
+      }
       refreshControl={
         <RefreshControl
           refreshing={enrolments.isFetching && !enrolments.isLoading}

@@ -49,6 +49,8 @@ type LoginAuthFormFieldsProps = {
   /** Signup: scroll heading under hero when Full Name is focused. */
   onSignupNameFocus?: () => void;
   onSocialLogin?: (provider: 'google' | 'facebook') => void;
+  /** iOS: do not focus email or open the keyboard until the user taps the field. */
+  suppressInitialFocus?: boolean;
 };
 
 export function LoginAuthFormFields(props: LoginAuthFormFieldsProps) {
@@ -95,6 +97,7 @@ export function LoginAuthFormFields(props: LoginAuthFormFieldsProps) {
         onOpenForgotMode={props.onOpenForgotMode}
         onResendVerification={props.onResendVerification}
         onSignupNameFocus={props.onSignupNameFocus}
+        suppressInitialFocus={props.suppressInitialFocus}
       />
 
       <LoginAuthFormActions

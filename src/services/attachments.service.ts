@@ -34,6 +34,21 @@ export function buildAttachmentDownloadUrl(attachmentId: string, download = true
   return download ? `${API_CONFIG.BASE_URL}${path}?download=true` : `${API_CONFIG.BASE_URL}${path}`;
 }
 
+function toUploadFileUri(uri: string): string {
+  const trimmed = uri.trim();
+  if (!trimmed) return trimmed;
+  if (
+    trimmed.startsWith('file://') ||
+    trimmed.startsWith('content://') ||
+    trimmed.startsWith('ph://') ||
+    trimmed.startsWith('assets-library://')
+  ) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('/')) return `file://${trimmed}`;
+  return trimmed;
+}
+
 function inferMimeTypeFromName(fileName: string): string {
   const lower = fileName.toLowerCase();
   if (lower.endsWith('.png')) return 'image/png';
@@ -60,6 +75,7 @@ export async function uploadAttachment({
   attachmentType,
 }: UploadAttachmentArgs): Promise<AttachmentUploadResponse> {
   const resolvedMime = mimeType ?? inferMimeTypeFromName(fileName);
+  const uploadUri = toUploadFileUri(fileUri);
 
   const formData = new FormData();
   formData.append('conversation_id', conversationId);
@@ -72,7 +88,7 @@ export async function uploadAttachment({
   formData.append(
     'file',
     {
-      uri: fileUri,
+      uri: uploadUri,
       name: fileName,
       type: resolvedMime,
     } as any,
@@ -82,7 +98,7 @@ export async function uploadAttachment({
     // Avoid dumping file contents; log only metadata.
     console.log('[Attachments Upload] Uploading:', {
       conversationId,
-      fileUri,
+      fileUri: uploadUri,
       fileName,
       resolvedMime,
       attachmentType,
@@ -93,9 +109,10 @@ export async function uploadAttachment({
     ENDPOINTS.ATTACHMENTS.UPLOAD,
     formData,
     {
-      // Let React Native set multipart boundary; a bare Content-Type breaks Android uploads.
+      // Omit Content-Type so RN sets multipart + boundary. JSON default breaks uploads.
       headers: {
         Accept: 'application/json',
+        'Content-Type': undefined as unknown as string,
       },
       transformRequest: (data) => data,
     },

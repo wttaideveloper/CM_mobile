@@ -20,7 +20,7 @@ export type MyEnrolledTraining = {
   id: string;
   title: string;
   vendor: string;
-  mode: 'Virtual' | 'In-Person' | 'Hybrid';
+  mode: 'Virtual' | 'In-Person' | 'Hybrid' | 'Self-paced';
   nextSession: string;
   progressLabel: string;
   enrollmentCode: string;

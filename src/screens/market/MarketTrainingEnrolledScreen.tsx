@@ -48,9 +48,11 @@ export function MarketTrainingEnrolledScreen() {
       ? 'Physical'
       : listItem?.mode === 'Hybrid'
         ? 'Hybrid'
-        : listItem?.mode === 'Virtual'
-          ? 'Virtual'
-          : 'Training';
+        : listItem?.mode === 'Self-paced'
+          ? 'Self-paced'
+          : listItem?.mode === 'Virtual'
+            ? 'Virtual'
+            : 'Training';
   const badgeCode = code?.trim() || typed?.badgeCode || TRAINING_ENROLLED_STATIC.badgeCode;
   const headline = isPendingApproval
     ? 'Request submitted'

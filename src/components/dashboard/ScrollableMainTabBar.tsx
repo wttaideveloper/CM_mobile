@@ -18,6 +18,15 @@ const TAB_ICON_SIZE = 22;
 /** First viewport shows exactly these many tabs edge-to-edge */
 const VISIBLE_TABS = 5;
 
+/** Keep the route files; just hide these from the bottom bar. */
+const HIDDEN_TAB_NAMES = new Set([
+  'coach',
+  'explore',
+  'shop',
+  'events',
+  'profile',
+]);
+
 type TabName =
   | 'home'
   | 'enterprises'
@@ -84,7 +93,7 @@ function routeToTabName(routeName: string): TabName {
 
 function labelForRoute(routeName: string, fallback: string): string {
   if (routeName === 'enterprises') return 'Enterprise';
-  if (routeName === 'events-training') return 'Events & Training';
+  if (routeName === 'events-training') return 'Trainings\nand Courses';
   if (routeName === 'me') return 'Me';
   if (routeName === 'hwi') return 'HWI™';
   if (routeName === 'market') return 'Market';
@@ -106,6 +115,7 @@ export function ScrollableMainTabBar({
   const visibleRoutes = useMemo(
     () =>
       state.routes.filter((route) => {
+        if (HIDDEN_TAB_NAMES.has(route.name)) return false;
         const href = descriptors[route.key]?.options?.href;
         return href !== null;
       }),
@@ -188,8 +198,9 @@ export function ScrollableMainTabBar({
                 style={[
                   styles.label,
                   focused ? styles.labelActive : styles.labelInactive,
+                  route.name === 'events-training' && styles.labelWrapped,
                 ]}
-                numberOfLines={1}
+                numberOfLines={route.name === 'events-training' ? 2 : 1}
               >
                 {label}
               </Text>
@@ -227,6 +238,12 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: '600',
+    textAlign: 'center',
+    paddingHorizontal: 2,
+  },
+  labelWrapped: {
+    fontSize: 10,
+    lineHeight: 12,
   },
   labelActive: {
     color: TAB_ACTIVE,

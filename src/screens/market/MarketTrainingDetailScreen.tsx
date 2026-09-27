@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
@@ -25,7 +25,7 @@ export function MarketTrainingDetailScreen() {
   const router = useRouter();
   const scrollRef = useScrollToTopOnFocus();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { training, isApiId } = useTraining(id);
+  const { training, isApiId, isLoading } = useTraining(id);
   const staticItem =
     MARKET_TRAININGS.find((item) => item.id === id) ?? MARKET_TRAININGS[0];
   const title = isApiId
@@ -53,6 +53,7 @@ export function MarketTrainingDetailScreen() {
     ? apiWishlist.has(trainingId)
     : localWishlisted;
   const enrolled = isApiId ? enrolments.isEnrolled(trainingId) : false;
+  const showLoading = isApiId && isLoading && !training;
 
   const openWishlist = () => {
     setPopupVisible(false);
@@ -99,48 +100,59 @@ export function MarketTrainingDetailScreen() {
       ? 'Physical training'
       : modeLabel === 'Hybrid'
         ? 'Hybrid training'
-        : modeLabel === 'Virtual'
-          ? 'Virtual training'
-          : 'Training';
+        : modeLabel === 'Self-paced'
+          ? 'Self-paced training'
+          : modeLabel === 'Virtual'
+            ? 'Virtual training'
+            : 'Training';
 
   return (
     <View style={styles.screen}>
       <AppStatusBar variant="light" backgroundColor={TRAINING_GREEN} />
       <StatusBarFill lightColor={TRAINING_GREEN} darkColor={TRAINING_GREEN} />
-      <ScrollView
-        ref={scrollRef}
-        style={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
-        <MarketTrainingHeader
-          eyebrow={eyebrow}
-          title={title}
-        />
-        <MarketTrainingDetailBody />
-      </ScrollView>
-      <MarketTrainingDetailFooter
-        wishlisted={wishlisted}
-        enrolled={enrolled}
-        busy={isApiId && toggleApiWishlist.isPending}
-        onToggleWishlist={onToggleWishlist}
-        onEnroll={() =>
-          router.push({
-            pathname: '/(main)/market/training-checkout',
-            params: {
-              id: trainingId ?? '',
-              title,
-              price: priceLabel,
-            },
-          })
-        }
-        onContinue={() =>
-          router.push({
-            pathname: '/(main)/market/my-training-progress',
-            params: { id: trainingId ?? '' },
-          })
-        }
+      <MarketTrainingHeader
+        eyebrow={eyebrow}
+        title={showLoading ? 'Loading…' : title}
+        flatBottom
       />
+      {showLoading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={TRAINING_GREEN} size="large" />
+        </View>
+      ) : (
+        <>
+          <ScrollView
+            ref={scrollRef}
+            style={styles.scroll}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.content}
+          >
+            <MarketTrainingDetailBody />
+          </ScrollView>
+          <MarketTrainingDetailFooter
+            wishlisted={wishlisted}
+            enrolled={enrolled}
+            busy={isApiId && toggleApiWishlist.isPending}
+            onToggleWishlist={onToggleWishlist}
+            onEnroll={() =>
+              router.push({
+                pathname: '/(main)/market/training-checkout',
+                params: {
+                  id: trainingId ?? '',
+                  title,
+                  price: priceLabel,
+                },
+              })
+            }
+            onContinue={() =>
+              router.push({
+                pathname: '/(main)/market/my-training-progress',
+                params: { id: trainingId ?? '' },
+              })
+            }
+          />
+        </>
+      )}
 
       <MarketTrainingWishlistPopup
         visible={popupVisible}
@@ -167,5 +179,10 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: 12,
+  },
+  loadingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

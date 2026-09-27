@@ -19,10 +19,6 @@ import {
   TRAINING_TEAL,
 } from '@/components/market/marketTrainingData';
 import {
-  TrainingCard,
-  TrainingSection,
-} from '@/components/market/MarketTrainingUi';
-import {
   isApiTrainingId,
   useSubmitTrainingReview,
   useTraining,
@@ -44,7 +40,7 @@ function RatingStars({
   size?: 'sm' | 'md' | 'lg';
 }) {
   const filled = Math.max(0, Math.min(5, Math.round(rating)));
-  const fontSize = size === 'lg' ? c(28, 24) : size === 'sm' ? c(16, 14) : c(26, 22);
+  const fontSize = size === 'lg' ? c(24, 22) : size === 'sm' ? c(14, 13) : c(22, 20);
 
   return (
     <View style={styles.starsRow}>
@@ -53,7 +49,7 @@ function RatingStars({
           key={value}
           disabled={!onSelect}
           onPress={() => onSelect?.(value)}
-          hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
           style={styles.starHit}
           accessibilityRole={onSelect ? 'button' : undefined}
           accessibilityLabel={`${value} star${value === 1 ? '' : 's'}`}
@@ -197,64 +193,70 @@ export function MarketTrainingReviewsScreen() {
       keyboardAware
       scrollViewRef={scrollRef}
     >
-      <TrainingSection label="Overall rating">
-        <View style={styles.ratingHero}>
-          <Text style={styles.ratingScore}>
-            {averageRating != null && averageRating > 0
-              ? averageRating.toFixed(1)
-              : '—'}
-          </Text>
-          <View style={styles.ratingCopy}>
-            <RatingStars rating={averageRating ?? 0} size="sm" />
-            <Text style={styles.meta}>Based on {count} learner reviews</Text>
+      <View style={styles.page}>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Overall rating</Text>
+          <View style={styles.ratingHero}>
+            <Text style={styles.ratingScore}>
+              {averageRating != null && averageRating > 0
+                ? averageRating.toFixed(1)
+                : '—'}
+            </Text>
+            <View style={styles.ratingCopy}>
+              <RatingStars rating={averageRating ?? 0} size="sm" />
+              <Text style={styles.meta}>Based on {count} learner reviews</Text>
+            </View>
           </View>
         </View>
-      </TrainingSection>
 
-      <TrainingSection label={`${reviews.length} reviews`}>
-        {isApiId && reviewsQuery.isLoading ? (
-          <TrainingCard>
-            <ActivityIndicator color={TRAINING_GREEN} />
-          </TrainingCard>
-        ) : null}
-        {reviews.map((review) => (
-          <View key={review.id} style={styles.reviewCard}>
-            <View style={styles.reviewTop}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {review.author.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.reviewCopy}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.title}>{review.author}</Text>
-                  {review.verified ? (
-                    <Text style={styles.verified}>Verified</Text>
-                  ) : null}
-                </View>
-                <View style={styles.ratingRow}>
-                  <RatingStars rating={review.rating} size="sm" />
-                  <Text style={styles.meta}>{review.date}</Text>
-                </View>
-              </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>{reviews.length} reviews</Text>
+          {isApiId && reviewsQuery.isLoading ? (
+            <View style={styles.loadingCard}>
+              <ActivityIndicator color={TRAINING_GREEN} />
             </View>
-            <Text style={styles.body}>{review.comment}</Text>
+          ) : null}
+          <View style={styles.reviewList}>
+            {reviews.map((review) => (
+              <View key={review.id} style={styles.reviewCard}>
+                <View style={styles.reviewTop}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>
+                      {review.author.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.reviewCopy}>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.title}>{review.author}</Text>
+                      {review.verified ? (
+                        <Text style={styles.verified}>Verified</Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.ratingRow}>
+                      <RatingStars rating={review.rating} size="sm" />
+                      <Text style={styles.meta}>{review.date}</Text>
+                    </View>
+                  </View>
+                </View>
+                <Text style={styles.body}>{review.comment}</Text>
+              </View>
+            ))}
           </View>
-        ))}
-        {!reviewsQuery.isLoading && reviews.length === 0 ? (
-          <Text style={styles.meta}>No reviews yet.</Text>
-        ) : null}
-      </TrainingSection>
+          {!reviewsQuery.isLoading && reviews.length === 0 ? (
+            <Text style={styles.meta}>No reviews yet.</Text>
+          ) : null}
+        </View>
 
-      <TrainingSection label="Add your review">
-        <View
-          ref={formCardRef}
-          collapsable={false}
-          onLayout={(event) => {
-            formOffsetY.current = event.nativeEvent.layout.y;
-          }}
-        >
-          <TrainingCard>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Add your review</Text>
+          <View
+            ref={formCardRef}
+            collapsable={false}
+            onLayout={(event) => {
+              formOffsetY.current = event.nativeEvent.layout.y;
+            }}
+            style={styles.formCard}
+          >
             <Text style={styles.helper}>
               Tap stars, write a comment, then submit.
             </Text>
@@ -314,54 +316,62 @@ export function MarketTrainingReviewsScreen() {
                 {submitReview.isPending ? 'Submitting…' : 'Submit review'}
               </Text>
             </Pressable>
-          </TrainingCard>
+          </View>
         </View>
-      </TrainingSection>
 
-      <Pressable
-        style={styles.link}
-        onPress={() => router.push('/(main)/market/training-wishlist')}
-      >
-        <Text style={styles.linkText}>View wishlist ›</Text>
-      </Pressable>
+        <Pressable
+          style={styles.link}
+          onPress={() => router.push('/(main)/market/training-wishlist')}
+        >
+          <Text style={styles.linkText}>View wishlist ›</Text>
+        </Pressable>
+      </View>
     </MarketTrainingScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
+  page: {
+    gap: c(14, 12),
+  },
+  section: {
+    gap: c(8, 6),
+  },
+  sectionLabel: {
+    fontSize: c(12, 11),
+    fontWeight: '700',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    color: TRAINING_MUTED,
+  },
   ratingHero: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: c(14, 12),
+    gap: c(12, 10),
     backgroundColor: '#e6f4e8',
     borderRadius: NU.cardRadius,
     borderWidth: 1,
     borderColor: '#c8e0cc',
-    paddingVertical: c(16, 13),
-    paddingHorizontal: c(16, 13),
+    paddingVertical: c(12, 10),
+    paddingHorizontal: c(12, 10),
   },
   ratingScore: {
-    fontSize: c(36, 30),
+    fontSize: c(32, 28),
     fontWeight: '800',
     color: TRAINING_GREEN,
   },
   ratingCopy: {
     flex: 1,
-    gap: c(4, 3),
-  },
-  formTitle: {
-    fontSize: NU.cardTitle,
-    fontWeight: '800',
-    color: TRAINING_TEAL,
+    gap: c(2, 1),
   },
   starsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: c(4, 2),
+    gap: c(2, 1),
   },
   starHit: {
-    minWidth: c(36, 32),
-    minHeight: c(40, 36),
+    minWidth: c(28, 26),
+    minHeight: c(28, 26),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -375,26 +385,33 @@ const styles = StyleSheet.create({
     color: '#c8e0cc',
   },
   ratingHint: {
-    marginTop: c(4, 2),
-    fontSize: c(12, 11),
+    marginTop: c(2, 1),
+    fontSize: c(11.5, 10.5),
     fontWeight: '700',
     color: TRAINING_MUTED,
   },
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: TRAINING_BORDER,
+    borderRadius: NU.cardRadius,
+    padding: c(12, 10),
+  },
   helper: {
-    marginTop: c(6, 4),
-    fontSize: c(12.5, 11.5),
+    fontSize: c(12, 11),
     color: TRAINING_MUTED,
-    lineHeight: c(18, 16),
+    lineHeight: c(16, 15),
+    marginBottom: c(2, 1),
   },
   formLabel: {
-    marginTop: c(12, 10),
-    marginBottom: c(6, 4),
+    marginTop: c(10, 8),
+    marginBottom: c(4, 3),
     fontSize: c(12, 11),
     fontWeight: '700',
     color: TRAINING_TEAL,
   },
   inputSingle: {
-    height: c(44, 40),
+    height: c(42, 38),
     borderWidth: 1,
     borderColor: TRAINING_BORDER,
     borderRadius: NU.cardRadiusSm,
@@ -404,19 +421,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   input: {
-    minHeight: c(100, 90),
+    minHeight: c(88, 80),
     borderWidth: 1,
     borderColor: TRAINING_BORDER,
     borderRadius: NU.cardRadiusSm,
     paddingHorizontal: c(12, 10),
-    paddingVertical: c(10, 8),
+    paddingVertical: c(8, 7),
     fontSize: NU.body,
     color: TRAINING_TEAL,
     backgroundColor: '#FFFFFF',
   },
   primary: {
-    marginTop: c(14, 12),
-    height: c(46, 42),
+    marginTop: c(12, 10),
+    height: c(44, 40),
     borderRadius: 99,
     backgroundColor: TRAINING_TEAL,
     alignItems: 'center',
@@ -430,39 +447,46 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
+  loadingCard: {
+    paddingVertical: c(12, 10),
+    alignItems: 'center',
+  },
+  reviewList: {
+    gap: c(8, 6),
+  },
   reviewCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: TRAINING_BORDER,
     borderRadius: NU.cardRadius,
-    padding: c(14, 12),
-    gap: c(10, 8),
+    padding: c(11, 9),
+    gap: c(8, 6),
   },
   reviewTop: {
     flexDirection: 'row',
-    gap: c(10, 8),
+    gap: c(8, 6),
   },
   avatar: {
-    width: c(40, 36),
-    height: c(40, 36),
-    borderRadius: c(20, 18),
+    width: c(34, 30),
+    height: c(34, 30),
+    borderRadius: c(17, 15),
     backgroundColor: '#e6f4e8',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: c(15, 13),
+    fontSize: c(13, 12),
     fontWeight: '800',
     color: TRAINING_GREEN,
   },
   reviewCopy: {
     flex: 1,
-    gap: c(3, 2),
+    gap: c(2, 1),
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: c(8, 6),
+    gap: c(6, 5),
     flexWrap: 'wrap',
   },
   title: {
@@ -471,31 +495,32 @@ const styles = StyleSheet.create({
     color: TRAINING_TEAL,
   },
   verified: {
-    fontSize: c(10.5, 9.5),
+    fontSize: c(10, 9),
     fontWeight: '700',
     color: TRAINING_GREEN,
     backgroundColor: '#e6f4e8',
-    paddingHorizontal: c(8, 6),
-    paddingVertical: c(3, 2),
+    paddingHorizontal: c(7, 5),
+    paddingVertical: c(2, 1),
     borderRadius: 99,
     overflow: 'hidden',
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: c(8, 6),
+    gap: c(6, 5),
   },
   meta: {
-    fontSize: c(12.5, 11.5),
+    fontSize: c(12, 11),
     color: TRAINING_MUTED,
   },
   body: {
     fontSize: NU.link,
-    lineHeight: c(20, 18),
+    lineHeight: c(19, 17),
     color: TRAINING_TEAL,
   },
   link: {
     alignSelf: 'flex-start',
+    marginTop: c(2, 1),
   },
   linkText: {
     fontSize: NU.link,

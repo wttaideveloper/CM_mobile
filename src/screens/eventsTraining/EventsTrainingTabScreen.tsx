@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,9 +16,7 @@ import {
   EVENTS_TRAINING_TEAL,
   EVENTS_TRAINING_TRACK,
   EventsTrainingTabHeader,
-  type EventsTrainingTab,
 } from '@/components/eventsTraining/EventsTrainingTabHeader';
-import { MarketEventListBody } from '@/components/market/MarketEventListBody';
 import { MarketTrainingCard } from '@/components/market/MarketTrainingCard';
 import {
   MARKET_TRAININGS,
@@ -52,27 +50,15 @@ function SectionHeader({
   );
 }
 
-function EventsPanel() {
+function TrainingPanel({ searchQuery }: { searchQuery: string }) {
   const insets = useSafeAreaInsets();
-  const [filter, setFilter] = useState('All');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  return (
-    <ScrollView
-      style={styles.panelScroll}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={[
-        styles.panelContent,
-        { paddingBottom: insets.bottom + 24 },
-      ]}
-      keyboardShouldPersistTaps="handled"
-    >
-      <MarketEventListBody filter={filter} onFilterChange={setFilter} />
-    </ScrollView>
-  );
-}
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-function TrainingPanel() {
-  const insets = useSafeAreaInsets();
   const {
     items: apiItems,
     isLoading,
@@ -82,14 +68,18 @@ function TrainingPanel() {
     refetch,
     total,
   } = useTrainingsList({
+    search: debouncedSearch || undefined,
     page: 1,
     page_size: 50,
   });
 
+  const isSearching = Boolean(debouncedSearch);
+
   const staticItems = useMemo(() => {
+    if (isSearching) return [];
     const apiIds = new Set(apiItems.map((item) => item.id));
     return MARKET_TRAININGS.filter((item) => !apiIds.has(item.id));
-  }, [apiItems]);
+  }, [apiItems, isSearching]);
 
   return (
     <ScrollView
@@ -103,15 +93,21 @@ function TrainingPanel() {
     >
       <View style={styles.trainingBody}>
         <SectionHeader
-          label="Live trainings"
+          label={isSearching ? 'Search results' : 'Live trainings'}
           count={apiItems.length || total}
-          hint="Pulled from /api/v1/trainings/"
+          hint={
+            isSearching
+              ? `Results for “${debouncedSearch}”`
+              : 'Pulled from /api/v1/trainings/'
+          }
         />
 
         {isLoading && apiItems.length === 0 ? (
           <View style={styles.stateBox}>
             <ActivityIndicator color={TRAINING_GREEN} />
-            <Text style={styles.stateText}>Loading trainings…</Text>
+            <Text style={styles.stateText}>
+              {isSearching ? 'Searching…' : 'Loading trainings…'}
+            </Text>
           </View>
         ) : null}
 
@@ -134,7 +130,11 @@ function TrainingPanel() {
 
         {!isLoading && !isError && apiItems.length === 0 ? (
           <View style={styles.emptySoft}>
-            <Text style={styles.stateText}>No API trainings yet.</Text>
+            <Text style={styles.stateText}>
+              {isSearching
+                ? `No trainings found for “${debouncedSearch}”.`
+                : 'No API trainings yet.'}
+            </Text>
           </View>
         ) : null}
 
@@ -148,43 +148,43 @@ function TrainingPanel() {
           <ActivityIndicator color={TRAINING_GREEN} style={styles.fetching} />
         ) : null}
 
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>UI reference</Text>
-          <View style={styles.dividerLine} />
-        </View>
+        {!isSearching ? (
+          <>
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>UI reference</Text>
+              <View style={styles.dividerLine} />
+            </View>
 
-        <SectionHeader
-          label="Static samples"
-          count={staticItems.length}
-          hint="Kept at the end so you can compare layout"
-        />
+            <SectionHeader
+              label="Static samples"
+              count={staticItems.length}
+              hint="Kept at the end so you can compare layout"
+            />
 
-        <View style={styles.cardStack}>
-          {staticItems.map((item) => (
-            <MarketTrainingCard key={`static-${item.id}`} item={item} />
-          ))}
-        </View>
+            <View style={styles.cardStack}>
+              {staticItems.map((item) => (
+                <MarketTrainingCard key={`static-${item.id}`} item={item} />
+              ))}
+            </View>
+          </>
+        ) : null}
       </View>
     </ScrollView>
   );
 }
 
 export function EventsTrainingTabScreen() {
-  const [activeTab, setActiveTab] = useState<EventsTrainingTab>('Events');
+  const [search, setSearch] = useState('');
 
   return (
     <View style={styles.screen}>
       <EventsTrainingTabHeader
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        subtitle={
-          activeTab === 'Events'
-            ? 'Classes, meetups and courses near you'
-            : 'Cohorts, labs and skill programs to join'
-        }
+        subtitle="Cohorts, labs and skill programs to join"
+        search={search}
+        onSearchChange={setSearch}
       />
-      {activeTab === 'Events' ? <EventsPanel /> : <TrainingPanel />}
+      <TrainingPanel searchQuery={search} />
     </View>
   );
 }

@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Keyboard, Pressable, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { AuthPasswordField } from '@/components/auth/LoginScreenParts';
@@ -28,6 +28,7 @@ type LoginAuthAccountFieldsProps = {
   onOpenForgotMode: () => void;
   onResendVerification: () => void;
   onSignupNameFocus?: () => void;
+  suppressInitialFocus?: boolean;
 };
 
 export function LoginAuthAccountFields({
@@ -51,9 +52,12 @@ export function LoginAuthAccountFields({
   onOpenForgotMode,
   onResendVerification,
   onSignupNameFocus,
+  suppressInitialFocus = false,
 }: LoginAuthAccountFieldsProps) {
   const { t } = useTranslation();
   const nameInputRef = useRef<TextInput>(null);
+  const emailInputRef = useRef<TextInput>(null);
+  const [emailReady, setEmailReady] = useState(!suppressInitialFocus);
 
   useEffect(() => {
     if (authMode !== 'signup') return undefined;
@@ -64,6 +68,25 @@ export function LoginAuthAccountFields({
 
     return () => clearTimeout(timer);
   }, [authMode]);
+
+  useEffect(() => {
+    if (!suppressInitialFocus || authMode !== 'login') {
+      setEmailReady(true);
+      return;
+    }
+
+    setEmailReady(false);
+    emailInputRef.current?.blur();
+    Keyboard.dismiss();
+    const timer = setTimeout(() => {
+      setEmailReady(true);
+      requestAnimationFrame(() => {
+        emailInputRef.current?.blur();
+        Keyboard.dismiss();
+      });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [authMode, suppressInitialFocus]);
 
   return (
     <>
@@ -94,6 +117,7 @@ export function LoginAuthAccountFields({
         <>
           <Text style={styles.label}>{t('auth.emailAddress')}</Text>
           <TextInput
+            ref={emailInputRef}
             style={styles.input}
             value={email}
             onChangeText={setEmail}
@@ -102,6 +126,10 @@ export function LoginAuthAccountFields({
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
+            autoFocus={false}
+            editable={emailReady}
+            showSoftInputOnFocus={emailReady}
+            blurOnSubmit
             accessibilityLabel={t('auth.emailAddress')}
           />
         </>

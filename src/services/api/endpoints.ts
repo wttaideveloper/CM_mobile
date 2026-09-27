@@ -66,6 +66,28 @@ export const ENDPOINTS = {
       `/api/v1/trainings/${id}/lessons/${lessonId}/download`,
     NOTES_PDF: (id: string) => `/api/v1/trainings/${id}/notes.pdf`,
     CONTENT: (id: string) => `/api/v1/trainings/${id}/content`,
+    PROGRESS: (id: string) => `/api/v1/trainings/${id}/progress`,
+    LESSON_PROGRESS: (trainingId: string, lessonId: string) =>
+      `/api/v1/trainings/${trainingId}/lessons/${lessonId}/progress`,
+    COMPLETE_LESSON: (id: string) =>
+      `/api/v1/trainings/${id}/progress/complete-lesson`,
+    ASSESSMENT_SUBMIT: (trainingId: string, assessmentId: string) =>
+      `/api/v1/trainings/${trainingId}/assessments/${assessmentId}/submit`,
+    ASSESSMENT_BY_ID: (trainingId: string, assessmentId: string) =>
+      `/api/v1/trainings/${trainingId}/assessments/${assessmentId}`,
+    ASSIGNMENTS: (trainingId: string) =>
+      `/api/v1/trainings/${trainingId}/assignments`,
+    LIVE_SESSION_ATTENDANCE: (trainingId: string, sessionId: string) =>
+      `/api/v1/trainings/${trainingId}/live-sessions/${sessionId}/attendance`,
+    /** Lesson-wise live/venue attendance (inside a session). */
+    LESSON_ATTENDANCE: (trainingId: string, lessonId: string) =>
+      `/api/v1/trainings/${trainingId}/lessons/${lessonId}/attendance`,
+    DISCUSSIONS: (id: string) => `/api/v1/trainings/${id}/discussions`,
+    DISCUSSION_REPLY: (trainingId: string, discussionId: string) =>
+      `/api/v1/trainings/${trainingId}/discussions/${discussionId}/replies`,
+    ANNOUNCEMENTS: (id: string) => `/api/v1/trainings/${id}/announcements`,
+    CERTIFICATE: (id: string) => `/api/v1/trainings/${id}/certificate`,
+    CERTIFICATE_PDF: (id: string) => `/api/v1/trainings/${id}/certificate.pdf`,
   },
 
   EVENTS: {

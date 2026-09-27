@@ -1,6 +1,6 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Dimensions, View } from 'react-native';
+import { Dimensions, Keyboard, Platform, View } from 'react-native';
 import {
   KeyboardAwareScrollView,
   type KeyboardAwareScrollViewRef,
@@ -18,15 +18,25 @@ import { getSpacing, isSmallDevice } from '@/utils/responsive';
 type LoginScreenProps = {
   /** Notifies parent (auth pager) so horizontal swipe can be locked while typing. */
   onKeyboardVisibilityChange?: (isOpen: boolean) => void;
+  /** False while this page is off-screen in the auth pager. */
+  isActive?: boolean;
 };
 
-export function LoginScreen({ onKeyboardVisibilityChange }: LoginScreenProps = {}) {
+export function LoginScreen({
+  onKeyboardVisibilityChange,
+  isActive = true,
+}: LoginScreenProps = {}) {
   useScreenPrivacy('auth-login');
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const auth = useLoginAuth(onKeyboardVisibilityChange);
   const isSignup = auth.authMode === 'signup';
   const scrollRef = useRef<KeyboardAwareScrollViewRef>(null);
+
+  // iOS focuses the first TextInput when this page slides in from onboarding.
+  useEffect(() => {
+    Keyboard.dismiss();
+  }, [isActive]);
 
   /** Name sits near the top, so KAV often skips it — scroll heading under the hero. */
   const scrollSignupNameIntoView = () => {
@@ -82,6 +92,7 @@ export function LoginScreen({ onKeyboardVisibilityChange }: LoginScreenProps = {
                 paddingBottom: insets.bottom + getSpacing(isSignup ? 56 : 24),
               },
             ]}
+            enabled={isActive}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
@@ -139,6 +150,7 @@ export function LoginScreen({ onKeyboardVisibilityChange }: LoginScreenProps = {
               onOpenSignupMode={() => auth.setAuthMode('signup')}
               onSignupNameFocus={scrollSignupNameIntoView}
               onSocialLogin={(provider) => void auth.handleSocialLogin(provider)}
+              suppressInitialFocus={Platform.OS === 'ios' && isActive}
             />
           </KeyboardAwareScrollView>
         </View>

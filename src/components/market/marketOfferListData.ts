@@ -23,6 +23,9 @@ export type OfferListItem = {
   route: 'listing' | 'service';
   /** Product image_urls / product_images, or service banner_image. */
   imageUrl?: string | null;
+  /** Service provider — used to start the old chat conversation. */
+  providerUserId?: string | null;
+  providerName?: string | null;
 };
 
 export const MARKET_OFFERS_ALL: OfferListItem[] = [

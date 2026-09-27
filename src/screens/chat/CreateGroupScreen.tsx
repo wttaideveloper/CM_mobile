@@ -12,6 +12,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
+
+const CHAT_STATUS_BAR = '#257d3f';
 import { PRIMARY, styles, TEXT_MUTED } from '@/screens/chat/CreateGroupScreen.styles';
 import { ChevronLeftIcon } from '@/components/dashboard/DashboardIcons';
 import { MOCK_GROUP_CONTACTS, type GroupContact } from '@/constants/chatInbox';
@@ -100,8 +102,8 @@ export function CreateGroupScreen() {
 
   return (
     <View style={styles.screen}>
-      <AppStatusBar />
-      <StatusBarFill />
+      <AppStatusBar variant="light" backgroundColor={CHAT_STATUS_BAR} />
+      <StatusBarFill lightColor={CHAT_STATUS_BAR} darkColor={CHAT_STATUS_BAR} />
 
       <View style={[styles.topSection, { paddingTop: 12 }]}>
         <View style={styles.titleRow}>

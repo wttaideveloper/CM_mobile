@@ -17,6 +17,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
+
+const CHAT_STATUS_BAR = '#257d3f';
 import {
   ChatConversationMenu,
   ChatMessageActionMenu,
@@ -35,8 +37,8 @@ import {
   type ChatMessage,
 } from '@/constants/chat';
 import { API_CONFIG } from '@/config';
-import { DEV_USER } from '@/constants/devUser';
 import { useChatPresence } from '@/hooks/useChatPresence';
+import { useAuthStore } from '@/stores/auth.store';
 import { useChatCamera } from '@/hooks/useChatCamera';
 import { useChatScreenRealtime } from '@/hooks/useChatScreenRealtime';
 import { useConversationRoom } from '@/hooks/useConversationRoom';
@@ -69,7 +71,9 @@ import { formatISTDateTime, parseApiDate } from '@/utils/dateTime';
 import { mapApiMessageToChatMessage } from '@/utils/message.mapper';
 import {
   hydrateChatMessagesFromApi,
+  hydrateSingleChatMessageFromApi,
 } from '@/utils/attachment.hydration';
+import type { ApiMessage } from '@/types/message.types';
 import { openChatAttachment, saveChatAttachmentToDevice } from '@/utils/openChatAttachment';
 import { inferChatAttachmentType } from '@/utils/attachmentType';
 import {
@@ -232,7 +236,8 @@ export function ChatScreen() {
     (isLiveConversation && conversationIsClosed);
   const showFullFeatures = meta.mode === 'full';
 
-  const currentUserId = DEV_USER.user_id;
+  // Own bubbles (right): sender_id === GET /auth/me user id
+  const currentUserId = useAuthStore((state) => state.user?.id?.trim() || '');
 
   const [selectedEditMessage, setSelectedEditMessage] = useState<ChatMessage | null>(null);
   const [editMenuOpen, setEditMenuOpen] = useState(false);
@@ -504,8 +509,6 @@ export function ChatScreen() {
     setHasOlder(false);
     setNextCursor(null);
 
-    const currentUserId = DEV_USER.user_id;
-
     console.log('[Chat] STEP 10 — GET conversation messages', {
       conversationId,
       currentUserId,
@@ -528,10 +531,10 @@ export function ChatScreen() {
         setNextCursor(response.pagination.next_cursor);
         setHasOlder(response.pagination.has_more);
 
-        if (API_CONFIG.SOCKET_ENABLED) {
+        if (API_CONFIG.SOCKET_ENABLED && currentUserId) {
           const unreadIncoming = response.items.filter(
             (message) =>
-              message.sender_id !== currentUserId && 
+              message.sender_id !== currentUserId &&
               !message.is_deleted &&
               !message.read_by.includes(currentUserId),
           );
@@ -556,7 +559,7 @@ export function ChatScreen() {
     return () => {
       cancelled = true;
     };
-  }, [conversationId, initialMessages, isLiveConversation, meta.hasOlderMessages]);
+  }, [conversationId, currentUserId, initialMessages, isLiveConversation, meta.hasOlderMessages]);
 
   useChatScreenRealtime({
     conversationId,
@@ -645,6 +648,37 @@ export function ChatScreen() {
     return () => subscription.remove();
   }, [viewerImageUri]);
 
+  const appendUploadedMessage = (apiMessage: ApiMessage, pendingId?: string) => {
+    const mapped = mapApiMessageToChatMessage(apiMessage, currentUserId);
+    setMessages((prev) => {
+      const withoutPending = pendingId
+        ? prev.filter((m) => m.id !== pendingId)
+        : prev;
+      if (withoutPending.some((m) => m.id === mapped.id)) return withoutPending;
+      if (
+        mapped.attachmentId &&
+        withoutPending.some((m) => m.attachmentId === mapped.attachmentId)
+      ) {
+        return withoutPending.map((m) =>
+          m.attachmentId === mapped.attachmentId ? mapped : m,
+        );
+      }
+      return [...withoutPending, mapped];
+    });
+
+    if (apiMessage.attachment_id) {
+      void hydrateSingleChatMessageFromApi(apiMessage, currentUserId)
+        .then((hydrated) => {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === hydrated.id ? hydrated : m)),
+          );
+        })
+        .catch((error) => {
+          if (__DEV__) console.warn('[Attachment hydrate] Failed:', error);
+        });
+    }
+  };
+
   const handleSendVoice = async () => {
     setSelectedEditMessage(null);
     const result = await voiceRecorder.finishRecording();
@@ -656,13 +690,14 @@ export function ChatScreen() {
         setIsSending(true);
 
         const fileName = `voice-${Date.now()}.m4a`;
-        await uploadAndSendAttachmentMessage({
+        const sent = await uploadAndSendAttachmentMessage({
           conversationId,
           fileUri: result.uri,
           fileName,
           mimeType: 'audio/mp4',
           attachmentType: 'audio',
         });
+        appendUploadedMessage(sent);
       } catch (error) {
         if (__DEV__) console.warn('[Attachment upload] voice failed:', error);
         Alert.alert('Upload failed', 'Could not upload voice message.');
@@ -701,13 +736,14 @@ export function ChatScreen() {
     if (isLiveConversation) {
       try {
         setIsSending(true);
-        await uploadAndSendAttachmentMessage({
+        const sent = await uploadAndSendAttachmentMessage({
           conversationId,
           fileUri: photo.uri,
           fileName: photo.fileName,
           mimeType: undefined,
           attachmentType: 'image',
         });
+        appendUploadedMessage(sent);
       } catch (error) {
         if (__DEV__) console.warn('[Attachment upload] image failed:', error);
         Alert.alert('Upload failed', 'Could not upload image.');
@@ -769,7 +805,7 @@ export function ChatScreen() {
     if (result.canceled || !result.assets?.[0]) return;
 
     const asset = result.assets[0];
-    const fileUri = asset.uri;
+    const fileUri = asset.uri.startsWith('/') ? `file://${asset.uri}` : asset.uri;
     const fileName = asset.name ?? `file-${Date.now()}`;
     const mimeType = asset.mimeType;
     const fileSizeLabel = typeof asset.size === 'number' ? `${Math.max(1, Math.round(asset.size / 1024))} KB` : '—';
@@ -777,17 +813,46 @@ export function ChatScreen() {
     const attachmentTypeForBackend =
       mimeType?.startsWith('image/') ? 'image' : mimeType?.startsWith('audio/') ? 'audio' : mimeType?.startsWith('video/') ? 'video' : 'document';
 
+    const attachmentTypeForUI = inferChatAttachmentType({
+      fileName,
+      mimeType: mimeType ?? '',
+      attachmentType: attachmentTypeForBackend,
+      messageType: attachmentTypeForBackend === 'document' ? 'document' : attachmentTypeForBackend,
+    });
+
     if (isLiveConversation) {
+      const pendingId = `pending-doc-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: pendingId,
+          sender: 'user',
+          timestamp: 'Just now',
+          status: 'sent',
+          messageType: 'attachment',
+          attachment: {
+            type: attachmentTypeForUI,
+            name: fileName,
+            size: fileSizeLabel,
+            thumbnail: mimeType?.startsWith('image/') ? fileUri : undefined,
+            uri: fileUri,
+            storage: 'S3',
+          },
+        },
+      ]);
+
       try {
         setIsSending(true);
-        await uploadAndSendAttachmentMessage({
+        const sent = await uploadAndSendAttachmentMessage({
           conversationId,
           fileUri,
           fileName,
           mimeType,
           attachmentType: attachmentTypeForBackend,
         });
+        appendUploadedMessage(sent, pendingId);
       } catch (error) {
+        setMessages((prev) => prev.filter((m) => m.id !== pendingId));
         if (__DEV__) console.warn('[Attachment upload] document failed:', error);
         Alert.alert('Upload failed', 'Could not upload attachment.');
       } finally {
@@ -797,13 +862,6 @@ export function ChatScreen() {
     }
 
     // Preview / readonly: add a local attachment bubble immediately.
-    const attachmentTypeForUI = inferChatAttachmentType({
-      fileName,
-      mimeType: mimeType ?? '',
-      attachmentType: attachmentTypeForBackend,
-      messageType: attachmentTypeForBackend === 'document' ? 'document' : attachmentTypeForBackend,
-    });
-
     setMessages((prev) => [
       ...prev,
       {
@@ -886,8 +944,6 @@ export function ChatScreen() {
     setIsSending(true);
 
     try {
-      // const currentUserId = useAuthStore.getState().user?.id ?? DEV_USER.user_id;
-      const currentUserId = DEV_USER.user_id;
       const sentMessage = await sendMessageViaSocket({
         content: text,
         conversation_id: conversationId,
@@ -1033,7 +1089,6 @@ export function ChatScreen() {
       if (!nextCursor || loadingOlder) return;
 
       setLoadingOlder(true);
-      const currentUserId = DEV_USER.user_id;
 
       void fetchConversationMessages(conversationId, { cursor: nextCursor, limit: 50 })
         .then(async (response) => {
@@ -1118,8 +1173,8 @@ export function ChatScreen() {
 
   return (
     <View style={styles.screen}>
-    <AppStatusBar />
-    <StatusBarFill />
+    <AppStatusBar variant="light" backgroundColor={CHAT_STATUS_BAR} />
+    <StatusBarFill lightColor={CHAT_STATUS_BAR} darkColor={CHAT_STATUS_BAR} />
       <ChatHeader
         title={headerTitle}
         subtitle={headerSubtitle}

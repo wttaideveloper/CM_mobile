@@ -17,6 +17,8 @@ type Props = {
   title: string;
   rightLabel?: string;
   onRightPress?: () => void;
+  /** Flat bottom edge (no rounded corners) — used on training detail. */
+  flatBottom?: boolean;
 };
 
 export function MarketTrainingHeader({
@@ -24,12 +26,13 @@ export function MarketTrainingHeader({
   title,
   rightLabel,
   onRightPress,
+  flatBottom = false,
 }: Props) {
   const router = useRouter();
   const scale = SCREEN_W / DESIGN_W;
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, flatBottom && styles.headerFlatBottom]}>
       <Image
         source={headerDeco}
         style={{
@@ -78,6 +81,10 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: c(30, 26),
     overflow: 'hidden',
     position: 'relative',
+  },
+  headerFlatBottom: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   topRow: {
     flexDirection: 'row',

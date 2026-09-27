@@ -87,7 +87,7 @@ export default function MainTabLayout() {
         <Tabs.Screen
           name="events-training"
           options={{
-            title: 'Events & Training',
+            title: 'Trainings and Courses',
           }}
         />
         <Tabs.Screen
@@ -96,10 +96,12 @@ export default function MainTabLayout() {
             title: 'Me',
           }}
         />
+        {/* Hidden from the tab bar only — files stay. Remove href: null to show again. */}
         <Tabs.Screen
           name="coach"
           options={{
             title: 'Coach',
+            href: null,
           }}
         />
         <Tabs.Screen
@@ -112,6 +114,7 @@ export default function MainTabLayout() {
           }}
           options={{
             title: 'Explore',
+            href: null,
           }}
         />
         <Tabs.Screen
@@ -124,6 +127,7 @@ export default function MainTabLayout() {
           }}
           options={{
             title: 'Shop',
+            href: null,
           }}
         />
         <Tabs.Screen
@@ -136,6 +140,7 @@ export default function MainTabLayout() {
           }}
           options={{
             title: 'Events',
+            href: null,
           }}
         />
         <Tabs.Screen

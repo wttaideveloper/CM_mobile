@@ -28,6 +28,10 @@ type Props = {
   /** Extra bottom space + avoid keyboard covering inputs */
   keyboardAware?: boolean;
   scrollViewRef?: RefObject<ScrollView | null>;
+  /** Stays fixed under the header (e.g. Udemy-style course video). */
+  stickyBelowHeader?: ReactNode;
+  /** Square bottom edge on the green header (no bottom radius). */
+  flatBottom?: boolean;
   children: ReactNode;
 };
 
@@ -39,6 +43,8 @@ export function MarketTrainingScreenShell({
   refreshControl,
   keyboardAware = false,
   scrollViewRef,
+  stickyBelowHeader,
+  flatBottom = false,
   children,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -87,6 +93,16 @@ export function MarketTrainingScreenShell({
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         enabled={keyboardAware}
       >
+        <MarketTrainingHeader
+          eyebrow={eyebrow}
+          title={title}
+          rightLabel={rightLabel}
+          onRightPress={onRightPress}
+          flatBottom={flatBottom}
+        />
+        {stickyBelowHeader ? (
+          <View style={styles.stickySlot}>{stickyBelowHeader}</View>
+        ) : null}
         <ScrollView
           ref={assignRef}
           style={styles.scroll}
@@ -97,12 +113,6 @@ export function MarketTrainingScreenShell({
           keyboardDismissMode={keyboardAware ? 'none' : 'on-drag'}
           automaticallyAdjustKeyboardInsets={keyboardAware && Platform.OS === 'ios'}
         >
-          <MarketTrainingHeader
-            eyebrow={eyebrow}
-            title={title}
-            rightLabel={rightLabel}
-            onRightPress={onRightPress}
-          />
           <View style={styles.body}>{children}</View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -117,6 +127,9 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  stickySlot: {
+    zIndex: 2,
   },
   scroll: {
     flex: 1,

@@ -8,19 +8,28 @@ export const TRAINING_TRACK = '#eef4ee';
 export const TRAINING_LIST_FILTERS = [
   'All',
   'Virtual',
+  'Self-paced',
   'Hybrid',
   'Physical',
 ] as const;
 
-/** Three delivery types shown as cards on trainings list (matches detail modes). */
+/** Delivery types shown as cards on trainings list (matches detail modes). */
 export const TRAINING_TYPE_CARDS = [
   {
     id: 'Virtual' as const,
     title: 'Virtual',
-    subtitle: 'Online · Zoom / video',
+    subtitle: 'Live online · Meet / Zoom',
     color: '#8352c0',
     bg: '#f2e9fb',
     mode: 'Virtual' as const,
+  },
+  {
+    id: 'Self-paced' as const,
+    title: 'Self-paced',
+    subtitle: 'Recorded · on demand',
+    color: '#6b5b95',
+    bg: '#f0ebf8',
+    mode: 'Self-paced' as const,
   },
   {
     id: 'Hybrid' as const,
@@ -61,10 +70,13 @@ export type TrainingListItem = {
   sideBg: string;
   sideTopColor: string;
   sideBottomColor: string;
-  mode: 'In-Person' | 'Virtual' | 'Hybrid';
+  mode: 'In-Person' | 'Virtual' | 'Hybrid' | 'Self-paced';
   priceLabel: string;
   status: string;
   imageUrl?: string | null;
+  /** From API `average_rating` when present */
+  averageRating?: number | null;
+  reviewCount?: number | null;
   isApiItem?: boolean;
 };
 
