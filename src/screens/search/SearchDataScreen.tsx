@@ -8,7 +8,7 @@ import { ChevronLeftIcon, SearchIcon } from '@/components/dashboard/DashboardIco
 import { filterCourses, filterEvents } from '@/components/search/searchFilters';
 import { SearchDataResults } from '@/components/search/SearchDataResults';
 import { COURSES } from '@/constants/courses';
-import { EVENTS } from '@/constants/events';
+import { useEvents } from '@/hooks/useEvents';
 import { useGlobalSearch } from '@/hooks/useSearch';
 import { useSearchStore } from '@/stores/search.store';
 import {
@@ -54,6 +54,14 @@ export function SearchDataScreen() {
     isFetching,
   } = useGlobalSearch(debouncedSearch);
 
+  // Events aren't query-parametrized server-side (same list the real Events
+  // tab fetches) — filtered client-side below, same as the real EventsScreen.
+  const {
+    data: apiEvents,
+    isLoading: isEventsLoading,
+    isFetching: isEventsFetching,
+  } = useEvents();
+
   useEffect(() => {
     if (!hasAutoFocused.current) {
       hasAutoFocused.current = true;
@@ -68,8 +76,8 @@ export function SearchDataScreen() {
   );
 
   const filteredEvents = useMemo(
-    () => filterEvents(EVENTS, debouncedSearch),
-    [debouncedSearch],
+    () => filterEvents(apiEvents ?? [], debouncedSearch),
+    [apiEvents, debouncedSearch],
   );
 
   const filteredCourses = useMemo(
@@ -80,7 +88,11 @@ export function SearchDataScreen() {
   const hasApiResults =
     enterprises.length > 0 || services.length > 0 || products.length > 0;
 
-  const showLoading = isLoading || (isFetching && !hasApiResults);
+  const showLoading =
+    isLoading ||
+    (isFetching && !hasApiResults) ||
+    (isEventsLoading && !apiEvents) ||
+    (isEventsFetching && !apiEvents?.length);
 
   return (
     <View style={styles.screen}>

@@ -26,14 +26,19 @@ import {
   MARKET_SOFT,
   MARKET_TEAL,
   type MarketBusiness,
+  type MarketEventItem,
   type MarketOffer,
   type MarketPillar,
 } from '@/components/market/marketDashboardData';
 import { MARKET_TRAININGS } from '@/components/market/marketTrainingData';
 import { MarketTrainingCard } from '@/components/market/MarketTrainingCard';
 import { FEATURED_BUSINESSES_ALL } from '@/components/market/marketBusinessListData';
+import type { Event } from '@/constants/events';
+import { useEvents } from '@/hooks/useEvents';
 import { useMarketHomeData } from '@/hooks/useMarketHome';
 import { useMarketTrainingsPreview } from '@/hooks/useTrainings';
+import { IST_TIMEZONE } from '@/utils/dateTime';
+import { detailHref } from '@/utils/searchNavigation';
 import {
   mapEnterprisesToFeaturedBusinesses,
   mapEnterprisesToMarketBusinessList,
@@ -43,6 +48,36 @@ import {
   mapMarketHomeOffers,
 } from '@/utils/marketOffers.mapper';
 import { c, NU } from '@/utils/newUiCompact';
+
+/** Real Event -> this section's existing teaser-card shape (same transform as MarketEventListBody.tsx's toEventListItem, applied to the Home dashboard's card type). */
+function toMarketEventItem(event: Event): MarketEventItem {
+  const monthDay = event.startDate
+    ? {
+        top: event.startDate
+          .toLocaleDateString('en-IN', { timeZone: IST_TIMEZONE, month: 'short' })
+          .toUpperCase(),
+        bottom: event.startDate.toLocaleDateString('en-IN', {
+          timeZone: IST_TIMEZONE,
+          day: 'numeric',
+        }),
+      }
+    : { top: '', bottom: '—' };
+
+  return {
+    id: event.id,
+    badge: event.isFree ? 'FREE EVENT' : 'EVENT',
+    badgeColor: event.isFree ? '#257d3f' : '#3c63c8',
+    badgeBg: event.isFree ? '#e6f4e8' : '#eaf1ff',
+    when: event.dateTime,
+    title: event.name,
+    detail: event.location || event.deliveryModeLabel || event.priceLabel,
+    sideTop: monthDay.top,
+    sideBottom: monthDay.bottom,
+    sideBg: event.isFree ? '#e6f4e8' : '#eaf1ff',
+    sideTopColor: event.isFree ? '#4d8a5c' : '#3c63c8',
+    sideBottomColor: event.isFree ? '#257d3f' : '#3c63c8',
+  };
+}
 
 function PillarIcon({ pillar }: { pillar: MarketPillar }) {
   const props = { color: pillar.color, size: 24 };
@@ -204,6 +239,7 @@ export function MarketBody({
   } = useMarketHomeData(searchQuery);
   const { items: apiTrainingsPreview, isLoading: isTrainingsLoading } =
     useMarketTrainingsPreview();
+  const { data: apiEvents, isLoading: isEventsLoading } = useEvents();
 
   const featuredBusinesses =
     enterprises.length > 0
@@ -250,6 +286,12 @@ export function MarketBody({
 
   const bizTitle = isSearching ? 'Businesses' : 'Featured businesses';
   const showLoading = isLoading || (isFetching && isSearching);
+
+  // MARKET_EVENTS now holds only its "course" entry (the fabricated "event"
+  // entry was removed from the data file) — the real event row comes from
+  // the Events API instead.
+  const realEventTeaserItems = (apiEvents ?? []).slice(0, 1).map(toMarketEventItem);
+  const eventTeaserItems = [...realEventTeaserItems, ...MARKET_EVENTS];
 
   return (
     <View style={styles.body}>
@@ -354,9 +396,14 @@ export function MarketBody({
           <SectionLabel
             title="Events & courses"
             action="See all"
-            onActionPress={() => router.push('/(main)/market/events')}
+            onActionPress={() => router.push('/(main)/events')}
           />
-          {MARKET_EVENTS.map((item) => (
+          {isEventsLoading && realEventTeaserItems.length === 0 ? (
+            <View style={styles.bizLoading}>
+              <ActivityIndicator color={MARKET_GREEN} />
+            </View>
+          ) : null}
+          {eventTeaserItems.map((item) => (
             <Pressable
               key={item.id}
               style={styles.eventCard}
@@ -364,7 +411,7 @@ export function MarketBody({
                 router.push(
                   item.id === 'metabolic'
                     ? '/(main)/market/course-learning'
-                    : '/(main)/market/event-detail',
+                    : detailHref('/(main)/event', item.id),
                 )
               }
             >

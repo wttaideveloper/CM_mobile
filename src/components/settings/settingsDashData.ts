@@ -105,7 +105,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         subtitle: 'Registered events and RSVPs',
         icon: 'calendar',
         kind: 'link',
-        href: '/(main)/market/my-events',
+        href: '/(main)/event/my-events',
       },
     ],
   },

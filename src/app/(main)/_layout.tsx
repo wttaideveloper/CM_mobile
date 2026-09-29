@@ -40,7 +40,6 @@ export default function MainLayout() {
       <Stack.Screen name="market/orders" />
       <Stack.Screen name="market/my-trainings" />
       <Stack.Screen name="market/my-training-progress" />
-      <Stack.Screen name="market/my-events" />
       <Stack.Screen name="market/course-learning" />
       <Stack.Screen name="market/cart" />
       <Stack.Screen name="market/checkout" />
@@ -51,7 +50,6 @@ export default function MainLayout() {
       <Stack.Screen name="market/pillar" />
       <Stack.Screen name="market/businesses" />
       <Stack.Screen name="market/offers" />
-      <Stack.Screen name="market/events" />
       <Stack.Screen name="market/trainings" />
       <Stack.Screen name="market/training-detail" />
       <Stack.Screen name="market/training-checkout" />
@@ -76,7 +74,6 @@ export default function MainLayout() {
       <Stack.Screen name="market/training-analytics" />
       <Stack.Screen name="market/listing" />
       <Stack.Screen name="market/service-detail" />
-      <Stack.Screen name="market/event-detail" />
       <Stack.Screen name="coach/consults" />
       <Stack.Screen name="coach/appointments" />
       <Stack.Screen name="coach/chat" />

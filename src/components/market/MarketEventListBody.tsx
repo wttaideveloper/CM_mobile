@@ -1,6 +1,7 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import { EmptyState } from '@/components/EmptyState';
 import {
   EVENT_LIST_BORDER,
   EVENT_LIST_FILTERS,
@@ -8,7 +9,13 @@ import {
   EVENT_LIST_SOFT,
   EVENT_LIST_TEAL,
   MARKET_EVENTS_ALL,
+  type EventListItem,
 } from '@/components/market/marketEventListData';
+import { appColors } from '@/constants/designTokens';
+import type { Event } from '@/constants/events';
+import { useEvents } from '@/hooks/useEvents';
+import { IST_TIMEZONE } from '@/utils/dateTime';
+import { detailHref } from '@/utils/searchNavigation';
 import { c, NU } from '@/utils/newUiCompact';
 
 type MarketEventListBodyProps = {
@@ -16,16 +23,57 @@ type MarketEventListBodyProps = {
   onFilterChange: (filter: string) => void;
 };
 
+/**
+ * Real Event -> this list's existing teaser-card shape (id/badge/side-badge/
+ * when/title/detail) so the card UI stays exactly the same; only the
+ * "Events" rows' data source changes, from the static mock array to the
+ * real Events API.
+ */
+function toEventListItem(event: Event): EventListItem {
+  const monthDay = event.startDate
+    ? {
+        top: event.startDate
+          .toLocaleDateString('en-IN', { timeZone: IST_TIMEZONE, month: 'short' })
+          .toUpperCase(),
+        bottom: event.startDate.toLocaleDateString('en-IN', {
+          timeZone: IST_TIMEZONE,
+          day: 'numeric',
+        }),
+      }
+    : { top: '', bottom: '—' };
+
+  return {
+    id: event.id,
+    kind: 'event',
+    badge: event.isFree ? 'FREE EVENT' : 'EVENT',
+    badgeColor: event.isFree ? '#257d3f' : '#3c63c8',
+    badgeBg: event.isFree ? '#e6f4e8' : '#eaf1ff',
+    when: event.dateTime,
+    title: event.name,
+    detail: event.location || event.deliveryModeLabel || event.priceLabel,
+    sideTop: monthDay.top,
+    sideBottom: monthDay.bottom,
+    sideBg: event.isFree ? '#e6f4e8' : '#eaf1ff',
+    sideTopColor: event.isFree ? '#4d8a5c' : '#3c63c8',
+    sideBottomColor: event.isFree ? '#257d3f' : '#3c63c8',
+  };
+}
+
 export function MarketEventListBody({
   filter,
   onFilterChange,
 }: MarketEventListBodyProps) {
   const router = useRouter();
-  const items = MARKET_EVENTS_ALL.filter((item) => {
-    if (filter === 'Events') return item.kind === 'event';
-    if (filter === 'Courses') return item.kind === 'course';
-    return true;
-  });
+  const { data: apiEvents, isLoading, isError, refetch } = useEvents();
+
+  const courseItems = MARKET_EVENTS_ALL.filter((item) => item.kind === 'course');
+  const eventItems = (apiEvents ?? []).map(toEventListItem);
+
+  const items =
+    filter === 'Events' ? eventItems : filter === 'Courses' ? courseItems : [...eventItems, ...courseItems];
+
+  const showEventsLoading = filter !== 'Courses' && isLoading;
+  const showEventsError = filter !== 'Courses' && isError && eventItems.length === 0;
 
   return (
     <View style={styles.body}>
@@ -57,15 +105,37 @@ export function MarketEventListBody({
       </View>
 
       <View style={styles.list}>
+        {showEventsLoading ? (
+          <View style={styles.stateBox}>
+            <ActivityIndicator color={appColors.primary} />
+          </View>
+        ) : null}
+
+        {showEventsError ? (
+          <EmptyState
+            variant="error"
+            entity="events"
+            compact
+            onAction={() => void refetch()}
+          />
+        ) : null}
+
+        {!showEventsLoading && !showEventsError && items.length === 0 ? (
+          <EmptyState
+            entity={filter === 'Courses' ? 'courses' : filter === 'Events' ? 'events' : 'events or courses'}
+            compact
+          />
+        ) : null}
+
         {items.map((item) => (
           <Pressable
-            key={item.id}
+            key={`${item.kind}-${item.id}`}
             style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             onPress={() =>
               router.push(
                 item.kind === 'course'
                   ? '/(main)/market/course-learning'
-                  : '/(main)/market/event-detail',
+                  : detailHref('/(main)/event', item.id),
               )
             }
             accessibilityRole="button"
@@ -105,6 +175,10 @@ export function MarketEventListBody({
 }
 
 const styles = StyleSheet.create({
+  stateBox: {
+    paddingVertical: c(20, 16),
+    alignItems: 'center',
+  },
   body: {
     paddingHorizontal: NU.hPad,
     paddingTop: NU.bodyPadTop,
