@@ -166,8 +166,14 @@ export function EventRegisterScreen() {
 
   const { event, isLoading, isError } = useEvent(id, { enabled: Boolean(id) });
   // Dynamic questions only apply to the free-registration flow — the paid
-  // checkout endpoint has no field to carry them (see Phase 5B report).
-  const { form, isLoading: isFormLoading } = useEventRegistrationForm(id, {
+  // checkout endpoint (EventCheckoutRequest, backend event_schema.py) has no
+  // field to carry them, confirmed against current backend source.
+  const {
+    form,
+    isLoading: isFormLoading,
+    isError: isFormError,
+    refetch: refetchForm,
+  } = useEventRegistrationForm(id, {
     enabled: Boolean(event?.isFree),
   });
   const registerMutation = useRegisterForEvent();
@@ -228,12 +234,16 @@ export function EventRegisterScreen() {
   }
 
   const spotsRemaining = Math.max(0, event.capacity - event.registered);
-  // Empty when paid, still loading, or the form legitimately has no custom
-  // questions — the basic Full Name / Email fields always work regardless.
-  // UPDATE: As per product requirement, we currently hide dynamic custom fields
-  // from the mobile customer flow to keep it clean.
-  const formSections: EventFormSection[] = [];
+  // Empty when paid, still loading/errored, or the form legitimately has no
+  // custom questions — the basic Full Name / Email fields always work
+  // regardless (Phase 3: restored, see EventRegisterFormField.tsx and
+  // buildCustomFieldsPayload below, both already built for this).
+  const formSections = !isPaid ? (form?.sections ?? []) : [];
   const isFormLoadingVisible = !isPaid && isFormLoading;
+  // A failed form fetch must not silently look like "no custom questions" —
+  // that could skip enforcement of a required question. Block submission
+  // and require a successful retry instead of guessing.
+  const isFormErrorVisible = !isPaid && isFormError;
 
   function validate(): boolean {
     let valid = true;
@@ -501,6 +511,25 @@ export function EventRegisterScreen() {
                 <ActivityIndicator color={PRIMARY} size="small" />
                 <Text style={styles.formLoadingText}>Loading registration questions…</Text>
               </View>
+            ) : isFormErrorVisible ? (
+              <View style={styles.submitBanner}>
+                <Text style={styles.submitBannerText}>
+                  Couldn&rsquo;t load this event&rsquo;s registration questions. Please try
+                  again before continuing.
+                </Text>
+                <Pressable
+                  onPress={() => refetchForm()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading registration questions"
+                  style={({ pressed }) => [
+                    styles.secondaryBtn,
+                    { marginTop: 10 },
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.secondaryBtnText}>Retry</Text>
+                </Pressable>
+              </View>
             ) : (
               formSections.map((section) => (
                 <View key={section.id}>
@@ -530,7 +559,7 @@ export function EventRegisterScreen() {
 
             <LeafyGradientButton
               onPress={handleSubmit}
-              disabled={registerMutation.isPending || isFormLoadingVisible}
+              disabled={registerMutation.isPending || isFormLoadingVisible || isFormErrorVisible}
               style={styles.submitBtn}
               borderRadius={14}
             >
