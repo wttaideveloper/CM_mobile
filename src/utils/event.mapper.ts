@@ -526,7 +526,14 @@ export function mapMyWaitlistApiToItem(api: MyWaitlistApiResponse): MyWaitlistEn
     status,
     statusLabel: WAITLIST_STATUS_LABELS[status],
     registrationId: api.registration_id != null ? String(api.registration_id) : null,
-    paymentOfferExpiresAt: api.payment_offer_expires_at ? new Date(api.payment_offer_expires_at + 'Z') : null,
+    // Backend model is `Column(DateTime, nullable=True)` (no timezone=True),
+    // always assigned via datetime.utcnow() (event_service.py) — a naive
+    // value that's semantically UTC but serializes with no 'Z'/offset.
+    // safeParseDate's HAS_TIMEZONE check already handles exactly this
+    // (append 'Z' only when no offset is present), same as every other
+    // timestamp in this file — using it here too instead of an unguarded
+    // string concat, since this value drives a live countdown timer.
+    paymentOfferExpiresAt: safeParseDate(api.payment_offer_expires_at),
   };
 }
 

@@ -15,7 +15,7 @@ const PROMOTED = '#1F7A45';
 const PENDING_BG = '#FEF3C7';
 const PENDING = '#D97706';
 const EXPIRED_BG = '#FEE2E2';
-const EXPIRED = '#B91C1C';
+export const EXPIRED = '#B91C1C';
 const LEFT_BG = '#F3F4F6';
 const LEFT = '#6B7280';
 const H_PAD = isSmallDevice ? 16 : 20;
@@ -163,6 +163,16 @@ export const styles = StyleSheet.create({
     fontSize: isSmallDevice ? 12 : 13,
     fontWeight: '700',
     color: PAGE_BG,
+  },
+  actionBtnDanger: {
+    borderWidth: 1,
+    borderColor: EXPIRED,
+    backgroundColor: PAGE_BG,
+  },
+  actionBtnDangerText: {
+    fontSize: isSmallDevice ? 12.5 : 13.5,
+    fontWeight: '700',
+    color: EXPIRED,
   },
   countdownText: {
     fontSize: isSmallDevice ? 12 : 13,

@@ -1,15 +1,15 @@
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
 import { ChevronLeftIcon } from '@/components/dashboard/DashboardIcons';
 import { EmptyState } from '@/components/EmptyState';
-import { useMyWaitlist } from '@/hooks/useEvents';
+import { useLeaveWaitlist, useMyWaitlist } from '@/hooks/useEvents';
 import type { MyWaitlistEntry } from '@/types/event.types';
 import { detailHref } from '@/utils/searchNavigation';
-import { PRIMARY, styles } from '@/screens/events/MyWaitlistScreen.styles';
+import { EXPIRED, PRIMARY, styles } from '@/screens/events/MyWaitlistScreen.styles';
 
 function CountdownTimer({ expiresAt }: { expiresAt: Date }) {
   const [timeLeft, setTimeLeft] = useState('');
@@ -36,6 +36,7 @@ function CountdownTimer({ expiresAt }: { expiresAt: Date }) {
 
 function MyWaitlistCard({ item }: { item: MyWaitlistEntry }) {
   const router = useRouter();
+  const leaveMutation = useLeaveWaitlist();
 
   const pillStyle = [
     styles.statusPill,
@@ -53,6 +54,40 @@ function MyWaitlistCard({ item }: { item: MyWaitlistEntry }) {
   ];
 
   const canViewTicket = item.status === 'promoted' && Boolean(item.registrationId);
+  // Only an active entry (still in line, or holding an unclaimed payment
+  // offer) can be left — same eligibility EventWaitlistScreen's own leave
+  // action assumes. Once promoted/expired/left, the entry is already
+  // settled and there's nothing left to leave.
+  const canLeave = item.status === 'waiting' || item.status === 'payment_pending';
+
+  function handleLeave() {
+    if (leaveMutation.isPending) return;
+
+    Alert.alert(
+      'Leave waitlist?',
+      `You'll lose your place in line for ${item.eventTitle}.`,
+      [
+        { text: 'Stay on waitlist', style: 'cancel' },
+        {
+          text: 'Leave Waitlist',
+          style: 'destructive',
+          onPress: () => {
+            leaveMutation.mutate(
+              { eventId: item.eventId, entryId: item.id },
+              {
+                onError: (error) => {
+                  Alert.alert(
+                    'Couldn’t leave waitlist',
+                    error.message?.trim() || 'Something went wrong. Please try again.',
+                  );
+                },
+              },
+            );
+          },
+        },
+      ],
+    );
+  }
 
   return (
     <View style={styles.card}>
@@ -101,6 +136,27 @@ function MyWaitlistCard({ item }: { item: MyWaitlistEntry }) {
             ]}
           >
             <Text style={styles.actionBtnFilledText}>View Ticket</Text>
+          </Pressable>
+        ) : null}
+
+        {canLeave ? (
+          <Pressable
+            onPress={handleLeave}
+            disabled={leaveMutation.isPending}
+            accessibilityRole="button"
+            accessibilityLabel="Leave waitlist"
+            accessibilityState={{ disabled: leaveMutation.isPending }}
+            style={({ pressed }) => [
+              styles.actionBtn,
+              styles.actionBtnDanger,
+              (pressed || leaveMutation.isPending) && { opacity: 0.7 },
+            ]}
+          >
+            {leaveMutation.isPending ? (
+              <ActivityIndicator size="small" color={EXPIRED} />
+            ) : (
+              <Text style={styles.actionBtnDangerText}>Leave</Text>
+            )}
           </Pressable>
         ) : null}
       </View>
