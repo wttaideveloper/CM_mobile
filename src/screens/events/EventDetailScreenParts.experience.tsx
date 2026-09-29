@@ -7,6 +7,7 @@ import { useEventMeetingLink, useJoinSessionMeeting } from '@/hooks/useEvents';
 import type { Event } from '@/constants/events';
 import type { EventSessionSummary } from '@/types/event.types';
 import type { EventAvailability } from '@/utils/event.mapper';
+import { isModuleEnabled } from '@/utils/eventModules';
 import {
   addEventToDeviceCalendar,
   hasValidEventTiming,
@@ -128,27 +129,33 @@ export function EventSessionsSection({
   availability: EventAvailability;
   isRegistered: boolean;
 }) {
-  const sessions = event.sessions;
-  if (!sessions || sessions.length === 0) return null;
+  if (!isModuleEnabled(event, 'sessions')) return null;
 
-  const isOnline = event.deliveryMode === 'online' || event.deliveryMode === 'hybrid';
+  const sessions = event.sessions ?? [];
+  const isOnline = isModuleEnabled(event, 'online_meeting');
   const isOver = availability.kind === 'cancelled' || availability.kind === 'completed';
 
   return (
     <View style={styles.experienceSection}>
       <Text style={styles.sectionTitle}>Agenda</Text>
       <View style={[styles.experienceCard, { marginTop: 10 }]}>
-        {sessions.map((session, index) => (
-          <EventSessionRow
-            key={session.id}
-            event={event}
-            session={session}
-            isLast={index === sessions.length - 1}
-            isOnline={isOnline}
-            isOver={isOver}
-            isRegistered={isRegistered}
-          />
-        ))}
+        {sessions.length === 0 ? (
+          <View style={styles.experienceRow}>
+            <Text style={styles.experienceBodyText}>No sessions scheduled yet.</Text>
+          </View>
+        ) : (
+          sessions.map((session, index) => (
+            <EventSessionRow
+              key={session.id}
+              event={event}
+              session={session}
+              isLast={index === sessions.length - 1}
+              isOnline={isOnline}
+              isOver={isOver}
+              isRegistered={isRegistered}
+            />
+          ))
+        )}
       </View>
     </View>
   );
@@ -175,7 +182,7 @@ export function EventMeetingSection({
   availability: EventAvailability;
   isRegistered: boolean;
 }) {
-  const isOnline = event.deliveryMode === 'online' || event.deliveryMode === 'hybrid';
+  const isOnline = isModuleEnabled(event, 'online_meeting');
   const isOver = availability.kind === 'cancelled' || availability.kind === 'completed';
   const hasSessionMeetings = event.sessions?.some((s) => s.hasMeetingInfo) ?? false;
   const router = useRouter();
@@ -367,7 +374,7 @@ export function EventAddToCalendarAction({
   event: Event;
   availability: EventAvailability;
 }) {
-  const isOnline = event.deliveryMode === 'online' || event.deliveryMode === 'hybrid';
+  const isOnline = isModuleEnabled(event, 'online_meeting');
   const isOver = availability.kind === 'cancelled' || availability.kind === 'completed';
 
   const { data: meetingAccess } = useEventMeetingLink(event.id, {

@@ -9,6 +9,7 @@ import type {
   EventFormSectionApiResponse,
   EventMeetingAccess,
   EventMeetingLinkApiResponse,
+  EventModules,
   EventMyRegistrationApiResponse,
   EventRegistrationForm,
   EventRegistrationFormApiResponse,
@@ -47,6 +48,40 @@ function pickEventImage(url?: string | null): string {
     return DEFAULT_EVENT_IMAGE;
   }
   return trimmed;
+}
+
+/**
+ * Mirrors the backend's own event_type resolution (app/utils/event_modules.py
+ * resolve_event_type): any non-empty string is trusted as-is; a missing/blank
+ * value falls back to "other". The backend already resolves this server-side
+ * on every read, so this only guards a genuinely missing/malformed response.
+ */
+function resolveEventType(eventType?: string | null): string {
+  const trimmed = eventType?.trim();
+  return trimmed || 'other';
+}
+
+/**
+ * Mirrors the backend's own module resolution (resolve_event_modules): the
+ * backend always returns a fully-populated `modules` object, even for
+ * legacy events (via its own behavior-derived fallback) — this only guards
+ * a genuinely missing/malformed response, and deliberately does not
+ * re-derive capability from other Event fields (sessions.length, isFree,
+ * meeting_link, ...). `registration` is forced true unconditionally,
+ * matching the backend's own unconditional mandatory rule.
+ */
+function normalizeEventModules(modules?: EventModules | null): EventModules {
+  const source = modules && typeof modules === 'object' ? modules : null;
+  return {
+    registration: true,
+    tickets: Boolean(source?.tickets),
+    sessions: Boolean(source?.sessions),
+    check_in: Boolean(source?.check_in),
+    online_meeting: Boolean(source?.online_meeting),
+    custom_questions: Boolean(source?.custom_questions),
+    meals: Boolean(source?.meals),
+    accommodation: Boolean(source?.accommodation),
+  };
 }
 
 function textOrNa(value?: string | null): string {
@@ -333,6 +368,8 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
     venueAddress: deriveVenueAddress(api),
     venueInstructions: api.venue?.instructions?.trim() || null,
     venueMapUrl: api.venue?.map_url?.trim() || null,
+    eventType: resolveEventType(api.event_type),
+    modules: normalizeEventModules(api.modules),
   };
 }
 

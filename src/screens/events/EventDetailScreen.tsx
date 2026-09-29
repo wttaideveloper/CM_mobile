@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar';
 import { EmptyState } from '@/components/EmptyState';
 import { useEvent, useMyRegistrations, useMyWaitlist } from '@/hooks/useEvents';
+import { useEventTypes } from '@/hooks/useEventTypes';
 import { useDetailBack } from '@/hooks/useDetailBack';
 import {
   EventDetailContent,
@@ -29,6 +30,12 @@ export function EventDetailScreen() {
 
   const { event, isLoading, isError } = useEvent(id, { enabled: Boolean(id) });
   const { entries: waitlistEntries } = useMyWaitlist(undefined, { enabled: Boolean(event?.isFull) });
+
+  // include_inactive: an existing event may reference a since-deactivated
+  // type and must still resolve/display its name correctly (Phase 2, no
+  // hardcoded key->name mapping).
+  const { data: eventTypes } = useEventTypes({ include_inactive: true });
+  const eventTypeName = eventTypes?.find((type) => type.key === event?.eventType)?.name ?? null;
 
   if (isLoading) {
     return (
@@ -136,6 +143,7 @@ export function EventDetailScreen() {
             spotsRemaining={spotsRemaining}
             availability={availability}
             isRegistered={isRegistered}
+            eventTypeName={eventTypeName}
           />
         </ScrollView>
 

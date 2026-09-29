@@ -96,15 +96,21 @@ export function EventDetailContent({
   spotsRemaining,
   availability,
   isRegistered,
+  eventTypeName,
 }: {
   event: Event;
   fillPercent: number;
   spotsRemaining: number;
   availability: EventAvailability;
   isRegistered: boolean;
+  /** Resolved dynamically via the Event Type API — null while resolving/unavailable, never a hardcoded label. */
+  eventTypeName?: string | null;
 }) {
   return (
     <View style={styles.contentSheet}>
+      {eventTypeName ? (
+        <Text style={styles.registrationMeta}>{eventTypeName}</Text>
+      ) : null}
       <View style={styles.infoGrid}>
         <View style={styles.infoRow}>
           <InfoCard emoji="📅" label="Date & Time" value={event.schedule} />

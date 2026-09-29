@@ -1,4 +1,9 @@
-import type { EventResource, EventSessionSummary, EventTicketOption } from '@/types/event.types';
+import type {
+  EventModules,
+  EventResource,
+  EventSessionSummary,
+  EventTicketOption,
+} from '@/types/event.types';
 
 export const EVENT_FILTERS = ['All', 'Upcoming', 'This Week', 'Online', 'Free'] as const;
 
@@ -54,4 +59,8 @@ export type Event = {
   endDate?: Date | null;
   /** Backend's time_zone label (e.g. "Asia/Kolkata") — display-only; see eventCalendar.ts for why it isn't applied as an offset. */
   timeZone?: string | null;
+  /** Dynamic Event Type key (Phase 2) — "other" for legacy events, resolved server-side. Resolve to a display name via useEventTypes(), never a hardcoded map. */
+  eventType: string;
+  /** Event-level capability flags (Phase 2) — always fully populated by the mapper. Read via isModuleEnabled(event, key) from utils/eventModules.ts, never inferred from other fields. */
+  modules: EventModules;
 };

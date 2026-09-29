@@ -113,6 +113,10 @@ export const ENDPOINTS = {
     REVIEWS: (id: string) => `/api/v1/events/${id}/reviews`,
   },
 
+  EVENT_TYPES: {
+    GET_ALL: '/api/v1/event-types/',
+  },
+
   SEARCH: {
     ENTERPRISES: '/api/v1/search/enterprises',
     PRODUCTS: '/api/v1/search/products',

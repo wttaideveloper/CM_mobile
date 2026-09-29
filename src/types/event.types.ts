@@ -120,6 +120,48 @@ export type EventSessionApiResponse = {
 };
 
 /**
+ * Event-level operational capability flags (Phase 2 foundation). The
+ * backend is the sole source of truth — `registration` is unconditionally
+ * mandatory (forced true server-side on every read, rejected if a write
+ * ever tries to set it false) and every key is always present in a real
+ * API response, fully resolved server-side even for legacy events with
+ * nothing explicitly stored (see EventApiResponse.modules doc comment).
+ * Do not add module keys beyond what the backend defines.
+ */
+export type EventModules = {
+  registration: boolean;
+  tickets: boolean;
+  sessions: boolean;
+  check_in: boolean;
+  online_meeting: boolean;
+  custom_questions: boolean;
+  meals: boolean;
+  accommodation: boolean;
+};
+
+/**
+ * GET /api/v1/event-types/ — the dynamic, DB-backed Event Type registry
+ * (Phase 2 foundation). `key` is the stable identifier that matches
+ * EventApiResponse.event_type (immutable once created); `name` is the
+ * display label. Public, unauthenticated endpoint; defaults to
+ * active-only unless `include_inactive` is requested.
+ */
+export type EventTypeApiResponse = {
+  id: string;
+  key: string;
+  name: string;
+  active: boolean;
+  default_modules: EventModules;
+  allowed_modules: EventModules;
+  required_modules: EventModules;
+};
+
+export type EventTypeListQuery = {
+  /** Existing Events may reference a since-deactivated type and must still resolve/display correctly — pass this when resolving a specific event's type, not when offering a picker. */
+  include_inactive?: boolean;
+};
+
+/**
  * Shape of a single item returned by GET /api/v1/events/ and GET /api/v1/events/{id}.
  * `enterprise_name` is only present on the detail response but is safe to type as
  * optional on both since the list response simply omits it.
@@ -165,6 +207,23 @@ export type EventApiResponse = {
   form_configuration_version_id?: string | null;
   sessions?: EventSessionApiResponse[] | null;
   status: string;
+  /**
+   * Dynamic Event Type key (Phase 2) — resolves against GET /event-types/.
+   * The backend always returns a non-empty string here, "other" for
+   * legacy events with nothing stored — never actually null in practice,
+   * but typed defensively since Mobile must not crash on older/cached
+   * response shapes.
+   */
+  event_type?: string | null;
+  /**
+   * Event-level module/capability flags (Phase 2). The backend always
+   * resolves a fully-populated object here (including for legacy events,
+   * via its own behavior-derived fallback) — never actually null/missing
+   * in practice, but typed defensively for the same reason as event_type.
+   * This is the sole source of truth for capability gating; see
+   * utils/eventModules.ts isModuleEnabled().
+   */
+  modules?: EventModules | null;
   is_deleted?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
