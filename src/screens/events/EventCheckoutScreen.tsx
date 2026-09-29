@@ -105,6 +105,32 @@ export function EventCheckoutScreen() {
     );
   }
 
+  // Mirrors the backend's own checkout gate (create_event_checkout_service):
+  // the event-wide capacity check only runs for non-waitlist checkouts, so a
+  // promoted waitlist entry's reserved seat must bypass this exactly like
+  // the backend does. This is a real, already-fetched signal — not a guess —
+  // but it only ever reflects overall event capacity, never a specific
+  // ticket type's own limit (the backend enforces that separately at
+  // submit time with its own "Ticket type at capacity" error, since it
+  // never exposes a per-type remaining/sold count for Mobile to check
+  // proactively).
+  const isEventFullBlock = event.isFull && !waitlist_id;
+
+  if (isEventFullBlock) {
+    return (
+      <View style={styles.screen}>
+        <AppStatusBar />
+        <EmptyState
+          variant="empty"
+          title="Event full"
+          description="This event is at full capacity. Join the waitlist to be notified if a spot opens up."
+          onAction={() => router.push({ pathname: '/(main)/event/waitlist', params: { id } })}
+          actionLabel="Join Waitlist"
+        />
+      </View>
+    );
+  }
+
   const ticketOptions = event.ticketOptions ?? [];
   const hasTicketOptions = ticketOptions.length > 0;
   const selectedTicket = hasTicketOptions
@@ -345,11 +371,20 @@ export function EventCheckoutScreen() {
                     key={ticket.id}
                     onPress={() => setSelectedTicketId(ticket.id)}
                     accessibilityRole="button"
-                    accessibilityLabel={`${ticket.name}, ${ticket.effectivePriceLabel}`}
+                    accessibilityLabel={
+                      ticket.capacity != null
+                        ? `${ticket.name}, ${ticket.effectivePriceLabel}, limited to ${ticket.capacity}`
+                        : `${ticket.name}, ${ticket.effectivePriceLabel}`
+                    }
                     accessibilityState={{ selected: isSelected }}
                     style={[styles.ticketRow, isSelected && styles.ticketRowSelected]}
                   >
-                    <Text style={styles.ticketName}>{ticket.name}</Text>
+                    <View>
+                      <Text style={styles.ticketName}>{ticket.name}</Text>
+                      {ticket.capacity != null ? (
+                        <Text style={styles.ticketCapacityHint}>Limited to {ticket.capacity}</Text>
+                      ) : null}
+                    </View>
                     <Text style={styles.ticketPrice}>{ticket.effectivePriceLabel}</Text>
                   </Pressable>
                 );

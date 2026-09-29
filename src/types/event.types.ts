@@ -338,6 +338,15 @@ export type EventTicketOption = {
   /** Early-bird/promo already applied — mirrors the backend's _ticket_effective_price, for preview only. */
   effectivePrice: number;
   effectivePriceLabel: string;
+  /**
+   * This ticket type's configured limit (backend event_schema.py
+   * EventTicketType.capacity) — informational only. The backend enforces
+   * this per-type at checkout (create_event_checkout_service) but never
+   * returns how many are already sold/remaining, so this cannot be used to
+   * proactively compute "N left" or sold-out state without guessing; null
+   * when the type has no configured limit.
+   */
+  capacity: number | null;
 };
 
 /** Body for POST /api/v1/events/{id}/checkout — paid registration (Phase 3). Quantity fixed at 1. */

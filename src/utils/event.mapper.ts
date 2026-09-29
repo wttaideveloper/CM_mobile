@@ -301,6 +301,7 @@ function buildTicketOptions(
         currency,
         effectivePrice,
         effectivePriceLabel: formatMoney(effectivePrice, currency),
+        capacity: Number.isFinite(ticket.capacity) ? Number(ticket.capacity) : null,
       };
     });
 }

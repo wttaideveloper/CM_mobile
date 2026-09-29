@@ -114,6 +114,12 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     color: TEXT_BLACK,
   },
+  ticketCapacityHint: {
+    marginTop: 2,
+    fontSize: isSmallDevice ? 11 : 11.5,
+    color: TEXT_MUTED,
+    fontWeight: '500',
+  },
   ticketPrice: {
     fontSize: isSmallDevice ? 13.5 : 14.5,
     fontWeight: '800',
