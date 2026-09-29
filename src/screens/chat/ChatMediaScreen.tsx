@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
+
+const CHAT_STATUS_BAR = '#257d3f';
 import { ChatImageViewer } from '@/components/chat/ChatImageViewer';
 import { DocRow, MediaTile } from '@/components/chat/ChatMediaScreenParts';
 import { DEV_USER } from '@/constants/devUser';
@@ -69,8 +71,8 @@ export function ChatMediaScreen() {
 
   return (
     <View style={styles.screen}>
-      <AppStatusBar />
-      <StatusBarFill />
+      <AppStatusBar variant="light" backgroundColor={CHAT_STATUS_BAR} />
+      <StatusBarFill lightColor={CHAT_STATUS_BAR} darkColor={CHAT_STATUS_BAR} />
 
       <View style={styles.header}>
         <Pressable

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +15,7 @@ import { BizProfileMonitorIcon } from '@/components/market/MarketBusinessProfile
 import {
   MarketBagIcon,
   MarketBowlIcon,
+  MarketChatIcon,
   MarketUserIcon,
 } from '@/components/market/MarketIcons';
 import {
@@ -25,6 +27,7 @@ import {
   OFFER_LIST_TEAL,
   type OfferListItem,
 } from '@/components/market/marketOfferListData';
+import { useOpenServiceChat } from '@/hooks/useOpenServiceChat';
 import { useMarketProductsList } from '@/hooks/useProducts';
 import { useMarketServicesList } from '@/hooks/useServices';
 import { mapProductsAndServicesToOfferList } from '@/utils/marketOffers.mapper';
@@ -61,10 +64,26 @@ export function MarketOfferListBody({
   onFilterChange,
 }: MarketOfferListBodyProps) {
   const router = useRouter();
+  const { openServiceChat, isOpeningChat } = useOpenServiceChat();
   const { data: products = [], isLoading: productsLoading } =
     useMarketProductsList();
   const { data: services = [], isLoading: servicesLoading } =
     useMarketServicesList();
+
+  const openChat = (offer: OfferListItem) => {
+    const providerUserId = offer.providerUserId?.trim() || null;
+    if (!providerUserId) {
+      Alert.alert('Chat unavailable', 'This service has no provider to chat with.');
+      return;
+    }
+    void openServiceChat({
+      id: offer.id,
+      name: offer.title,
+      provider: offer.providerName ?? offer.vendor,
+      providerUserId,
+      enterpriseName: offer.vendor,
+    });
+  };
 
   const isLoading = productsLoading || servicesLoading;
   const allOffers = useMemo(
@@ -154,17 +173,51 @@ export function MarketOfferListBody({
                     )}
                   </View>
                   <View style={styles.copy}>
-                    <Text
-                      style={[
-                        styles.kind,
-                        {
-                          color: offer.kindColor,
-                          backgroundColor: offer.kindBg,
-                        },
-                      ]}
-                    >
-                      {offer.kind}
-                    </Text>
+                    <View style={styles.kindRow}>
+                      <Text
+                        style={[
+                          styles.kind,
+                          {
+                            color: offer.kindColor,
+                            backgroundColor: offer.kindBg,
+                          },
+                        ]}
+                      >
+                        {offer.kind}
+                      </Text>
+                      {offer.kind === 'SERVICE' ? (
+                        <Pressable
+                          onPress={() => openChat(offer)}
+                          disabled={
+                            isOpeningChat || !offer.providerUserId?.trim()
+                          }
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel="Chat"
+                          style={[
+                            styles.chatBtn,
+                            (isOpeningChat || !offer.providerUserId?.trim()) &&
+                              styles.chatBtnDisabled,
+                          ]}
+                        >
+                          {isOpeningChat ? (
+                            <ActivityIndicator
+                              size="small"
+                              color={OFFER_LIST_GREEN}
+                            />
+                          ) : (
+                            <MarketChatIcon
+                              color={
+                                offer.providerUserId?.trim()
+                                  ? OFFER_LIST_GREEN
+                                  : OFFER_LIST_SOFT
+                              }
+                              size={16}
+                            />
+                          )}
+                        </Pressable>
+                      ) : null}
+                    </View>
                     <Text style={styles.title}>{offer.title}</Text>
                     <Text style={styles.vendor}>{offer.vendor}</Text>
                     <Text style={styles.price}>
@@ -268,6 +321,11 @@ const styles = StyleSheet.create({
     paddingBottom: c(13, 11),
     gap: c(4, 3),
   },
+  kindRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   kind: {
     fontSize: c(10.5, 10),
     fontWeight: '700',
@@ -276,6 +334,17 @@ const styles = StyleSheet.create({
     borderRadius: c(4, 3),
     overflow: 'hidden',
     alignSelf: 'flex-start',
+  },
+  chatBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#e6f4e8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatBtnDisabled: {
+    opacity: 0.45,
   },
   title: {
     fontSize: c(13.5, 12.5),

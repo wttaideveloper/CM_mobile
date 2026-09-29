@@ -1,4 +1,4 @@
-import { DEV_PROVIDER, DEV_USER } from '@/constants/devUser';
+import { DEV_PROVIDER } from '@/constants/devUser';
 import { API_CONFIG } from '@/config';
 import { useAuthStore } from '@/stores/auth.store';
 import type {
@@ -17,6 +17,7 @@ import { apiClient } from './api/client';
 import { ENDPOINTS } from './api/endpoints';
 
 export type OpenServiceConversationInput = {
+  serviceId: string;
   serviceName: string;
   providerId?: string | null;
   providerName?: string | null;
@@ -42,21 +43,15 @@ export async function createOrOpenConversation(
 }
 
 export async function openServiceConversation({
+  serviceId,
   serviceName,
   providerId,
   providerName,
   conversationType = 'standard',
 }: OpenServiceConversationInput): Promise<Conversation> {
-  const authUser = useAuthStore.getState().user;
-  const loggedInUserId = authUser?.id?.trim() || null;
-
-  // Demo fallback kept for later if real provider/user IDs fail:
-  // const customerId = loggedInUserId ?? DEV_USER.user_id;
-  // const resolvedProviderId = providerId?.trim() || DEV_PROVIDER.user_id;
-  // const resolvedProviderName = providerName?.trim() || DEV_PROVIDER.role;
-
-  if (!loggedInUserId) {
-    throw new Error('Please sign in again to start a chat.');
+  const resolvedServiceId = serviceId?.trim() || null;
+  if (!resolvedServiceId) {
+    throw new Error('Missing service to start chat.');
   }
 
   const resolvedProviderId = providerId?.trim() || null;
@@ -67,9 +62,9 @@ export async function openServiceConversation({
   const resolvedProviderName = providerName?.trim() || null;
 
   console.log('[ServiceChat] STEP 4 — building create-conversation payload', {
+    serviceId: resolvedServiceId,
     serviceName,
     conversationType,
-    loggedInUserId,
     providerId: resolvedProviderId,
     providerName: resolvedProviderName,
     providerRole: DEV_PROVIDER.role,
@@ -77,7 +72,10 @@ export async function openServiceConversation({
   });
 
   const payload: CreateConversationRequest = {
-    context_id: loggedInUserId,
+    // Provider from service record → user_id
+    user_id: resolvedProviderId,
+    // Service id → context_id (current user comes from auth token)
+    context_id: resolvedServiceId,
     context_type: 'service',
     conversation_type: conversationType,
     participant_ids: [

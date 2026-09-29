@@ -37,7 +37,7 @@ export function MarketTrainingSessionsScreen() {
             <View style={styles.box}>
               {day.lessons.map((lesson) => (
                 <Text key={lesson.id} style={styles.concept}>
-                  {lesson.kind === 'video'
+                  {lesson.kind === 'video' || lesson.kind === 'youtube'
                     ? '▶'
                     : lesson.kind === 'live'
                       ? '●'

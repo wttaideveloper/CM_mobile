@@ -6,7 +6,7 @@ export type MyEnrolmentCardView = {
   enrolmentId: string;
   title: string;
   vendor: string;
-  mode: 'Virtual' | 'In-Person' | 'Hybrid';
+  mode: 'Virtual' | 'In-Person' | 'Hybrid' | 'Self-paced';
   progressLabel: string;
   enrollmentCode: string;
   priceLabel: string;
@@ -32,6 +32,12 @@ const MODE_STYLES: Record<
     badgeBg: '#f2e9fb',
     accent: '#8352c0',
     progressLabel: 'Virtual · live Zoom sessions',
+  },
+  'Self-paced': {
+    badgeColor: '#6b5b95',
+    badgeBg: '#f0ebf8',
+    accent: '#6b5b95',
+    progressLabel: 'Self-paced · recorded lessons',
   },
   Hybrid: {
     badgeColor: '#3c63c8',
@@ -75,6 +81,14 @@ function resolveMode(
     key.includes('offline')
   ) {
     return 'In-Person';
+  }
+  if (
+    key.includes('self_paced') ||
+    key.includes('self_placed') ||
+    key.includes('on_demand') ||
+    key.includes('recorded')
+  ) {
+    return 'Self-paced';
   }
   return 'Virtual';
 }

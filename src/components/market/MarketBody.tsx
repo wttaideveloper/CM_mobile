@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 
 import {
   MarketBagIcon,
   MarketBarbellIcon,
+  MarketChatIcon,
   MarketExternalIcon,
   MarketFlaskIcon,
   MarketHeartIcon,
@@ -47,6 +55,7 @@ import {
   mapFeaturedMarketOffers,
   mapMarketHomeOffers,
 } from '@/utils/marketOffers.mapper';
+import { useOpenServiceChat } from '@/hooks/useOpenServiceChat';
 import { c, NU } from '@/utils/newUiCompact';
 
 /** Real Event -> this section's existing teaser-card shape (same transform as MarketEventListBody.tsx's toEventListItem, applied to the Home dashboard's card type). */
@@ -157,12 +166,30 @@ function FeaturedBusinessCard({ biz }: { biz: MarketBusiness }) {
 
 function FeaturedOfferCard({ offer }: { offer: MarketOffer }) {
   const router = useRouter();
+  const { openServiceChat, isOpeningChat } = useOpenServiceChat();
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = Boolean(offer.imageUrl) && !imageFailed;
+  const canChat =
+    offer.kind === 'SERVICE' && Boolean(offer.providerUserId?.trim());
 
   useEffect(() => {
     setImageFailed(false);
   }, [offer.imageUrl, offer.id]);
+
+  const openChat = () => {
+    const providerUserId = offer.providerUserId?.trim() || null;
+    if (!providerUserId) {
+      Alert.alert('Chat unavailable', 'This service has no provider to chat with.');
+      return;
+    }
+    void openServiceChat({
+      id: offer.id,
+      name: offer.title,
+      provider: offer.providerName ?? offer.vendor,
+      providerUserId,
+      enterpriseName: offer.vendor,
+    });
+  };
 
   return (
     <Pressable
@@ -198,14 +225,38 @@ function FeaturedOfferCard({ offer }: { offer: MarketOffer }) {
         )}
       </View>
       <View style={styles.offerCopy}>
-        <Text
-          style={[
-            styles.offerKind,
-            { color: offer.kindColor, backgroundColor: offer.kindBg },
-          ]}
-        >
-          {offer.kind}
-        </Text>
+        <View style={styles.offerKindRow}>
+          <Text
+            style={[
+              styles.offerKind,
+              { color: offer.kindColor, backgroundColor: offer.kindBg },
+            ]}
+          >
+            {offer.kind}
+          </Text>
+          {offer.kind === 'SERVICE' ? (
+            <Pressable
+              onPress={openChat}
+              disabled={isOpeningChat || !canChat}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Chat"
+              style={[
+                styles.offerChatBtn,
+                (isOpeningChat || !canChat) && styles.offerChatBtnDisabled,
+              ]}
+            >
+              {isOpeningChat ? (
+                <ActivityIndicator size="small" color={MARKET_GREEN} />
+              ) : (
+                <MarketChatIcon
+                  color={canChat ? MARKET_GREEN : MARKET_SOFT}
+                  size={16}
+                />
+              )}
+            </Pressable>
+          ) : null}
+        </View>
         <Text style={styles.offerTitle}>{offer.title}</Text>
         <Text style={styles.offerVendor}>{offer.vendor}</Text>
         <Text style={styles.offerPrice}>
@@ -625,6 +676,11 @@ const styles = StyleSheet.create({
     paddingBottom: c(13, 11),
     gap: c(4, 3),
   },
+  offerKindRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   offerKind: {
     fontSize: c(10.5, 10),
     fontWeight: '700',
@@ -633,6 +689,17 @@ const styles = StyleSheet.create({
     borderRadius: c(4, 3),
     overflow: 'hidden',
     alignSelf: 'flex-start',
+  },
+  offerChatBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#e6f4e8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offerChatBtnDisabled: {
+    opacity: 0.45,
   },
   offerTitle: {
     fontSize: c(13.5, 12.5),

@@ -93,7 +93,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       },
       {
         id: 'my-trainings',
-        title: 'My Trainings',
+        title: 'My Trainings and Courses',
         subtitle: 'Enrolled courses and sessions',
         icon: 'book',
         kind: 'link',

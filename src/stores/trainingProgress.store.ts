@@ -10,7 +10,7 @@ import {
 } from '@/components/market/marketTrainingProgressData';
 
 /** Videos auto-complete once watched at least this far. */
-export const VIDEO_COMPLETE_THRESHOLD = 80;
+export const VIDEO_COMPLETE_THRESHOLD = 98;
 
 export type ExamAttempt = {
   examId: string;

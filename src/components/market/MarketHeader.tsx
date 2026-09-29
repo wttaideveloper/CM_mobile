@@ -14,6 +14,7 @@ import {
   MarketBackIcon,
   MarketBookmarkIcon,
   MarketCartIcon,
+  MarketInboxIcon,
   MarketSearchIcon,
 } from '@/components/market/MarketIcons';
 import {
@@ -74,34 +75,52 @@ export function MarketHeader({
           accessibilityRole="button"
           accessibilityLabel="Back"
         >
-          <MarketBackIcon />
+          <MarketBackIcon size={c(18, 16)} />
         </Pressable>
         <View style={styles.titleBlock}>
-          <Text style={styles.eyebrow}>Nearby & online</Text>
-          <Text style={styles.title}>Marketplace</Text>
+          <Text style={styles.eyebrow} numberOfLines={1}>
+            Nearby & online
+          </Text>
+          <Text
+            style={styles.title}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.82}
+          >
+            Marketplace
+          </Text>
         </View>
-        <View style={styles.spacer} />
-        <Pressable
-          style={styles.iconBtn}
-          onPress={() => router.push('/(main)/market/orders')}
-          accessibilityRole="button"
-          accessibilityLabel="Orders and subscriptions"
-        >
-          <MarketBookmarkIcon />
-        </Pressable>
-        <Pressable
-          style={styles.iconBtn}
-          onPress={() => router.push('/(main)/market/cart')}
-          accessibilityRole="button"
-          accessibilityLabel="Cart"
-        >
-          <MarketCartIcon />
-          {badge > 0 ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-            </View>
-          ) : null}
-        </Pressable>
+        <View style={styles.iconCluster}>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => router.push('/(main)/market/orders')}
+            accessibilityRole="button"
+            accessibilityLabel="Orders and subscriptions"
+          >
+            <MarketBookmarkIcon size={c(18, 16)} />
+          </Pressable>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => router.push('/(main)/chat/inbox')}
+            accessibilityRole="button"
+            accessibilityLabel="Chat inbox"
+          >
+            <MarketInboxIcon size={c(18, 16)} />
+          </Pressable>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => router.push('/(main)/market/cart')}
+            accessibilityRole="button"
+            accessibilityLabel="Cart"
+          >
+            <MarketCartIcon size={c(18, 16)} />
+            {badge > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.search}>
@@ -160,29 +179,34 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: NU.rowGap,
+    gap: c(8, 6),
     zIndex: 1,
   },
+  iconCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: c(6, 4),
+    flexShrink: 0,
+  },
   iconBtn: {
-    width: NU.iconBtn,
-    height: NU.iconBtn,
-    borderRadius: NU.iconBtnRadius,
+    width: c(40, 32),
+    height: c(40, 32),
+    borderRadius: c(20, 16),
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   titleBlock: {
-    flexShrink: 1,
-  },
-  spacer: {
     flex: 1,
+    minWidth: 0,
+    marginRight: c(4, 2),
   },
   eyebrow: {
-    fontSize: NU.eyebrow,
+    fontSize: c(13, 11),
     color: 'rgba(255,255,255,0.85)',
   },
   title: {
-    fontSize: NU.title,
+    fontSize: c(22, 18),
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.4,

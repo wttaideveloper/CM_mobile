@@ -63,6 +63,14 @@ export function MarketTrainingCard({ item }: Props) {
         </View>
         <Text style={styles.eventTitle}>{item.title}</Text>
         <Text style={styles.eventDetail}>{item.detail}</Text>
+        {item.averageRating != null && item.averageRating > 0 ? (
+          <Text style={styles.eventRating}>
+            ★ {item.averageRating.toFixed(1)}
+            {item.reviewCount != null && item.reviewCount > 0
+              ? ` · ${item.reviewCount} review${item.reviewCount === 1 ? '' : 's'}`
+              : ''}
+          </Text>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -132,5 +140,11 @@ const styles = StyleSheet.create({
   eventDetail: {
     fontSize: c(12.5, 11.5),
     color: TRAINING_MUTED,
+  },
+  eventRating: {
+    fontSize: c(12, 11),
+    fontWeight: '700',
+    color: TRAINING_TEAL,
+    marginTop: c(2, 1),
   },
 });

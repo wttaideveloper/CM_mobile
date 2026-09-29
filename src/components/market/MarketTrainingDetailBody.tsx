@@ -3,6 +3,7 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Linking,
   Pressable,
   StyleSheet,
@@ -11,13 +12,18 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { BizProfilePinIcon } from '@/components/market/MarketBusinessProfileIcons';
+import {
+  CoursePlayFillIcon,
+} from '@/components/market/CourseLearningIcons';
 import {
   EventDetailCalSmallIcon,
   EventDetailPersonIcon,
 } from '@/components/market/MarketEventDetailIcons';
 import { ListingChevronIcon } from '@/components/market/MarketListingIcons';
+import { MarketCheckoutLockIcon } from '@/components/market/MarketCheckoutIcons';
 import {
   TRAINING_BORDER,
   TRAINING_GREEN,
@@ -26,13 +32,214 @@ import {
   TRAINING_TRACK,
 } from '@/components/market/marketTrainingData';
 import { getTrainingProgressPath } from '@/components/market/marketTrainingProgressData';
+import { TrainingAnnouncementsPanel } from '@/components/market/TrainingAnnouncementsPanel';
+import { TrainingStickyVideoPlayer } from '@/components/market/TrainingStickyVideoPlayer';
 import {
+  useMyTrainingEnrolments,
   useTraining,
   useTrainingReviews,
 } from '@/hooks/useTrainings';
-import type { TrainingDetailView } from '@/types/training.types';
+import type {
+  TrainingCurriculumItemType,
+  TrainingDetailView,
+} from '@/types/training.types';
 import { buildStaticTrainingDetail } from '@/utils/buildStaticTrainingDetail';
+import { openTrainingFile } from '@/utils/downloadTrainingFile';
 import { c, NU } from '@/utils/newUiCompact';
+
+type CurriculumItemView = {
+  id: string;
+  type: TrainingCurriculumItemType;
+  title: string;
+  meta: string;
+  locked?: boolean;
+  completed?: boolean;
+  isPreview?: boolean;
+  videoUrl?: string;
+  fileUrl?: string;
+  examId?: string;
+};
+
+const CURRICULUM_TYPE_META: Record<
+  TrainingCurriculumItemType,
+  { label: string; color: string; bg: string }
+> = {
+  topic: { label: 'Topic', color: '#3c63c8', bg: '#eaf1ff' },
+  video: { label: 'Video', color: '#257d3f', bg: '#e6f4e8' },
+  youtube: { label: 'YouTube', color: '#c4302b', bg: '#fdecea' },
+  live: { label: 'Live', color: '#c45c26', bg: '#fff0e8' },
+  venue: { label: 'Venue', color: '#1f6f8b', bg: '#e5f4f8' },
+  pdf: { label: 'PDF', color: '#8a4b1f', bg: '#fff3e8' },
+  notes: { label: 'Notes', color: '#5b6b7c', bg: '#eef2f5' },
+  quiz: { label: 'Quiz', color: '#8352c0', bg: '#f2e9fb' },
+  assignment: { label: 'Task', color: '#b45309', bg: '#fff7ed' },
+};
+
+function CurriculumChevron({ expanded }: { expanded: boolean }) {
+  return (
+    <View style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }}>
+      <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="m6 9 6 6 6-6"
+          stroke={expanded ? TRAINING_GREEN : TRAINING_MUTED}
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    </View>
+  );
+}
+
+function CurriculumTypeIcon({
+  type,
+  color,
+  size = 18,
+}: {
+  type: TrainingCurriculumItemType;
+  color: string;
+  size?: number;
+}) {
+  if (type === 'video') {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth={1.8} />
+        <Path d="M10 8.5v7l6-3.5-6-3.5z" fill={color} />
+      </Svg>
+    );
+  }
+  if (type === 'youtube') {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Rect
+          x="2"
+          y="5"
+          width="20"
+          height="14"
+          rx="3.5"
+          stroke={color}
+          strokeWidth={1.8}
+        />
+        <Path d="M10 9.2v5.6l5.2-2.8-5.2-2.8z" fill={color} />
+      </Svg>
+    );
+  }
+  if (type === 'live') {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="M4 8h10a2 2 0 0 1 2 2v6H4V8z"
+          stroke={color}
+          strokeWidth={1.8}
+        />
+        <Path
+          d="m16 11 4-2.5v7L16 13"
+          stroke={color}
+          strokeWidth={1.8}
+          strokeLinejoin="round"
+        />
+      </Svg>
+    );
+  }
+  if (type === 'venue') {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11z"
+          stroke={color}
+          strokeWidth={1.8}
+        />
+        <Circle cx="12" cy="10" r="2.2" stroke={color} strokeWidth={1.8} />
+      </Svg>
+    );
+  }
+  if (type === 'pdf' || type === 'notes') {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="M7 3h7l5 5v13H7V3z"
+          stroke={color}
+          strokeWidth={1.8}
+          strokeLinejoin="round"
+        />
+        <Path d="M14 3v5h5M9 13h6M9 17h4" stroke={color} strokeWidth={1.8} />
+      </Svg>
+    );
+  }
+  if (type === 'quiz') {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Rect
+          x="4"
+          y="3"
+          width="16"
+          height="18"
+          rx="2"
+          stroke={color}
+          strokeWidth={1.8}
+        />
+        <Path
+          d="M9 8h6M9 12h6M9 16h3"
+          stroke={color}
+          strokeWidth={1.8}
+          strokeLinecap="round"
+        />
+      </Svg>
+    );
+  }
+  if (type === 'assignment') {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="M8 4h8v3H8V4zM7 7h10v13H7V7z"
+          stroke={color}
+          strokeWidth={1.8}
+          strokeLinejoin="round"
+        />
+        <Path d="M10 12h4M10 16h4" stroke={color} strokeWidth={1.8} />
+      </Svg>
+    );
+  }
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M5 6h14M5 12h14M5 18h10"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+function summarizeCurriculumItems(items: CurriculumItemView[]): string {
+  if (items.length === 0) return 'No items yet';
+  const counts = items.reduce<Partial<Record<TrainingCurriculumItemType, number>>>(
+    (acc, item) => {
+      acc[item.type] = (acc[item.type] ?? 0) + 1;
+      return acc;
+    },
+    {},
+  );
+  const pluralLabel: Record<TrainingCurriculumItemType, [string, string]> = {
+    topic: ['topic', 'topics'],
+    video: ['video', 'videos'],
+    youtube: ['YouTube', 'YouTube'],
+    live: ['live', 'live'],
+    venue: ['venue', 'venues'],
+    pdf: ['PDF', 'PDFs'],
+    notes: ['notes', 'notes'],
+    quiz: ['quiz', 'quizzes'],
+    assignment: ['task', 'tasks'],
+  };
+  return (Object.entries(counts) as [TrainingCurriculumItemType, number][])
+    .map(([type, count]) => {
+      const [one, many] = pluralLabel[type];
+      return `${count} ${count === 1 ? one : many}`;
+    })
+    .slice(0, 4)
+    .join(' · ');
+}
 
 function Section({
   label,
@@ -51,24 +258,6 @@ function Section({
 
 function Card({ children }: { children: ReactNode }) {
   return <View style={styles.card}>{children}</View>;
-}
-
-function MetaRow({
-  label,
-  value,
-  last,
-}: {
-  label: string;
-  value: string;
-  last?: boolean;
-}) {
-  if (!value || value === '—') return null;
-  return (
-    <View style={[styles.metaRow, !last && styles.infoBorder]}>
-      <Text style={styles.metaLabel}>{label}</Text>
-      <Text style={styles.metaValue}>{value}</Text>
-    </View>
-  );
 }
 
 function RatingStars({
@@ -138,6 +327,54 @@ function ReviewPreviewCard({
   );
 }
 
+function DiscussionsPreviewCard({ enrolled }: { enrolled: boolean }) {
+  return (
+    <View style={[styles.discussCard, !enrolled && styles.discussCardLocked]}>
+      <View style={styles.discussHero}>
+        <View style={styles.discussIconWrap}>
+          <Text style={styles.discussIconText}>Q</Text>
+        </View>
+        <View style={styles.discussHeroCopy}>
+          <Text style={styles.discussTitle}>Q&A · Discussions</Text>
+          <Text style={styles.discussSubtitle}>
+            Ask questions and get replies from instructors and peers
+          </Text>
+        </View>
+      </View>
+
+      {enrolled ? (
+        <>
+          <View style={styles.discussSample}>
+            <Text style={styles.discussSampleLabel}>Example</Text>
+            <Text style={styles.discussSampleQuestion}>
+              When should I complete the session quiz?
+            </Text>
+            <Text style={styles.discussSampleReply}>
+              After you finish that session’s lessons, the quiz unlocks in My
+              Learning.
+            </Text>
+          </View>
+          <View style={styles.discussComposerPreview}>
+            <Text style={styles.discussComposerPlaceholder}>
+              Ask a question…
+            </Text>
+          </View>
+          <Text style={styles.discussHint}>
+            Open this training in My Learning to post and reply.
+          </Text>
+        </>
+      ) : (
+        <View style={styles.discussLockedBox}>
+          <MarketCheckoutLockIcon color={TRAINING_MUTED} size={16} />
+          <Text style={styles.discussLockedText}>
+            Enroll to unlock discussions for this training
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 function ActionLink({
   label,
   onPress,
@@ -153,12 +390,175 @@ function ActionLink({
   );
 }
 
+function CurriculumItemRow({
+  item,
+  locked,
+  onPress,
+}: {
+  item: CurriculumItemView;
+  locked: boolean;
+  onPress?: () => void;
+}) {
+  const meta = CURRICULUM_TYPE_META[item.type] ?? CURRICULUM_TYPE_META.topic;
+  const canPlayVideo =
+    !locked &&
+    (item.type === 'video' || item.type === 'youtube') &&
+    Boolean(item.videoUrl?.trim());
+  const canOpenFile =
+    !locked &&
+    (item.type === 'pdf' || item.type === 'notes') &&
+    Boolean(item.fileUrl?.trim());
+  const canOpenQuiz = !locked && item.type === 'quiz';
+  const interactive =
+    Boolean(onPress) && (canPlayVideo || canOpenFile || canOpenQuiz || !locked);
+
+  const rightIcon = locked ? (
+    <MarketCheckoutLockIcon color={TRAINING_MUTED} size={16} />
+  ) : canPlayVideo ? (
+    <CoursePlayFillIcon color={TRAINING_GREEN} size={16} />
+  ) : canOpenQuiz ? (
+    <Text style={styles.curriculumPreviewPill}>Quiz</Text>
+  ) : item.isPreview ? (
+    <Text style={styles.curriculumPreviewPill}>Preview</Text>
+  ) : null;
+
+  const content = (
+    <>
+      <View style={[styles.curriculumTypeIconWrap, { backgroundColor: meta.bg }]}>
+        <CurriculumTypeIcon type={item.type} color={meta.color} size={14} />
+      </View>
+      <View style={styles.curriculumItemCopy}>
+        <Text style={styles.curriculumItemTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={styles.curriculumItemMeta} numberOfLines={1}>
+          {meta.label}
+          {item.meta ? ` · ${item.meta}` : ''}
+          {!locked && item.isPreview ? ' · Preview' : ''}
+        </Text>
+      </View>
+      <View style={styles.curriculumItemRight}>{rightIcon}</View>
+    </>
+  );
+
+  if (interactive && onPress) {
+    return (
+      <Pressable
+        style={styles.curriculumItem}
+        onPress={onPress}
+        accessibilityRole="button"
+      >
+        {content}
+      </Pressable>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.curriculumItem,
+        locked && styles.curriculumItemLocked,
+      ]}
+    >
+      {content}
+    </View>
+  );
+}
+
+function CurriculumSectionRow({
+  sectionIndex,
+  title,
+  summary,
+  items,
+  expanded,
+  isLast,
+  isItemLocked,
+  onToggle,
+  onItemPress,
+}: {
+  sectionIndex: number;
+  title: string;
+  summary: string;
+  items: CurriculumItemView[];
+  expanded: boolean;
+  isLast: boolean;
+  isItemLocked: (item: CurriculumItemView) => boolean;
+  onToggle: () => void;
+  onItemPress: (item: CurriculumItemView) => void;
+}) {
+  const total = items.length;
+
+  return (
+    <View style={!isLast ? styles.curriculumSectionBorder : undefined}>
+      <Pressable
+        style={[
+          styles.curriculumSectionHeader,
+          expanded && styles.curriculumSectionHeaderOpen,
+        ]}
+        onPress={onToggle}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+      >
+        <View style={styles.curriculumSectionBadge}>
+          <Text style={styles.curriculumSectionBadgeText}>
+            {sectionIndex + 1}
+          </Text>
+        </View>
+        <View style={styles.curriculumSectionCopy}>
+          <Text style={styles.curriculumSectionTitle} numberOfLines={2}>
+            {title}
+          </Text>
+          <Text style={styles.curriculumSectionMeta} numberOfLines={1}>
+            {summary}
+          </Text>
+        </View>
+        {total > 0 ? (
+          <Text style={styles.curriculumProgressPill}>{total}</Text>
+        ) : null}
+        <CurriculumChevron expanded={expanded} />
+      </Pressable>
+
+      {expanded ? (
+        <View style={styles.curriculumLessonList}>
+          <View style={styles.curriculumLessonNest}>
+            {items.length > 0 ? (
+              items.map((item) => {
+                const locked = isItemLocked(item);
+                return (
+                  <CurriculumItemRow
+                    key={item.id}
+                    item={item}
+                    locked={locked}
+                    onPress={
+                      locked
+                        ? undefined
+                        : () => {
+                            onItemPress(item);
+                          }
+                    }
+                  />
+                );
+              })
+            ) : (
+              <Text style={styles.curriculumEmptyText}>
+                No items in this section yet.
+              </Text>
+            )}
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function CurriculumBlock({
   trainingId,
   sessions,
   materials,
   onOpenMaterial,
   preferApiSessions = false,
+  isSelfPaced = false,
+  enrolled = false,
 }: {
   trainingId?: string;
   sessions: TrainingDetailView['sessions'];
@@ -166,155 +566,187 @@ function CurriculumBlock({
   onOpenMaterial: (url?: string) => void;
   /** API trainings use `sections` → sessions; skip static demo curriculum. */
   preferApiSessions?: boolean;
+  /** Self-paced only: honor `is_preview` unlock on detail. */
+  isSelfPaced?: boolean;
+  enrolled?: boolean;
 }) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const router = useRouter();
+  const [expandedId, setExpandedId] = useState<string | null | undefined>(
+    undefined,
+  );
+  const [activePreview, setActivePreview] = useState<{
+    id: string;
+    title: string;
+    url: string;
+  } | null>(null);
+
   const previewDays = preferApiSessions
     ? []
     : getTrainingProgressPath(trainingId).days;
   const useDayCurriculum = previewDays.length > 0;
+  const sessionCount = useDayCurriculum ? previewDays.length : sessions.length;
+  const defaultExpandedId = useDayCurriculum
+    ? previewDays[0]?.id
+    : sessions[0]?.id;
+  const openId =
+    expandedId === undefined ? defaultExpandedId ?? null : expandedId;
+
+  const totalItems = useDayCurriculum
+    ? previewDays.reduce((sum, day) => sum + day.lessons.length, 0)
+    : sessions.reduce((sum, session) => sum + session.items.length, 0);
+
+  const isItemLocked = (item: CurriculumItemView): boolean => {
+    // Self-paced detail: unlock only `is_preview` lessons; others stay locked.
+    if (!isSelfPaced) return true;
+    return !item.isPreview;
+  };
+
+  const onItemPress = (item: CurriculumItemView) => {
+    if (isItemLocked(item)) return;
+
+    if (item.type === 'quiz') {
+      const examId = item.examId?.trim();
+      if (!examId || !trainingId) {
+        Alert.alert(
+          'Quiz',
+          'Assessment id is missing for this quiz.',
+        );
+        return;
+      }
+      router.push({
+        pathname: '/(main)/market/training-exam',
+        params: {
+          trainingId,
+          examId,
+          lessonId: item.id,
+        },
+      });
+      return;
+    }
+
+    if (
+      (item.type === 'video' || item.type === 'youtube') &&
+      item.videoUrl?.trim()
+    ) {
+      setActivePreview({
+        id: item.id,
+        title: item.title,
+        url: item.videoUrl.trim(),
+      });
+      return;
+    }
+
+    if (
+      (item.type === 'pdf' || item.type === 'notes') &&
+      item.fileUrl?.trim()
+    ) {
+      void openTrainingFile({
+        url: item.fileUrl.trim(),
+        suggestedName: item.title,
+      });
+      return;
+    }
+
+    if (item.isPreview) {
+      Alert.alert(
+        'Preview',
+        'This preview item has no playable media yet. Enroll to access the full curriculum.',
+      );
+    }
+  };
 
   return (
-    <Section label="Curriculum">
-      <Card>
-        {useDayCurriculum
-          ? previewDays.map((day, dayIndex) => {
-              const expanded = expandedId === day.id;
-              return (
-                <View
-                  key={day.id}
-                  style={
-                    dayIndex < previewDays.length - 1
-                      ? styles.infoBorder
-                      : undefined
-                  }
-                >
-                  <Pressable
-                    style={styles.sessionRow}
-                    onPress={() =>
-                      setExpandedId((current) =>
-                        current === day.id ? null : day.id,
-                      )
+    <View style={styles.section}>
+      {activePreview ? (
+        <TrainingStickyVideoPlayer
+          url={activePreview.url}
+          title={activePreview.title}
+          subtitle="Preview"
+          onClose={() => setActivePreview(null)}
+        />
+      ) : null}
+      <View style={styles.curriculumPanel}>
+        <Text style={styles.curriculumLabel}>Curriculum</Text>
+        <Text style={styles.curriculumHint}>
+          {sessionCount} section{sessionCount === 1 ? '' : 's'}
+          {totalItems > 0 ? ` · ${totalItems} items` : ''}
+          {isSelfPaced ? ' · Preview lessons unlocked' : ''}
+        </Text>
+        <View style={styles.curriculumCard}>
+          {useDayCurriculum
+            ? previewDays.map((day, dayIndex) => {
+                const items: CurriculumItemView[] = day.lessons.map((lesson) => ({
+                  id: lesson.id,
+                  type: lesson.kind === 'exam' ? 'quiz' : 'topic',
+                  title: lesson.title,
+                  meta: lesson.kind === 'exam' ? 'Quiz' : '',
+                  locked: false,
+                  completed: false,
+                }));
+                return (
+                  <CurriculumSectionRow
+                    key={day.id}
+                    sectionIndex={dayIndex}
+                    title={`${day.dayLabel} · ${day.title}`}
+                    summary={day.summary || summarizeCurriculumItems(items)}
+                    items={items}
+                    expanded={openId === day.id}
+                    isLast={dayIndex === previewDays.length - 1}
+                    isItemLocked={isItemLocked}
+                    onItemPress={onItemPress}
+                    onToggle={() =>
+                      setExpandedId((current) => {
+                        const active =
+                          current === undefined ? defaultExpandedId : current;
+                        return active === day.id ? null : day.id;
+                      })
                     }
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded }}
-                  >
-                    <View style={styles.sessionCopy}>
-                      <Text style={styles.sessionTitle}>
-                        {day.dayLabel} · {day.title}
-                      </Text>
-                      <Text style={styles.infoMeta}>{day.summary}</Text>
-                    </View>
-                    <Text style={styles.expandChevron}>
-                      {expanded ? '▾' : '▸'}
-                    </Text>
-                  </Pressable>
-
-                  {expanded ? (
-                    <View style={styles.conceptsBox}>
-                      <Text style={styles.conceptsLabel}>
-                        {previewDays.some((day) =>
-                          day.lessons.some((lesson) => lesson.kind === 'venue'),
-                        ) &&
-                        previewDays.some((day) =>
-                          day.lessons.some(
-                            (lesson) =>
-                              lesson.kind === 'live' || lesson.kind === 'video',
-                          ),
-                        )
-                          ? 'Virtual + physical · exams unlock after content'
-                          : previewDays.some((day) =>
-                                day.lessons.some(
-                                  (lesson) => lesson.kind === 'venue',
-                                ),
-                              )
-                            ? 'Physical venue · QR check-in · exams'
-                            : 'Live Zoom sessions · exams (auto-unlock)'}
-                      </Text>
-                      {day.lessons.map((lesson) => (
-                        <Text key={lesson.id} style={styles.conceptItem}>
-                          {lesson.kind === 'video'
-                            ? '▶ Video'
-                            : lesson.kind === 'live'
-                              ? '● Join Zoom'
-                              : lesson.kind === 'venue'
-                                ? '▣ Venue QR'
-                                : '✎ MCQ exam'}
-                          {' · '}
-                          {lesson.title}
-                        </Text>
-                      ))}
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })
-          : sessions.map((session, index) => {
-              const expanded = expandedId === session.id;
-              const concepts =
-                session.concepts.length > 0
-                  ? session.concepts
-                  : [
-                      preferApiSessions
-                        ? 'No lessons in this section yet.'
-                        : 'Concepts for this session will be shared soon.',
-                    ];
-
-              return (
-                <View
-                  key={session.id}
-                  style={
-                    index < sessions.length - 1 ? styles.infoBorder : undefined
-                  }
-                >
-                  <Pressable
-                    style={styles.sessionRow}
-                    onPress={() =>
-                      setExpandedId((current) =>
-                        current === session.id ? null : session.id,
-                      )
+                  />
+                );
+              })
+            : sessions.map((session, index) => {
+                const items =
+                  session.items.length > 0
+                    ? session.items
+                    : session.concepts.map((title, conceptIndex) => ({
+                        id: `${session.id}-${conceptIndex}`,
+                        type: 'topic' as const,
+                        title,
+                        meta: '',
+                        locked: false,
+                        completed: false,
+                      }));
+                return (
+                  <CurriculumSectionRow
+                    key={session.id}
+                    sectionIndex={index}
+                    title={session.name}
+                    summary={
+                      items.length > 0
+                        ? summarizeCurriculumItems(items) ||
+                          session.when ||
+                          session.duration
+                        : preferApiSessions
+                          ? 'No lessons in this section yet'
+                          : 'Concepts coming soon'
                     }
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded }}
-                  >
-                    <View style={styles.sessionCopy}>
-                      <Text style={styles.sessionTitle}>{session.name}</Text>
-                      <Text style={styles.infoMeta}>
-                        {session.when}
-                        {session.duration && session.duration !== '—'
-                          ? ` · ${session.duration}`
-                          : ''}
-                      </Text>
-                    </View>
-                    <Text style={styles.expandChevron}>
-                      {expanded ? '▾' : '▸'}
-                    </Text>
-                  </Pressable>
-
-                  {expanded ? (
-                    <View style={styles.conceptsBox}>
-                      <Text style={styles.conceptsLabel}>
-                        {preferApiSessions
-                          ? 'Lessons & quizzes'
-                          : 'Concepts covered'}
-                      </Text>
-                      {concepts.map((concept, conceptIndex) => (
-                        <Text
-                          key={`${session.id}-${conceptIndex}`}
-                          style={styles.conceptItem}
-                        >
-                          {concept.startsWith('Quiz ·')
-                            ? `✎  ${concept}`
-                            : concept.startsWith('Lesson ·')
-                              ? `•  ${concept}`
-                              : `•  ${concept}`}
-                        </Text>
-                      ))}
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-      </Card>
+                    items={items}
+                    expanded={openId === session.id}
+                    isLast={index === sessions.length - 1}
+                    isItemLocked={isItemLocked}
+                    onItemPress={onItemPress}
+                    onToggle={() =>
+                      setExpandedId((current) => {
+                        const active =
+                          current === undefined ? defaultExpandedId : current;
+                        return active === session.id ? null : session.id;
+                      })
+                    }
+                  />
+                );
+              })}
+        </View>
+      </View>
 
       {materials.length > 0 ? (
         <>
@@ -341,7 +773,7 @@ function CurriculumBlock({
           </Card>
         </>
       ) : null}
-    </Section>
+    </View>
   );
 }
 
@@ -351,20 +783,17 @@ export function MarketTrainingDetailBody() {
   const { training, isApiId, isLoading, isError, error, refetch, isFetching } =
     useTraining(id);
   const reviewsQuery = useTrainingReviews(isApiId ? id : undefined);
+  const enrolments = useMyTrainingEnrolments();
 
   const d = isApiId ? training : buildStaticTrainingDetail(id);
 
   if (isApiId && isLoading && !d) {
-    return (
-      <View style={styles.stateWrap}>
-        <ActivityIndicator color={TRAINING_GREEN} size="large" />
-      </View>
-    );
+    return null;
   }
 
   if (isApiId && isError && !d) {
     return (
-      <View style={styles.stateWrap}>
+      <View style={styles.stateWrapCentered}>
         <Text style={styles.stateText}>
           {error?.message || 'Could not load training details.'}
         </Text>
@@ -379,6 +808,7 @@ export function MarketTrainingDetailBody() {
 
   if (!d) return null;
 
+  const enrolled = isApiId ? enrolments.isEnrolled(d.id) : false;
   const reviews = isApiId ? reviewsQuery.reviews : d.reviews;
   const averageRating = isApiId
     ? reviewsQuery.averageRating ?? d.averageRating
@@ -395,6 +825,74 @@ export function MarketTrainingDetailBody() {
       Alert.alert('Link', url);
     }
   };
+
+  const hasReal = (value?: string | null, emptyMarks: string[] = []) => {
+    const trimmed = typeof value === 'string' ? value.trim() : '';
+    if (!trimmed) return false;
+    return !emptyMarks.includes(trimmed);
+  };
+
+  const scheduleTitle =
+    hasReal(d.startDate, ['Start date TBD']) &&
+    hasReal(d.endDate, ['End date TBD'])
+      ? `${d.startDate} – ${d.endDate}`
+      : hasReal(d.startDate, ['Start date TBD'])
+        ? d.startDate
+        : hasReal(d.endDate, ['End date TBD'])
+          ? d.endDate
+          : '';
+  const scheduleMeta = [
+    d.startTime && d.endTime
+      ? `${d.startTime} – ${d.endTime}`
+      : d.startTime || d.endTime || null,
+    hasReal(d.recurring) ? d.recurring : null,
+    hasReal(d.timezone, ['—']) ? d.timezone : null,
+    hasReal(d.duration, ['Duration TBD']) ? d.duration : null,
+  ].filter(Boolean) as string[];
+  const showSchedule = Boolean(scheduleTitle) || scheduleMeta.length > 0;
+
+  const attendModeLabel =
+    d.deliveryMode === 'In-Person' || d.deliveryMode === 'Physical'
+      ? 'Physical venue'
+      : d.deliveryMode === 'Hybrid'
+        ? 'Hybrid delivery'
+        : d.deliveryMode === 'Self-paced'
+          ? 'Self-paced · recorded'
+          : d.deliveryMode === 'Virtual'
+            ? 'Virtual · live online'
+            : hasReal(d.deliveryMode)
+              ? d.deliveryMode
+              : '';
+  const attendVenue = hasReal(d.venue, ['—']) ? d.venue : '';
+  const attendAddress = hasReal(d.address, ['—']) ? d.address : '';
+  const attendProvider = hasReal(d.meetingProvider, ['—'])
+    ? d.meetingProvider
+    : '';
+  const attendMeetingLink = hasReal(d.meetingLink) ? d.meetingLink : '';
+  const attendTitle = [attendModeLabel, attendVenue].filter(Boolean).join(' · ');
+  const attendMeta = [attendAddress, attendProvider].filter(Boolean).join(' · ');
+  const showAttend =
+    Boolean(attendTitle) ||
+    Boolean(attendMeta) ||
+    Boolean(attendMeetingLink);
+
+  const seatsTitle = [
+    hasReal(d.enrolled, ['—']) ? `${d.enrolled} people joined` : null,
+    hasReal(d.available, ['—']) ? `${d.available} spots left` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const seatsMeta = [
+    hasReal(d.capacityMax, ['—']) ? `Capacity ${d.capacityMax}` : null,
+    hasReal(d.enrolmentDeadline, ['Open enrollment'])
+      ? `closes ${d.enrolmentDeadline}`
+      : null,
+    d.requiresApproval ? 'Approval required' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const showSeats = Boolean(seatsTitle) || Boolean(seatsMeta);
+  const showWhenWhere = showSchedule || showAttend || showSeats;
 
   return (
     <View>
@@ -433,7 +931,10 @@ export function MarketTrainingDetailBody() {
               {[d.category, d.courseType].filter(Boolean).join(' · ')}
             </Text>
           </View>
-          <Text style={styles.title}>{d.title}</Text>
+          <View style={styles.titlePriceRow}>
+            <Text style={[styles.title, styles.titleFlex]}>{d.title}</Text>
+            <Text style={styles.priceInline}>{d.priceLabel}</Text>
+          </View>
           {averageRating != null ? (
             <View style={styles.ratingSummary}>
               <RatingStars rating={averageRating} size="md" />
@@ -459,7 +960,6 @@ export function MarketTrainingDetailBody() {
 
         <Section label="At a glance">
           <View style={styles.factRow}>
-            <FactChip label="Best for" value={d.targetAudience} />
             <FactChip label="Level" value={d.difficulty} />
             <FactChip label="Language" value={d.language} />
           </View>
@@ -469,79 +969,6 @@ export function MarketTrainingDetailBody() {
           </Text>
         </Section>
 
-        <Section label="When & where">
-        <Card>
-          <View style={[styles.infoRow, styles.infoBorder]}>
-            <EventDetailCalSmallIcon />
-            <View style={styles.infoCopy}>
-              <Text style={styles.infoTitle}>
-                {d.startDate} – {d.endDate}
-              </Text>
-              <Text style={styles.infoMeta}>
-                {[
-                  d.startTime && d.endTime
-                    ? `${d.startTime} – ${d.endTime}`
-                    : null,
-                  d.recurring,
-                  d.timezone !== '—' ? d.timezone : null,
-                  d.duration,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.infoRow, styles.infoBorder]}>
-            <BizProfilePinIcon />
-            <View style={styles.infoCopy}>
-              <Text style={styles.infoTitle}>
-                {d.deliveryMode === 'In-Person' ||
-                d.deliveryMode === 'Physical'
-                  ? 'Physical venue'
-                  : d.deliveryMode === 'Hybrid'
-                    ? 'Hybrid delivery'
-                    : 'Virtual delivery'}{' '}
-                · {d.venue}
-              </Text>
-              <Text style={styles.infoMeta}>
-                {[d.address !== '—' ? d.address : null, d.meetingProvider]
-                  .filter(Boolean)
-                  .join(' · ') || 'Location details after enroll'}
-              </Text>
-              {d.meetingLink ? (
-                <Pressable onPress={() => openLink(d.meetingLink)}>
-                  <Text style={styles.linkText}>{d.meetingLink}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          </View>
-          <View style={styles.infoRow}>
-            <EventDetailPersonIcon />
-            <View style={styles.infoCopy}>
-              <Text style={styles.infoTitle}>
-                {d.enrolled !== '—' ? `${d.enrolled} people joined` : 'Open to join'}
-                {d.available !== '—' ? ` · ${d.available} spots left` : ''}
-              </Text>
-              <Text style={styles.infoMeta}>
-                Capacity {d.capacityMax}
-                {d.enrolmentDeadline ? ` · closes ${d.enrolmentDeadline}` : ''}
-                {d.requiresApproval ? ' · Approval required' : ''}
-              </Text>
-            </View>
-          </View>
-        </Card>
-        </Section>
-
-        <View style={styles.priceCard}>
-          <View>
-            <Text style={styles.priceLabel}>{d.priceType} training</Text>
-            <Text style={styles.priceValue}>{d.priceLabel}</Text>
-          </View>
-          {d.discountLabel ? (
-            <Text style={styles.priceMeta}>{d.discountLabel}</Text>
-          ) : null}
-        </View>
-
         {d.sessions.length > 0 || d.materials.length > 0 ? (
           <CurriculumBlock
             trainingId={d.id}
@@ -549,87 +976,199 @@ export function MarketTrainingDetailBody() {
             materials={d.materials}
             onOpenMaterial={openLink}
             preferApiSessions={isApiId}
+            isSelfPaced={d.deliveryMode === 'Self-paced'}
+            enrolled={enrolled}
           />
         ) : null}
 
+        {showWhenWhere ? (
+          <Section label="When & where">
+            <View style={styles.softStack}>
+              {showSchedule ? (
+                <View style={styles.softTile}>
+                  <View
+                    style={[styles.infoIconWrap, { backgroundColor: '#e6f4e8' }]}
+                  >
+                    <EventDetailCalSmallIcon />
+                  </View>
+                  <View style={styles.infoCopy}>
+                    <Text style={styles.infoEyebrow}>Schedule</Text>
+                    {scheduleTitle ? (
+                      <Text style={styles.infoTitle}>{scheduleTitle}</Text>
+                    ) : null}
+                    {scheduleMeta.length > 0 ? (
+                      <Text style={styles.infoMeta}>
+                        {scheduleMeta.join(' · ')}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              ) : null}
+
+              {showAttend ? (
+                <View style={styles.softTile}>
+                  <View
+                    style={[styles.infoIconWrap, { backgroundColor: '#fdf0e3' }]}
+                  >
+                    <BizProfilePinIcon />
+                  </View>
+                  <View style={styles.infoCopy}>
+                    <Text style={styles.infoEyebrow}>How you attend</Text>
+                    {attendTitle ? (
+                      <Text style={styles.infoTitle}>{attendTitle}</Text>
+                    ) : null}
+                    {attendMeta ? (
+                      <Text style={styles.infoMeta}>{attendMeta}</Text>
+                    ) : null}
+                    {attendMeetingLink ? (
+                      <Pressable onPress={() => openLink(attendMeetingLink)}>
+                        <Text style={styles.linkText} numberOfLines={1}>
+                          Open meeting link
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+              ) : null}
+
+              {showSeats ? (
+                <View style={styles.softTile}>
+                  <View
+                    style={[styles.infoIconWrap, { backgroundColor: '#f2e9fb' }]}
+                  >
+                    <EventDetailPersonIcon />
+                  </View>
+                  <View style={styles.infoCopy}>
+                    <Text style={styles.infoEyebrow}>Seats</Text>
+                    {seatsTitle ? (
+                      <Text style={styles.infoTitle}>{seatsTitle}</Text>
+                    ) : null}
+                    {seatsMeta ? (
+                      <Text style={styles.infoMeta}>{seatsMeta}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          </Section>
+        ) : null}
+
         <Section label="Instructor">
-          <Card>
-            <Text style={styles.sessionTitle}>{d.trainerName}</Text>
-            <Text style={styles.infoMeta}>{d.trainerRole}</Text>
-            <Text style={styles.bio}>{d.trainerBio}</Text>
-          </Card>
+          <View style={styles.instructorCard}>
+            <View style={styles.instructorRow}>
+              <View style={styles.instructorAvatar}>
+                <Text style={styles.instructorAvatarText}>
+                  {(d.trainerName || 'T')
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part) => part[0]?.toUpperCase() ?? '')
+                    .join('') || 'T'}
+                </Text>
+              </View>
+              <View style={styles.instructorCopy}>
+                <Text style={styles.instructorName}>{d.trainerName}</Text>
+                <Text style={styles.infoMeta}>
+                  {d.trainerRole && d.trainerRole !== '—'
+                    ? d.trainerRole
+                    : 'Instructor'}
+                </Text>
+              </View>
+            </View>
+            {d.trainerBio && d.trainerBio !== '—' ? (
+              <Text style={styles.bio}>{d.trainerBio}</Text>
+            ) : null}
+          </View>
         </Section>
 
         <Section label="Requirements">
-          <Card>
-            <Text style={styles.bullet}>{d.prerequisites}</Text>
-          </Card>
+          <View style={styles.proseBlock}>
+            <Text style={styles.proseText}>{d.prerequisites}</Text>
+          </View>
         </Section>
 
         {d.deliveryInstructions || d.accessInfo || d.exceptions ? (
           <Section label="Delivery instructions">
-            <Card>
+            <View style={styles.proseBlock}>
               {d.deliveryInstructions ? (
-                <Text style={styles.bullet}>{d.deliveryInstructions}</Text>
+                <Text style={styles.proseText}>{d.deliveryInstructions}</Text>
               ) : null}
               {d.accessInfo ? (
-                <Text style={styles.mutedLine}>{d.accessInfo}</Text>
+                <Text style={styles.proseMuted}>{d.accessInfo}</Text>
               ) : null}
               {d.exceptions ? (
-                <Text style={styles.mutedLine}>Exceptions: {d.exceptions}</Text>
+                <Text style={styles.proseMuted}>
+                  Exceptions: {d.exceptions}
+                </Text>
               ) : null}
-            </Card>
+            </View>
           </Section>
         ) : null}
 
         <Section label="What you’ll learn">
-          <Card>
+          <View style={styles.learnList}>
             {(d.objectives.length > 0
               ? d.objectives
               : ['Full curriculum shared after enrollment']
             ).map((item) => (
-              <Text key={item} style={styles.bullet}>
-                •  {item}
-              </Text>
+              <View key={item} style={styles.learnRow}>
+                <View style={styles.learnDot}>
+                  <Text style={styles.learnDotText}>✓</Text>
+                </View>
+                <Text style={styles.learnText}>{item}</Text>
+              </View>
             ))}
-          </Card>
+          </View>
         </Section>
 
-        <Section label="Offline & notes">
-          <Card>
-            <MetaRow
-              label="Offline access"
-              value={d.offlineEnabled ? 'Enabled for enrolled learners' : 'Not enabled'}
-            />
-            <MetaRow
-              label="Auto notes PDF"
-              value={d.notesPdfAvailable ? 'Available after enroll' : 'Not available'}
-            />
-            <MetaRow
-              label="Instructor notes"
-              value={`${d.instructorNotes.length} file(s)`}
-              last
-            />
-            <ActionLink
-              label="Offline downloads"
-              onPress={() =>
-                router.push({
-                  pathname: '/(main)/market/training-offline',
-                  params: { id: d.id },
-                })
-              }
-            />
-            <ActionLink
-              label="Course notes"
-              onPress={() =>
-                router.push({
-                  pathname: '/(main)/market/training-notes',
-                  params: { id: d.id },
-                })
-              }
-            />
-          </Card>
+        <Section label="Notes">
+          {d.notes.length > 0 ? (
+            <View style={styles.notesList}>
+              {d.notes.map((note) => (
+                <Pressable
+                  key={note.id}
+                  style={({ pressed }) => [
+                    styles.noteTile,
+                    pressed && styles.noteTilePressed,
+                  ]}
+                  onPress={() => {
+                    void openTrainingFile({
+                      url: note.url,
+                      suggestedName: note.title,
+                    });
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open note ${note.title}`}
+                >
+                  <View style={styles.noteIconWrap}>
+                    <Text style={styles.noteIconText}>PDF</Text>
+                  </View>
+                  <View style={styles.noteCopy}>
+                    <Text style={styles.noteTitle} numberOfLines={2}>
+                      {note.title}
+                    </Text>
+                    <Text style={styles.noteMeta}>Tap to open</Text>
+                  </View>
+                  <View style={styles.noteOpenPill}>
+                    <Text style={styles.noteOpenText}>Open</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.notesEmpty}>
+              <Text style={styles.notesEmptyText}>No notes are there.</Text>
+            </View>
+          )}
         </Section>
+
+        <Section label="Discussions">
+          <DiscussionsPreviewCard enrolled={enrolled} />
+        </Section>
+
+        {isApiId ? (
+          <TrainingAnnouncementsPanel trainingId={d.id} enabled />
+        ) : null}
 
         <Section label="Ratings & reviews">
           {averageRating != null && averageRating > 0 ? (
@@ -647,9 +1186,9 @@ export function MarketTrainingDetailBody() {
           ) : null}
           <View style={styles.reviewStack}>
             {isApiId && reviewsQuery.isLoading ? (
-              <Card>
+              <View style={styles.proseBlock}>
                 <ActivityIndicator color={TRAINING_GREEN} />
-              </Card>
+              </View>
             ) : null}
             {reviews.slice(0, 2).map((review) => (
               <ReviewPreviewCard
@@ -662,11 +1201,11 @@ export function MarketTrainingDetailBody() {
               />
             ))}
             {!reviewsQuery.isLoading && reviews.length === 0 ? (
-              <Card>
-                <Text style={styles.mutedLine}>
+              <View style={styles.proseBlock}>
+                <Text style={styles.proseMuted}>
                   No reviews yet. Be the first to leave a rating.
                 </Text>
-              </Card>
+              </View>
             ) : null}
           </View>
           <View style={styles.reviewActions}>
@@ -699,16 +1238,17 @@ export function MarketTrainingDetailBody() {
 }
 
 const styles = StyleSheet.create({
-  stateWrap: {
-    paddingVertical: c(48, 40),
+  stateWrapCentered: {
+    minHeight: Dimensions.get('window').height * 0.55,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: c(12, 10),
+    paddingHorizontal: NU.hPad,
   },
   stateText: {
     fontSize: NU.body,
     color: TRAINING_MUTED,
     textAlign: 'center',
-    paddingHorizontal: NU.hPad,
   },
   retryBtn: {
     paddingHorizontal: c(14, 12),
@@ -773,6 +1313,21 @@ const styles = StyleSheet.create({
     color: TRAINING_TEAL,
     letterSpacing: -0.4,
   },
+  titleFlex: {
+    flex: 1,
+  },
+  titlePriceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: c(12, 10),
+  },
+  priceInline: {
+    fontSize: NU.heading,
+    fontWeight: '800',
+    color: TRAINING_GREEN,
+    letterSpacing: -0.3,
+    marginTop: c(2, 1),
+  },
   ratingSummary: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -821,9 +1376,9 @@ const styles = StyleSheet.create({
   },
   factChip: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f4f8f5',
     borderWidth: 1,
-    borderColor: TRAINING_BORDER,
+    borderColor: '#e8f0ea',
     borderRadius: NU.cardRadiusSm,
     paddingVertical: c(12, 10),
     paddingHorizontal: c(10, 8),
@@ -898,6 +1453,108 @@ const styles = StyleSheet.create({
   reviewStack: {
     gap: c(10, 8),
   },
+  discussCard: {
+    backgroundColor: '#f3fafc',
+    borderWidth: 1,
+    borderColor: '#c5dde8',
+    borderRadius: NU.cardRadius,
+    padding: c(14, 12),
+    gap: c(12, 10),
+  },
+  discussCardLocked: {
+    backgroundColor: '#f7f8f9',
+    borderColor: TRAINING_BORDER,
+  },
+  discussHero: {
+    flexDirection: 'row',
+    gap: c(10, 8),
+    alignItems: 'center',
+  },
+  discussIconWrap: {
+    width: c(40, 36),
+    height: c(40, 36),
+    borderRadius: c(20, 18),
+    backgroundColor: '#e5f4f8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  discussIconText: {
+    fontSize: c(15, 13),
+    fontWeight: '800',
+    color: TRAINING_TEAL,
+  },
+  discussHeroCopy: {
+    flex: 1,
+    gap: c(2, 1),
+  },
+  discussTitle: {
+    fontSize: NU.body,
+    fontWeight: '800',
+    color: '#14352a',
+  },
+  discussSubtitle: {
+    fontSize: c(12.5, 11.5),
+    color: TRAINING_MUTED,
+    lineHeight: c(17, 15),
+  },
+  discussSample: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#d7e8ef',
+    borderRadius: NU.cardRadiusSm,
+    padding: c(12, 10),
+    gap: c(6, 5),
+  },
+  discussSampleLabel: {
+    fontSize: c(11, 10),
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    color: TRAINING_TEAL,
+  },
+  discussSampleQuestion: {
+    fontSize: c(13.5, 12.5),
+    fontWeight: '700',
+    color: '#14352a',
+    lineHeight: c(19, 17),
+  },
+  discussSampleReply: {
+    fontSize: c(12.5, 11.5),
+    color: TRAINING_MUTED,
+    lineHeight: c(18, 16),
+  },
+  discussComposerPreview: {
+    borderWidth: 1,
+    borderColor: '#c5dde8',
+    borderRadius: NU.cardRadiusSm,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: c(12, 10),
+    paddingHorizontal: c(12, 10),
+  },
+  discussComposerPlaceholder: {
+    fontSize: c(13, 12),
+    color: TRAINING_MUTED,
+  },
+  discussHint: {
+    fontSize: c(12, 11),
+    color: TRAINING_MUTED,
+    lineHeight: c(17, 15),
+  },
+  discussLockedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: c(8, 6),
+    backgroundColor: '#eef1f3',
+    borderRadius: NU.cardRadiusSm,
+    paddingVertical: c(12, 10),
+    paddingHorizontal: c(12, 10),
+  },
+  discussLockedText: {
+    flex: 1,
+    fontSize: c(12.5, 11.5),
+    color: TRAINING_MUTED,
+    lineHeight: c(18, 16),
+  },
   reviewActions: {
     marginTop: c(4, 2),
     gap: c(10, 8),
@@ -915,9 +1572,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   reviewCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f7faf8',
     borderWidth: 1,
-    borderColor: TRAINING_BORDER,
+    borderColor: '#e8f0ea',
     borderRadius: NU.cardRadius,
     padding: c(14, 12),
     gap: c(10, 8),
@@ -1020,37 +1677,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: TRAINING_GREEN,
   },
-  priceCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: TRAINING_BORDER,
-    borderRadius: NU.cardRadius,
-    padding: c(15, 12),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: c(12, 10),
-  },
-  priceLabel: {
-    fontSize: c(12, 11),
-    fontWeight: '700',
-    color: TRAINING_MUTED,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  priceValue: {
-    marginTop: c(2, 1),
-    fontSize: NU.heading,
-    fontWeight: '800',
-    color: TRAINING_TEAL,
-  },
-  priceMeta: {
-    flex: 1,
-    textAlign: 'right',
-    fontSize: c(12.5, 11.5),
-    color: TRAINING_GREEN,
-    fontWeight: '600',
-  },
   section: {
     gap: c(10, 8),
   },
@@ -1061,8 +1687,164 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: TRAINING_MUTED,
   },
+  softStack: {
+    gap: c(8, 6),
+  },
+  softTile: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: c(12, 10),
+    backgroundColor: '#f4f8f5',
+    borderWidth: 1,
+    borderColor: '#e8f0ea',
+    borderRadius: NU.cardRadius,
+    paddingVertical: c(13, 11),
+    paddingHorizontal: c(13, 11),
+  },
+  instructorCard: {
+    backgroundColor: '#eef7f0',
+    borderWidth: 1,
+    borderColor: '#d7eadc',
+    borderRadius: NU.cardRadius,
+    padding: c(15, 12),
+    gap: c(10, 8),
+  },
+  instructorName: {
+    fontSize: NU.cardTitle,
+    fontWeight: '800',
+    color: TRAINING_TEAL,
+  },
+  proseBlock: {
+    backgroundColor: '#f4f8f5',
+    borderRadius: NU.cardRadius,
+    borderWidth: 1,
+    borderColor: '#e8f0ea',
+    paddingVertical: c(14, 12),
+    paddingHorizontal: c(14, 12),
+    gap: c(8, 6),
+  },
+  proseText: {
+    fontSize: NU.link,
+    lineHeight: c(22, 20),
+    color: TRAINING_TEAL,
+    fontWeight: '500',
+  },
+  proseMuted: {
+    fontSize: c(12.5, 11.5),
+    lineHeight: c(18, 16),
+    color: TRAINING_MUTED,
+  },
+  learnList: {
+    gap: c(8, 6),
+  },
+  learnRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: c(10, 8),
+    backgroundColor: '#f4f8f5',
+    borderRadius: NU.cardRadiusSm,
+    borderWidth: 1,
+    borderColor: '#e8f0ea',
+    paddingVertical: c(11, 9),
+    paddingHorizontal: c(12, 10),
+  },
+  learnDot: {
+    width: c(22, 20),
+    height: c(22, 20),
+    borderRadius: 99,
+    backgroundColor: '#e6f4e8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: c(1, 0),
+  },
+  learnDotText: {
+    fontSize: c(11, 10),
+    fontWeight: '800',
+    color: TRAINING_GREEN,
+  },
+  learnText: {
+    flex: 1,
+    fontSize: NU.link,
+    lineHeight: c(20, 18),
+    color: TRAINING_TEAL,
+    fontWeight: '600',
+  },
+  notesList: {
+    gap: c(8, 6),
+  },
+  noteTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: c(12, 10),
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#d7eadc',
+    borderRadius: NU.cardRadius,
+    paddingVertical: c(12, 10),
+    paddingHorizontal: c(12, 10),
+  },
+  noteTilePressed: {
+    backgroundColor: '#f0f7f2',
+    borderColor: TRAINING_GREEN,
+  },
+  noteIconWrap: {
+    width: c(40, 36),
+    height: c(40, 36),
+    borderRadius: c(10, 8),
+    backgroundColor: '#fde8e6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noteIconText: {
+    fontSize: c(10, 9),
+    fontWeight: '800',
+    color: '#b42318',
+    letterSpacing: 0.4,
+  },
+  noteCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: c(2, 1),
+  },
+  noteTitle: {
+    fontSize: NU.link,
+    fontWeight: '700',
+    color: TRAINING_TEAL,
+    lineHeight: c(19, 17),
+  },
+  noteMeta: {
+    fontSize: c(12, 11),
+    color: TRAINING_MUTED,
+    fontWeight: '500',
+  },
+  noteOpenPill: {
+    backgroundColor: '#e6f4e8',
+    paddingHorizontal: c(10, 8),
+    paddingVertical: c(6, 5),
+    borderRadius: 99,
+  },
+  noteOpenText: {
+    fontSize: c(12, 11),
+    fontWeight: '800',
+    color: TRAINING_GREEN,
+  },
+  notesEmpty: {
+    backgroundColor: '#f4f8f5',
+    borderRadius: NU.cardRadius,
+    borderWidth: 1,
+    borderColor: '#e8f0ea',
+    borderStyle: 'dashed',
+    paddingVertical: c(18, 14),
+    paddingHorizontal: c(14, 12),
+    alignItems: 'center',
+  },
+  notesEmptyText: {
+    fontSize: c(13, 12),
+    color: TRAINING_MUTED,
+    fontWeight: '600',
+  },
   bio: {
-    marginTop: c(4, 2),
+    marginTop: c(2, 1),
     fontSize: NU.link,
     lineHeight: c(21, 19),
     color: TRAINING_TEAL,
@@ -1079,12 +1861,32 @@ const styles = StyleSheet.create({
   sessionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: c(10, 8),
-    paddingVertical: c(8, 6),
+    gap: c(12, 10),
+    paddingVertical: c(14, 12),
+  },
+  sessionRowExpanded: {
+    paddingBottom: c(8, 6),
+  },
+  sessionBlockBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: TRAINING_TRACK,
+  },
+  sessionIndex: {
+    width: c(34, 30),
+    height: c(34, 30),
+    borderRadius: c(17, 15),
+    backgroundColor: '#e6f4e8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sessionIndexText: {
+    fontSize: c(13, 12),
+    fontWeight: '800',
+    color: TRAINING_GREEN,
   },
   sessionCopy: {
     flex: 1,
-    gap: c(2, 1),
+    gap: c(3, 2),
   },
   sessionTitle: {
     fontSize: NU.link,
@@ -1096,52 +1898,218 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: TRAINING_GREEN,
   },
-  expandChevron: {
-    fontSize: c(16, 14),
-    fontWeight: '700',
-    color: TRAINING_MUTED,
-    paddingLeft: c(6, 4),
+  curriculumLabel: {
+    alignSelf: 'flex-start',
+    fontSize: c(12, 11),
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    color: '#FFFFFF',
+    backgroundColor: TRAINING_GREEN,
+    paddingHorizontal: c(10, 8),
+    paddingVertical: c(5, 4),
+    borderRadius: c(8, 7),
+    overflow: 'hidden',
   },
-  conceptsBox: {
-    marginBottom: c(10, 8),
-    marginLeft: c(2, 1),
-    paddingVertical: c(8, 6),
+  curriculumHint: {
+    fontSize: c(13, 12),
+    lineHeight: c(18, 16),
+    fontWeight: '700',
+    color: '#1f6b36',
+    backgroundColor: '#c8ebd2',
+    paddingHorizontal: c(10, 8),
+    paddingVertical: c(7, 6),
+    borderRadius: c(8, 7),
+    overflow: 'hidden',
+  },
+  curriculumPanel: {
+    gap: c(8, 6),
+    padding: c(12, 10),
+    borderRadius: NU.cardRadius,
+    backgroundColor: '#e8f6ec',
+    borderWidth: 1,
+    borderColor: '#b9dfc2',
+  },
+  curriculumCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#9ed0aa',
+    borderRadius: NU.cardRadius,
+    overflow: 'hidden',
+  },
+  curriculumSectionBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#c5e3cd',
+  },
+  curriculumSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: c(10, 8),
+    paddingVertical: c(13, 11),
     paddingHorizontal: c(12, 10),
-    borderRadius: NU.cardRadiusSm,
-    backgroundColor: TRAINING_TRACK,
+    backgroundColor: '#f2faf4',
+  },
+  curriculumSectionHeaderOpen: {
+    paddingBottom: c(10, 8),
+    backgroundColor: '#d9f0df',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#a8d4b4',
+  },
+  curriculumSectionBadge: {
+    width: c(30, 28),
+    height: c(30, 28),
+    borderRadius: c(15, 14),
+    backgroundColor: TRAINING_GREEN,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  curriculumSectionBadgeText: {
+    fontSize: c(12, 11),
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  curriculumSectionCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: c(2, 1),
+  },
+  curriculumSectionTitle: {
+    fontSize: c(14.5, 13.5),
+    fontWeight: '800',
+    color: TRAINING_TEAL,
+    lineHeight: c(19, 17),
+  },
+  curriculumSectionMeta: {
+    fontSize: c(11.5, 10.5),
+    color: '#4a7a58',
+  },
+  curriculumProgressPill: {
+    fontSize: c(11, 10),
+    fontWeight: '800',
+    color: '#1f6b36',
+    backgroundColor: '#c8ebd2',
+    paddingHorizontal: c(7, 6),
+    paddingVertical: c(3, 2),
+    borderRadius: c(6, 5),
+    overflow: 'hidden',
+  },
+  curriculumLessonList: {
+    paddingTop: c(8, 6),
+    paddingBottom: c(10, 8),
+    paddingHorizontal: c(10, 8),
+    backgroundColor: '#dff3e5',
+  },
+  curriculumLessonNest: {
+    marginLeft: c(14, 12),
+    paddingLeft: c(10, 8),
+    borderLeftWidth: 3,
+    borderLeftColor: TRAINING_GREEN,
     gap: c(5, 4),
   },
-  conceptsLabel: {
-    fontSize: c(11.5, 10.5),
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
+  curriculumEmptyText: {
+    fontSize: c(12, 11),
+    color: '#4a7a58',
+    paddingVertical: c(8, 6),
+    paddingHorizontal: c(4, 2),
+  },
+  curriculumItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: c(8, 6),
+    paddingVertical: c(6, 5),
+    paddingHorizontal: c(8, 7),
+    borderRadius: c(8, 7),
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#b9dfc2',
+  },
+  curriculumItemLocked: {
+    opacity: 0.88,
+    backgroundColor: '#f4faf6',
+  },
+  curriculumTypeIconWrap: {
+    width: c(22, 20),
+    height: c(22, 20),
+    borderRadius: c(6, 5),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  curriculumItemCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 0,
+  },
+  curriculumItemRight: {
+    minWidth: c(22, 20),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  curriculumPreviewPill: {
+    fontSize: c(9.5, 8.5),
+    fontWeight: '800',
+    color: TRAINING_GREEN,
+    backgroundColor: '#e6f4e8',
+    paddingHorizontal: c(6, 5),
+    paddingVertical: c(2, 1),
+    borderRadius: c(5, 4),
+    overflow: 'hidden',
+  },
+  curriculumItemTitle: {
+    fontSize: c(12.5, 11.5),
+    lineHeight: c(16, 15),
+    fontWeight: '600',
+    color: TRAINING_TEAL,
+  },
+  curriculumItemMeta: {
+    fontSize: c(10.5, 9.5),
     color: TRAINING_MUTED,
-    marginBottom: c(2, 1),
+    fontWeight: '500',
   },
   conceptItem: {
     fontSize: c(13, 12),
     lineHeight: c(19, 17),
     color: TRAINING_TEAL,
   },
-  docsLabel: {
-    marginTop: c(8, 6),
+  infoIconWrap: {
+    width: c(40, 36),
+    height: c(40, 36),
+    borderRadius: c(12, 10),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  metaRow: {
-    paddingVertical: c(8, 6),
-    gap: c(2, 1),
-  },
-  metaLabel: {
-    fontSize: c(11.5, 10.5),
+  infoEyebrow: {
+    fontSize: c(10.5, 9.5),
     fontWeight: '700',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     color: TRAINING_MUTED,
   },
-  metaValue: {
-    fontSize: NU.link,
-    fontWeight: '600',
-    color: TRAINING_TEAL,
+  instructorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: c(12, 10),
+  },
+  instructorAvatar: {
+    width: c(52, 46),
+    height: c(52, 46),
+    borderRadius: c(26, 23),
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#d7eadc',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  instructorAvatarText: {
+    fontSize: c(17, 15),
+    fontWeight: '800',
+    color: TRAINING_GREEN,
+  },
+  instructorCopy: {
+    flex: 1,
+    gap: c(2, 1),
+  },
+  docsLabel: {
+    marginTop: c(8, 6),
   },
   actionLink: {
     flexDirection: 'row',

@@ -36,6 +36,7 @@ export function useOpenServiceChat() {
 
       try {
         const conversation = await openServiceConversation({
+          serviceId: service.id,
           serviceName: service.name,
           providerId: service.providerUserId,
           providerName: service.provider,

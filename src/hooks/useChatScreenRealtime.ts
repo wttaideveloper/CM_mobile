@@ -1,5 +1,4 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, type Dispatch, type SetStateAction } from 'react';
 
 import { API_CONFIG } from '@/config';
 import { SOCKET_SERVER_EVENTS } from '@/constants/socket.events';
@@ -25,8 +24,9 @@ type UseChatScreenRealtimeArgs = {
 };
 
 /**
- * Socket subscriptions for the open chat screen — moved out of ChatScreen for file size only.
- * Event handling must stay identical to the former inlined useFocusEffect.
+ * Socket subscriptions for the open chat screen.
+ * Use mount/unmount — not focus — so iOS document/image pickers do not
+ * unsubscribe and drop the `new_message` event while a file is selected.
  */
 export function useChatScreenRealtime({
   conversationId,
@@ -38,8 +38,7 @@ export function useChatScreenRealtime({
   setIsOtherUserOnline,
   refreshOtherPresence,
 }: UseChatScreenRealtimeArgs) {
-  useFocusEffect(
-    useCallback(() => {
+  useEffect(() => {
       if (!isLiveConversation) return undefined;
       if (!API_CONFIG.SOCKET_ENABLED) return undefined;
 
@@ -194,6 +193,5 @@ export function useChatScreenRealtime({
       setApiConversation,
       setIsOtherUserOnline,
       setMessages,
-    ]),
-  );
+    ]);
 }

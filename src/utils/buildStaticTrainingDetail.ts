@@ -1,4 +1,7 @@
-import type { TrainingDetailView } from '@/types/training.types';
+import type {
+  TrainingCurriculumItemType,
+  TrainingDetailView,
+} from '@/types/training.types';
 import {
   MARKET_TRAININGS,
   TRAINING_DOWNLOADABLE_LESSONS,
@@ -228,26 +231,59 @@ const BY_ID: Record<string, StaticDetailSource> = {
 function sessionsFor(listItem: TrainingListItem, source: StaticDetailSource) {
   const path = getTrainingProgressPath(listItem.id);
   if (path.days.length > 0) {
-    return path.days.map((day) => ({
-      id: day.id,
-      name: `${day.dayLabel} · ${day.title}`,
-      when: day.summary,
-      duration: listItem.mode === 'In-Person' ? 'Venue session' : 'Session block',
-      status: 'Included',
-      concepts: day.lessons
-        .filter((lesson) => lesson.kind !== 'exam')
-        .map((lesson) => lesson.title),
-    }));
+    return path.days.map((day) => {
+      const items = day.lessons.map((lesson) => ({
+        id: lesson.id,
+        type: (lesson.kind === 'exam'
+          ? 'quiz'
+          : lesson.kind === 'youtube'
+            ? 'youtube'
+            : lesson.kind === 'video'
+              ? 'video'
+              : lesson.kind === 'live'
+                ? 'live'
+                : lesson.kind === 'venue'
+                  ? 'venue'
+                  : lesson.kind === 'document'
+                    ? 'pdf'
+                    : 'topic') as TrainingCurriculumItemType,
+        title: lesson.title,
+        meta: lesson.kind === 'exam' ? 'Quiz' : '',
+        locked: false,
+        completed: false,
+      }));
+      return {
+        id: day.id,
+        name: `${day.dayLabel} · ${day.title}`,
+        when: day.summary,
+        duration: listItem.mode === 'In-Person' ? 'Venue session' : 'Session block',
+        status: 'Included',
+        concepts: items.map((item) => item.title),
+        items,
+      };
+    });
   }
 
-  return TRAINING_SESSIONS.map((session) => ({
-    id: session.id,
-    name: session.name,
-    when: session.when,
-    duration: session.duration,
-    status: session.status,
-    concepts: source.sessionConcepts[session.id] ?? session.concepts,
-  }));
+  return TRAINING_SESSIONS.map((session) => {
+    const concepts = source.sessionConcepts[session.id] ?? session.concepts;
+    const items = concepts.map((title, index) => ({
+      id: `${session.id}-${index}`,
+      type: 'topic' as const,
+      title,
+      meta: '',
+      locked: false,
+      completed: false,
+    }));
+    return {
+      id: session.id,
+      name: session.name,
+      when: session.when,
+      duration: session.duration,
+      status: session.status,
+      concepts,
+      items,
+    };
+  });
 }
 
 export function buildStaticTrainingDetail(id?: string): TrainingDetailView {
@@ -324,6 +360,11 @@ export function buildStaticTrainingDetail(id?: string): TrainingDetailView {
     reviews: TRAINING_REVIEWS,
     downloadableLessons: TRAINING_DOWNLOADABLE_LESSONS,
     instructorNotes: TRAINING_INSTRUCTOR_NOTES,
+    notes: TRAINING_INSTRUCTOR_NOTES.map((note) => ({
+      id: note.id,
+      title: note.title,
+      url: note.url,
+    })),
   };
 }
 

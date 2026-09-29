@@ -9,6 +9,7 @@ import type {
   TrainingListQuery,
   TrainingWishlistApiItem,
 } from '@/types/training.types';
+import { mapAssessmentDetailToExam } from '@/utils/mapAssessmentDetailToExam';
 import { mapTrainingsApiToListItems } from '@/utils/marketTraining.mapper';
 import { mapTrainingContentToProgressPath } from '@/utils/marketTrainingContent.mapper';
 import { mapWishlistApiItem } from '@/utils/marketTrainingWishlist.mapper';
@@ -20,10 +21,19 @@ export const trainingKeys = {
   marketPreview: () => [...trainingKeys.all, 'market-preview'] as const,
   detail: (id: string) => [...trainingKeys.all, 'detail', id] as const,
   content: (id: string) => [...trainingKeys.all, 'content', id] as const,
+  progress: (id: string) => [...trainingKeys.all, 'progress', id] as const,
+  assessment: (trainingId: string, assessmentId: string) =>
+    [...trainingKeys.all, 'assessment', trainingId, assessmentId] as const,
+  assignments: (trainingId: string) =>
+    [...trainingKeys.all, 'assignments', trainingId] as const,
   wishlist: () => [...trainingKeys.all, 'wishlist'] as const,
   enrolments: (status?: string) =>
     [...trainingKeys.all, 'enrolments', status ?? 'all'] as const,
   reviews: (id: string) => [...trainingKeys.all, 'reviews', id] as const,
+  discussions: (id: string) => [...trainingKeys.all, 'discussions', id] as const,
+  announcements: (id: string) =>
+    [...trainingKeys.all, 'announcements', id] as const,
+  certificate: (id: string) => [...trainingKeys.all, 'certificate', id] as const,
 };
 
 export function isApiTrainingId(id?: string | null): boolean {
@@ -132,6 +142,232 @@ export function useTrainingContent(id?: string) {
     content: query.data,
     isApiId: enabled,
   };
+}
+
+/** GET /api/v1/trainings/{id}/progress — resume lesson + watch positions. */
+export function useTrainingProgress(id?: string) {
+  const enabled = isApiTrainingId(id);
+
+  return useQuery({
+    queryKey: trainingKeys.progress(id ?? ''),
+    queryFn: () => trainingService.getProgress(id!),
+    enabled,
+    staleTime: 15_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+}
+
+/** POST /api/v1/trainings/{id}/lessons/{lessonId}/progress */
+export function useSaveLessonProgress(trainingId?: string) {
+  const id = trainingId ?? '';
+
+  return useMutation({
+    mutationFn: (input: {
+      lessonId: string;
+      positionSeconds: number;
+      durationSeconds?: number;
+      sectionId?: string;
+    }) =>
+      trainingService.saveLessonProgress(id, input.lessonId, {
+        position_seconds: Math.max(0, Math.floor(input.positionSeconds)),
+        ...(input.durationSeconds != null
+          ? { duration_seconds: Math.max(0, Math.floor(input.durationSeconds)) }
+          : {}),
+        ...(input.sectionId ? { section_id: input.sectionId } : {}),
+      }),
+  });
+}
+
+/** POST /api/v1/trainings/{id}/progress/complete-lesson */
+export function useCompleteTrainingLesson(trainingId?: string) {
+  const queryClient = useQueryClient();
+  const id = trainingId ?? '';
+
+  return useMutation({
+    mutationFn: (lessonId: string) =>
+      trainingService.completeLesson(id, { lesson_id: lessonId }),
+    onSuccess: () => {
+      if (!isApiTrainingId(id)) return;
+      void queryClient.invalidateQueries({ queryKey: trainingKeys.content(id) });
+      void queryClient.invalidateQueries({ queryKey: trainingKeys.progress(id) });
+      void queryClient.invalidateQueries({
+        queryKey: trainingKeys.enrolments(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trainingKeys.certificate(id),
+      });
+    },
+  });
+}
+
+/**
+ * GET /api/v1/trainings/{id}/certificate
+ * null / missing data = not eligible yet (backend 404).
+ */
+export function useTrainingCertificate(trainingId?: string) {
+  const id = trainingId?.trim() ?? '';
+  const enabled = isApiTrainingId(id);
+
+  const query = useQuery({
+    queryKey: trainingKeys.certificate(id),
+    queryFn: () => trainingService.getCertificate(id),
+    enabled,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+
+  const certificate = query.data ?? null;
+  const isAvailable = Boolean(
+    certificate &&
+      (certificate.certificate_url ||
+        certificate.completed_at ||
+        certificate.training_id),
+  );
+
+  return {
+    ...query,
+    certificate,
+    isAvailable,
+  };
+}
+
+/**
+ * POST /api/v1/trainings/{id}/live-sessions/{session_id}/attendance
+ * Session-level Join meeting (section meeting link).
+ */
+export function useRecordLiveSessionAttendance(trainingId?: string) {
+  const queryClient = useQueryClient();
+  const id = trainingId ?? '';
+
+  return useMutation({
+    mutationFn: (sessionId: string) =>
+      trainingService.recordLiveSessionAttendance(id, sessionId, {}),
+    onSuccess: () => {
+      if (!isApiTrainingId(id)) return;
+      void queryClient.invalidateQueries({ queryKey: trainingKeys.content(id) });
+      void queryClient.invalidateQueries({
+        queryKey: trainingKeys.enrolments(),
+      });
+    },
+  });
+}
+
+/**
+ * POST /api/v1/trainings/{id}/lessons/{lesson_id}/attendance
+ * Lesson-level Join meeting (live/venue lesson inside a session).
+ */
+export function useRecordLessonAttendance(trainingId?: string) {
+  const queryClient = useQueryClient();
+  const id = trainingId ?? '';
+
+  return useMutation({
+    mutationFn: (lessonId: string) =>
+      trainingService.recordLessonAttendance(id, lessonId, {}),
+    onSuccess: () => {
+      if (!isApiTrainingId(id)) return;
+      void queryClient.invalidateQueries({ queryKey: trainingKeys.content(id) });
+      void queryClient.invalidateQueries({
+        queryKey: trainingKeys.enrolments(),
+      });
+    },
+  });
+}
+
+/** GET /api/v1/trainings/{id}/assessments/{aid} — full quiz for taking. */
+export function useTrainingAssessment(
+  trainingId?: string,
+  assessmentId?: string,
+) {
+  const enabled =
+    isApiTrainingId(trainingId) && Boolean(assessmentId?.trim());
+
+  const query = useQuery({
+    queryKey: trainingKeys.assessment(trainingId ?? '', assessmentId ?? ''),
+    queryFn: () => trainingService.getAssessment(trainingId!, assessmentId!),
+    enabled,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+
+  const exam = useMemo(
+    () => (query.data ? mapAssessmentDetailToExam(query.data) : null),
+    [query.data],
+  );
+
+  return {
+    ...query,
+    exam,
+    assessment: query.data,
+    isApiId: enabled,
+  };
+}
+
+/** GET /api/v1/trainings/{id}/assignments — assessments + file assignments. */
+export function useTrainingAssignments(trainingId?: string) {
+  const enabled = isApiTrainingId(trainingId);
+
+  const query = useQuery({
+    queryKey: trainingKeys.assignments(trainingId ?? ''),
+    queryFn: () => trainingService.getAssignments(trainingId!),
+    enabled,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+
+  const assessments = useMemo(
+    () =>
+      (query.data ?? []).filter((row) => {
+        const type = String(row.type ?? '')
+          .trim()
+          .toLowerCase();
+        return type === 'assessment' || type === 'quiz' || type === 'exam';
+      }),
+    [query.data],
+  );
+
+  return {
+    ...query,
+    items: query.data ?? [],
+    assessments,
+    isApiId: enabled,
+  };
+}
+
+/** POST /api/v1/trainings/{id}/assessments/{aid}/submit */
+export function useSubmitTrainingAssessment(trainingId?: string) {
+  const queryClient = useQueryClient();
+  const id = trainingId ?? '';
+
+  return useMutation({
+    mutationFn: (input: {
+      assessmentId: string;
+      answers: { question_id: string; answer: string }[];
+      started_at?: string;
+    }) =>
+      trainingService.submitAssessment(id, input.assessmentId, {
+        answers: input.answers,
+        started_at: input.started_at,
+      }),
+    onSuccess: (_result, variables) => {
+      if (!isApiTrainingId(id)) return;
+      void queryClient.invalidateQueries({ queryKey: trainingKeys.content(id) });
+      void queryClient.invalidateQueries({
+        queryKey: trainingKeys.assignments(id),
+      });
+      if (variables?.assessmentId) {
+        void queryClient.invalidateQueries({
+          queryKey: trainingKeys.assessment(id, variables.assessmentId),
+        });
+      }
+      void queryClient.invalidateQueries({
+        queryKey: trainingKeys.enrolments(),
+      });
+    },
+  });
 }
 
 /** POST /api/v1/trainings/{training_id}/enroll (fallback /enrol). */
@@ -369,4 +605,90 @@ export function useSubmitTrainingReview(trainingId?: string) {
       });
     },
   });
+}
+
+/** GET /api/v1/trainings/{id}/discussions */
+export function useTrainingDiscussions(trainingId?: string) {
+  const id = trainingId?.trim() ?? '';
+  const enabled = isApiTrainingId(id);
+
+  const query = useQuery({
+    queryKey: trainingKeys.discussions(id),
+    queryFn: () => trainingService.getDiscussions(id),
+    enabled,
+    staleTime: 20_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+
+  return {
+    ...query,
+    discussions: query.data ?? [],
+  };
+}
+
+/** POST /api/v1/trainings/{id}/discussions */
+export function useCreateTrainingDiscussion(trainingId?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (question: string) => {
+      if (!trainingId) {
+        return Promise.reject(new Error('Missing training id'));
+      }
+      return trainingService.createDiscussion(trainingId, { question });
+    },
+    onSuccess: () => {
+      if (!trainingId) return;
+      void queryClient.invalidateQueries({
+        queryKey: trainingKeys.discussions(trainingId),
+      });
+    },
+  });
+}
+
+/**
+ * POST /api/v1/trainings/{id}/discussions/{discussion_id}/replies
+ */
+export function useReplyTrainingDiscussion(trainingId?: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { discussionId: string; answer: string }) => {
+      if (!trainingId) {
+        return Promise.reject(new Error('Missing training id'));
+      }
+      return trainingService.replyToDiscussion(
+        trainingId,
+        input.discussionId,
+        { answer: input.answer },
+      );
+    },
+    onSuccess: () => {
+      if (!trainingId) return;
+      void queryClient.invalidateQueries({
+        queryKey: trainingKeys.discussions(trainingId),
+      });
+    },
+  });
+}
+
+/** GET /api/v1/trainings/{id}/announcements */
+export function useTrainingAnnouncements(trainingId?: string) {
+  const id = trainingId?.trim() ?? '';
+  const enabled = isApiTrainingId(id);
+
+  const query = useQuery({
+    queryKey: trainingKeys.announcements(id),
+    queryFn: () => trainingService.getAnnouncements(id),
+    enabled,
+    staleTime: 20_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+
+  return {
+    ...query,
+    announcements: query.data ?? [],
+  };
 }

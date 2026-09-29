@@ -229,8 +229,15 @@ apiClient.interceptors.request.use(
         .replace(/[?&]$/, '');
     }
 
-    if (config.data instanceof FormData && config.headers) {
+    const isFormData =
+      typeof FormData !== 'undefined' &&
+      (config.data instanceof FormData ||
+        (Boolean(config.data) &&
+          typeof config.data === 'object' &&
+          Array.isArray((config.data as { _parts?: unknown })._parts)));
+    if (isFormData && config.headers) {
       delete config.headers['Content-Type'];
+      delete config.headers.common?.['Content-Type'];
     }
 
     return config;

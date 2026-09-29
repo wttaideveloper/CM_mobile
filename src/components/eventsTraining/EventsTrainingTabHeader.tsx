@@ -1,6 +1,8 @@
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 
+import { MarketSearchIcon } from '@/components/market/MarketIcons';
 import { c, NU } from '@/utils/newUiCompact';
 
 const headerDeco = require('../../assets/images/market-header-deco.png');
@@ -14,19 +16,18 @@ export const EVENTS_TRAINING_BG = '#f2fff3';
 export const EVENTS_TRAINING_BORDER = '#dbeadd';
 export const EVENTS_TRAINING_TRACK = '#eef4ee';
 
-export type EventsTrainingTab = 'Events' | 'Training';
-
 type Props = {
-  activeTab: EventsTrainingTab;
-  onTabChange: (tab: EventsTrainingTab) => void;
   subtitle?: string;
+  search: string;
+  onSearchChange: (text: string) => void;
 };
 
 export function EventsTrainingTabHeader({
-  activeTab,
-  onTabChange,
-  subtitle = 'Browse nearby events and guided trainings',
+  subtitle = 'Cohorts, labs and skill programs to join',
+  search,
+  onSearchChange,
 }: Props) {
+  const router = useRouter();
   const scale = SCREEN_W / DESIGN_W;
 
   return (
@@ -44,34 +45,36 @@ export function EventsTrainingTabHeader({
         pointerEvents="none"
         transition={0}
       />
-      <View style={styles.titleBlock}>
-        <Text style={styles.eyebrow}>Discover</Text>
-        <Text style={styles.title}>Events & Training</Text>
-        <Text style={styles.subtitle}>{subtitle}</Text>
+      <View style={styles.topRow}>
+        <View style={styles.titleBlock}>
+          <Text style={styles.eyebrow}>Discover</Text>
+          <Text style={styles.title}>Trainings and Courses</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
+        </View>
+        <Pressable
+          style={styles.enrollmentsBtn}
+          onPress={() => router.push('/(main)/market/my-trainings')}
+          accessibilityRole="button"
+          accessibilityLabel="My Enrollments"
+        >
+          <Text style={styles.enrollmentsBtnText}>My Enrollments</Text>
+        </Pressable>
       </View>
 
-      <View style={styles.segment}>
-        {(['Events', 'Training'] as const).map((tab) => {
-          const active = tab === activeTab;
-          return (
-            <Pressable
-              key={tab}
-              style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-              onPress={() => onTabChange(tab)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-            >
-              <Text
-                style={[
-                  styles.segmentText,
-                  active && styles.segmentTextActive,
-                ]}
-              >
-                {tab}
-              </Text>
-            </Pressable>
-          );
-        })}
+      <View style={styles.search}>
+        <MarketSearchIcon />
+        <TextInput
+          style={styles.searchInput}
+          value={search}
+          onChangeText={onSearchChange}
+          placeholder="Search trainings and courses"
+          placeholderTextColor="rgba(255,255,255,0.55)"
+          returnKeyType="search"
+          autoCorrect={false}
+          autoCapitalize="none"
+          clearButtonMode="while-editing"
+          accessibilityLabel="Search trainings and courses"
+        />
       </View>
     </View>
   );
@@ -88,9 +91,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
-  titleBlock: {
+  topRow: {
     zIndex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: c(10, 8),
+  },
+  titleBlock: {
+    flex: 1,
     gap: c(4, 3),
+    minWidth: 0,
   },
   eyebrow: {
     fontSize: NU.eyebrow,
@@ -106,34 +117,38 @@ const styles = StyleSheet.create({
     fontSize: c(13, 12),
     lineHeight: c(18, 16),
     color: 'rgba(255,255,255,0.82)',
-    maxWidth: '92%',
+    maxWidth: '100%',
   },
-  segment: {
-    marginTop: NU.sectionGap,
-    flexDirection: 'row',
-    padding: c(4, 3),
+  enrollmentsBtn: {
+    paddingVertical: c(7, 6),
+    paddingHorizontal: c(10, 9),
     borderRadius: 99,
-    backgroundColor: 'rgba(0,0,0,0.14)',
-    gap: c(4, 3),
-    zIndex: 1,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.45)',
   },
-  segmentBtn: {
-    flex: 1,
-    paddingVertical: c(10, 8),
-    borderRadius: 99,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentBtnActive: {
-    backgroundColor: '#FFFFFF',
-  },
-  segmentText: {
-    fontSize: c(13.5, 12.5),
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.88)',
-  },
-  segmentTextActive: {
+  enrollmentsBtnText: {
+    fontSize: c(11.5, 10.5),
     fontWeight: '800',
-    color: EVENTS_TRAINING_TEAL,
+    color: '#FFFFFF',
+  },
+  search: {
+    zIndex: 1,
+    marginTop: NU.sectionGap,
+    height: c(44, 40),
+    borderRadius: 99,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: c(10, 8),
+    paddingHorizontal: NU.cardPad,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: NU.link,
+    color: '#FFFFFF',
+    paddingVertical: 0,
   },
 });

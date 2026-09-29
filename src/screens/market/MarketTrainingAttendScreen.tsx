@@ -145,7 +145,9 @@ export function MarketTrainingAttendScreen() {
                 ? 'Hybrid · each day has its own attend method (link or QR pass).'
                 : training.mode === 'Virtual'
                   ? 'Online · open the day-wise join link to attend.'
-                  : 'In person · show your QR pass at the venue.'}
+                  : training.mode === 'Self-paced'
+                    ? 'Self-paced · watch recorded lessons anytime — no live join required.'
+                    : 'In person · show your QR pass at the venue.'}
             </Text>
           </View>
 

@@ -4,6 +4,9 @@ export type ConversationParticipantInput = {
 };
 
 export type CreateConversationRequest = {
+  /** Provider to chat with (from service `provider_user_id`). */
+  user_id?: string;
+  /** Service id for service chats (current user comes from auth token). */
   context_id: string;
   context_type: string;
   conversation_type: string;

@@ -9,7 +9,7 @@ import { formatServicePrice } from '@/utils/service.mapper';
 import { useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 function providerInitial(name: string): string {
   return name.trim().charAt(0).toUpperCase();
@@ -29,6 +29,7 @@ export function ServiceCard({
   const queryClient = useQueryClient();
   const { openServiceChat, isOpeningChat } = useOpenServiceChat();
   const hasProvider = Boolean(service.provider);
+  const canChat = Boolean(service.providerUserId?.trim());
 
   const openDetail = () => {
     void queryClient.prefetchQuery({
@@ -49,13 +50,30 @@ export function ServiceCard({
   };
 
   const openChat = () => {
+    const providerUserId = service.providerUserId?.trim() || null;
     console.log('[ServiceChat] STEP 1 — Chat icon tapped on ServiceCard', {
       serviceId: service.id,
       serviceName: service.name,
       provider: service.provider,
+      providerUserId,
       enterpriseName: service.enterpriseName,
     });
-    void openServiceChat(service);
+
+    if (!providerUserId) {
+      Alert.alert(
+        'Chat unavailable',
+        'This service has no provider to chat with.',
+      );
+      return;
+    }
+
+    void openServiceChat({
+      id: service.id,
+      name: service.name,
+      provider: service.provider,
+      providerUserId,
+      enterpriseName: service.enterpriseName,
+    });
   };
 
   return (
@@ -126,14 +144,14 @@ export function ServiceCard({
 
           <Pressable
             onPress={openChat}
-            disabled={isOpeningChat}
+            disabled={isOpeningChat || !canChat}
             accessibilityRole="button"
             accessibilityLabel="Chat"
-            accessibilityState={{ disabled: isOpeningChat }}
+            accessibilityState={{ disabled: isOpeningChat || !canChat }}
             style={({ pressed }) => [
               styles.chatBtn,
               pressed && styles.cardPressed,
-              isOpeningChat && styles.chatBtnDisabled,
+              (isOpeningChat || !canChat) && styles.chatBtnDisabled,
             ]}
             hitSlop={4}
           >

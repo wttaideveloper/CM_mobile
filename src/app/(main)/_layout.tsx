@@ -40,6 +40,8 @@ export default function MainLayout() {
       <Stack.Screen name="market/orders" />
       <Stack.Screen name="market/my-trainings" />
       <Stack.Screen name="market/my-training-progress" />
+      <Stack.Screen name="market/my-training-downloads" />
+      <Stack.Screen name="market/my-training-assessments" />
       <Stack.Screen name="market/course-learning" />
       <Stack.Screen name="market/cart" />
       <Stack.Screen name="market/checkout" />
@@ -82,6 +84,7 @@ export default function MainLayout() {
       <Stack.Screen name="library/reading" />
       <Stack.Screen name="library/listening" />
       <Stack.Screen name="library/watching" />
+      <Stack.Screen name="chat/inbox" />
       <Stack.Screen name="chat/[id]" />
       </Stack>
     </>

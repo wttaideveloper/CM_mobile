@@ -87,7 +87,7 @@ export default function MainTabLayout() {
         <Tabs.Screen
           name="events-training"
           options={{
-            title: 'Events & Training',
+            title: 'Trainings and Courses',
           }}
         />
         <Tabs.Screen

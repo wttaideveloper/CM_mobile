@@ -51,3 +51,18 @@ export function formatISTDateTime(date: Date): string {
     minute: '2-digit',
   });
 }
+
+/** Live / venue attendance timestamp from content API (`attended_at`). */
+export function formatAttendanceDateTime(iso?: string | null): string | null {
+  if (!iso?.trim()) return null;
+  const date = parseApiDate(iso);
+  if (Number.isNaN(date.getTime())) return iso.trim();
+  return date.toLocaleString('en-IN', {
+    timeZone: IST_TIMEZONE,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}

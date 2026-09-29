@@ -26,6 +26,14 @@ function formatDeliveryMode(raw?: string | null): string | null {
     return 'Physical';
   }
   if (
+    key.includes('self_paced') ||
+    key.includes('self_placed') ||
+    key.includes('on_demand') ||
+    key.includes('recorded')
+  ) {
+    return 'Self-paced';
+  }
+  if (
     key.includes('virtual') ||
     key.includes('online') ||
     key.includes('remote') ||

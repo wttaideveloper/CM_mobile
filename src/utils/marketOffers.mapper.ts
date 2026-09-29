@@ -99,6 +99,8 @@ export function mapServiceToMarketOffer(
     ...SERVICE_DASHBOARD_STYLE,
     // banner_image → ServiceListItem.image
     imageUrl: pickOfferImageUrl(item.image),
+    providerUserId: item.providerUserId,
+    providerName: item.provider,
   };
 }
 
@@ -207,6 +209,8 @@ export function mapServiceToOfferListItem(
     icon: style.icon,
     route: 'service',
     imageUrl: pickOfferImageUrl(item.image),
+    providerUserId: item.providerUserId,
+    providerName: item.provider,
   };
 }
 

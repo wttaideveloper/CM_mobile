@@ -17,8 +17,10 @@ export function OnboardingScreen({ onNavigateToLogin }: OnboardingScreenProps) {
 
   return (
     <AuthScreenLayout
-      showSkip
-      onSkip={goToLogin}
+      // Skip is hidden: only one onboarding screen today (next page is login).
+      // If more onboarding screens are added, uncomment showSkip + onSkip.
+      // showSkip
+      // onSkip={goToLogin}
       backgroundImage={AUTH_BG_ONBOARDING}
       contentTopRatio={isSmallDevice ? 0.65 : 0.578}
     >
