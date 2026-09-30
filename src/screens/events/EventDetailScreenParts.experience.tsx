@@ -316,6 +316,52 @@ export function EventResourcesSection({ resources }: { resources: Event['resourc
   );
 }
 
+/**
+ * Informational only (Phase 7) — matches Sessions/Resources' read-only
+ * pattern. Selection happens at free registration time
+ * (EventRegisterScreen.tsx); there is no participant-facing endpoint to
+ * read back an existing registration's current selections, so this
+ * section never attempts to show or edit "your" selections, only what's
+ * on offer. Retired (active:false) options are never listed here — they
+ * only matter for an attendee who already holds one, which this section
+ * doesn't know about.
+ */
+export function EventMealsSection({ event }: { event: Event }) {
+  if (!isModuleEnabled(event, 'meals')) return null;
+
+  const options = event.meals.options.filter((option) => option.active);
+
+  return (
+    <View style={styles.experienceSection}>
+      <Text style={styles.sectionTitle}>Meals</Text>
+      <View style={[styles.experienceCard, { marginTop: 10 }]}>
+        {options.length === 0 ? (
+          <View style={styles.experienceRow}>
+            <Text style={styles.experienceBodyText}>No meal options configured yet.</Text>
+          </View>
+        ) : (
+          options.map((option, index) => (
+            <View
+              key={option.id}
+              style={[styles.experienceRow, index > 0 && styles.experienceRowBorder]}
+            >
+              <View style={styles.experienceRowHeader}>
+                <Text style={styles.experienceRowTitle}>{option.name}</Text>
+              </View>
+              {option.date ? (
+                <Text style={styles.experienceRowMeta}>{option.date}</Text>
+              ) : null}
+              {option.description ? (
+                <Text style={styles.experienceRowMeta}>{option.description}</Text>
+              ) : null}
+            </View>
+          ))
+        )}
+      </View>
+    </View>
+  );
+}
+
 export function EventLocationSection({ event }: { event: Event }) {
   const isVenueRelevant = event.deliveryMode === 'in_person' || event.deliveryMode === 'hybrid';
   if (!isVenueRelevant || !event.venueAddress) return null;

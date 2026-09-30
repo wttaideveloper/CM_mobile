@@ -5,6 +5,20 @@ import type {
   EventTicketOption,
 } from '@/types/event.types';
 
+/** Normalized meal option — id/active passthrough from the API; description/date default to null; date is pre-formatted for display (mirrors dateTime/schedule elsewhere on Event), matching option.active semantics (false = retired, kept for history). */
+export type EventMealOption = {
+  id: string;
+  name: string;
+  description: string | null;
+  date: string | null;
+  active: boolean;
+};
+
+export type EventMeals = {
+  enabled: boolean;
+  options: EventMealOption[];
+};
+
 export const EVENT_FILTERS = ['All', 'Upcoming', 'This Week', 'Online', 'Free'] as const;
 
 export type EventFilterTag = 'upcoming' | 'thisWeek' | 'online' | 'free';
@@ -63,4 +77,6 @@ export type Event = {
   eventType: string;
   /** Event-level capability flags (Phase 2) — always fully populated by the mapper. Read via isModuleEnabled(event, key) from utils/eventModules.ts, never inferred from other fields. */
   modules: EventModules;
+  /** Meals configuration (Phase 7) — always fully populated by the mapper ({enabled:false, options:[]} for legacy/unconfigured events). Gate visibility with isModuleEnabled(event, 'meals'), not options.length. */
+  meals: EventMeals;
 };

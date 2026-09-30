@@ -26,6 +26,7 @@ import type {
   EventRegistrationResult,
 } from '@/types/event.types';
 import { getEventAvailability } from '@/utils/event.mapper';
+import { isModuleEnabled } from '@/utils/eventModules';
 import { EventRegisterFormField } from '@/screens/events/EventRegisterFormField';
 import { InfoCard } from '@/screens/events/EventDetailScreenParts.shared';
 import { PRIMARY, styles } from '@/screens/events/EventRegisterScreen.styles';
@@ -183,6 +184,7 @@ export function EventRegisterScreen() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, EventFormFieldValue>>({});
+  const [mealSelections, setMealSelections] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<EventRegistrationResult | null>(null);
@@ -244,6 +246,12 @@ export function EventRegisterScreen() {
   // that could skip enforcement of a required question. Block submission
   // and require a successful retry instead of guessing.
   const isFormErrorVisible = !isPaid && isFormError;
+  // Meal selection only exists on the free-registration payload today
+  // (EventRegistrationCreate.meal_selections) — the paid checkout schema
+  // has no equivalent field, same constraint Phase 3 found for custom_fields.
+  const mealsEnabled = !isPaid && isModuleEnabled(event, 'meals');
+  // Retired options can't be newly selected — only ever offer active ones.
+  const availableMealOptions = mealsEnabled ? event.meals.options.filter((o) => o.active) : [];
 
   function validate(): boolean {
     let valid = true;
@@ -309,6 +317,9 @@ export function EventRegisterScreen() {
           participant_email: email.trim(),
           ...(formSections.length > 0
             ? { custom_fields: buildCustomFieldsPayload(formSections, answers) }
+            : {}),
+          ...(mealsEnabled && mealSelections.length > 0
+            ? { meal_selections: mealSelections }
             : {}),
         },
       },
@@ -556,6 +567,45 @@ export function EventRegisterScreen() {
                 </View>
               ))
             )}
+
+            {mealsEnabled && availableMealOptions.length > 0 ? (
+              <View style={styles.fieldGroup}>
+                <Text style={styles.formSectionTitle}>Meals</Text>
+                <View style={styles.optionList}>
+                  {availableMealOptions.map((option) => {
+                    const isSelected = mealSelections.includes(option.id);
+                    return (
+                      <Pressable
+                        key={option.id}
+                        onPress={() =>
+                          setMealSelections((current) =>
+                            isSelected
+                              ? current.filter((id) => id !== option.id)
+                              : [...current, option.id],
+                          )
+                        }
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          option.date ? `${option.name}, ${option.date}` : option.name
+                        }
+                        accessibilityState={{ selected: isSelected }}
+                        style={[styles.optionChip, isSelected && styles.optionChipSelected]}
+                      >
+                        <Text
+                          style={[
+                            styles.optionChipText,
+                            isSelected && styles.optionChipTextSelected,
+                          ]}
+                        >
+                          {option.name}
+                          {option.date ? ` · ${option.date}` : ''}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
 
             <LeafyGradientButton
               onPress={handleSubmit}

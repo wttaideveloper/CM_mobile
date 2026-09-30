@@ -30,6 +30,7 @@ import {
   EventAddToCalendarAction,
   EventInstructionsSection,
   EventLocationSection,
+  EventMealsSection,
   EventMeetingSection,
   EventResourcesSection,
   EventSessionsSection,
@@ -201,6 +202,7 @@ export function EventDetailContent({
       <EventLocationSection event={event} />
       <EventSessionsSection event={event} availability={availability} isRegistered={isRegistered} />
       <EventMeetingSection event={event} availability={availability} isRegistered={isRegistered} />
+      <EventMealsSection event={event} />
       <EventResourcesSection resources={event.resources} />
       <EventInstructionsSection event={event} />
     </View>

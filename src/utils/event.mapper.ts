@@ -1,4 +1,4 @@
-import type { Event, EventFilterTag } from '@/constants/events';
+import type { Event, EventFilterTag, EventMealOption, EventMeals } from '@/constants/events';
 import type {
   EventApiResponse,
   EventFormField,
@@ -7,6 +7,8 @@ import type {
   EventFormFieldRenderer,
   EventFormSection,
   EventFormSectionApiResponse,
+  EventMealOptionApiResponse,
+  EventMealsApiResponse,
   EventMeetingAccess,
   EventMeetingLinkApiResponse,
   EventModules,
@@ -82,6 +84,42 @@ function normalizeEventModules(modules?: EventModules | null): EventModules {
     meals: Boolean(source?.meals),
     accommodation: Boolean(source?.accommodation),
   };
+}
+
+function normalizeEventMealOption(option: EventMealOptionApiResponse): EventMealOption | null {
+  const id = option?.id != null ? String(option.id).trim() : '';
+  const name = option?.name?.trim();
+  if (!id || !name) return null;
+
+  // date is a bare YYYY-MM-DD string (backend `date` type, no time/timezone
+  // component) — same shape and safe-parse approach already proven for
+  // session_date below (buildSessionDateTimeLabel), pre-formatted here for
+  // display consistency with the rest of Event (dateTime, schedule, ...).
+  const parsedDate = safeParseDate(option.date);
+
+  return {
+    id,
+    name,
+    description: option.description?.trim() || null,
+    date: parsedDate ? formatISTShortDate(parsedDate) : null,
+    active: Boolean(option.active),
+  };
+}
+
+/**
+ * Mirrors the backend's own meals resolution (app/utils/event_meals.py):
+ * `enabled` is a read-only mirror of modules.meals, never the capability
+ * check itself — use isModuleEnabled(event, 'meals'). Legacy/never-
+ * configured events resolve to {enabled:false, options:[]} server-side;
+ * this only guards a genuinely missing/malformed response.
+ */
+function normalizeEventMeals(meals?: EventMealsApiResponse | null): EventMeals {
+  const options = Array.isArray(meals?.options)
+    ? meals!.options
+        .map(normalizeEventMealOption)
+        .filter((option): option is EventMealOption => option !== null)
+    : [];
+  return { enabled: Boolean(meals?.enabled), options };
 }
 
 function textOrNa(value?: string | null): string {
@@ -371,6 +409,7 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
     venueMapUrl: api.venue?.map_url?.trim() || null,
     eventType: resolveEventType(api.event_type),
     modules: normalizeEventModules(api.modules),
+    meals: normalizeEventMeals(api.meals),
   };
 }
 

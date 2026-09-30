@@ -140,6 +140,28 @@ export type EventModules = {
 };
 
 /**
+ * One meal option (backend app/schemas/event_meal_schema.py MealOption).
+ * `active: false` = retired by the organizer — kept for history/existing
+ * selections, never offered as a new choice.
+ */
+export type EventMealOptionApiResponse = {
+  id: string;
+  name: string;
+  description?: string | null;
+  date?: string | null;
+  active: boolean;
+};
+
+/**
+ * Event.meals (backend EventMeals) — `enabled` mirrors `modules.meals`
+ * exactly; never the capability check itself (use isModuleEnabled).
+ */
+export type EventMealsApiResponse = {
+  enabled: boolean;
+  options: EventMealOptionApiResponse[];
+};
+
+/**
  * GET /api/v1/event-types/ — the dynamic, DB-backed Event Type registry
  * (Phase 2 foundation). `key` is the stable identifier that matches
  * EventApiResponse.event_type (immutable once created); `name` is the
@@ -224,6 +246,12 @@ export type EventApiResponse = {
    * utils/eventModules.ts isModuleEnabled().
    */
   modules?: EventModules | null;
+  /**
+   * Event-level meals configuration (Phase 2.6). Always resolved server-side
+   * (`{enabled:false, options:[]}` for legacy/never-configured events) —
+   * typed optional/nullable defensively, same reasoning as event_type/modules.
+   */
+  meals?: EventMealsApiResponse | null;
   is_deleted?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -265,6 +293,13 @@ export type EventRegistrationRequest = {
    * no server-side shape validation for this endpoint).
    */
   custom_fields?: Record<string, string | boolean | string[]>;
+  /**
+   * Meal option ids from the event's meals configuration (backend
+   * EventRegistrationCreate.meal_selections, Phase 2.6) — only meaningful
+   * when modules.meals is enabled; omit rather than send an empty array
+   * when nothing was selected.
+   */
+  meal_selections?: string[];
 };
 
 /**
