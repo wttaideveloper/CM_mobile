@@ -362,6 +362,46 @@ export function EventMealsSection({ event }: { event: Event }) {
   );
 }
 
+/**
+ * Informational only (Phase 8) — same pattern and same constraint as
+ * EventMealsSection: no participant-facing endpoint exists to read back an
+ * existing registration's current selections, so this never shows/edits
+ * "your" selections, only what's on offer. Retired options are excluded
+ * for the same reason as meals.
+ */
+export function EventAccommodationSection({ event }: { event: Event }) {
+  if (!isModuleEnabled(event, 'accommodation')) return null;
+
+  const options = event.accommodation.options.filter((option) => option.active);
+
+  return (
+    <View style={styles.experienceSection}>
+      <Text style={styles.sectionTitle}>Accommodation</Text>
+      <View style={[styles.experienceCard, { marginTop: 10 }]}>
+        {options.length === 0 ? (
+          <View style={styles.experienceRow}>
+            <Text style={styles.experienceBodyText}>No accommodation options configured yet.</Text>
+          </View>
+        ) : (
+          options.map((option, index) => (
+            <View
+              key={option.id}
+              style={[styles.experienceRow, index > 0 && styles.experienceRowBorder]}
+            >
+              <View style={styles.experienceRowHeader}>
+                <Text style={styles.experienceRowTitle}>{option.name}</Text>
+              </View>
+              {option.description ? (
+                <Text style={styles.experienceRowMeta}>{option.description}</Text>
+              ) : null}
+            </View>
+          ))
+        )}
+      </View>
+    </View>
+  );
+}
+
 export function EventLocationSection({ event }: { event: Event }) {
   const isVenueRelevant = event.deliveryMode === 'in_person' || event.deliveryMode === 'hybrid';
   if (!isVenueRelevant || !event.venueAddress) return null;

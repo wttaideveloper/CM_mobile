@@ -162,6 +162,27 @@ export type EventMealsApiResponse = {
 };
 
 /**
+ * One accommodation option (backend app/schemas/event_accommodation_schema.py
+ * AccommodationOption) — identical shape to a meal option minus `date`.
+ * `active: false` = retired by the organizer.
+ */
+export type EventAccommodationOptionApiResponse = {
+  id: string;
+  name: string;
+  description?: string | null;
+  active: boolean;
+};
+
+/**
+ * Event.accommodation (backend EventAccommodation) — `enabled` mirrors
+ * `modules.accommodation` exactly; never the capability check itself.
+ */
+export type EventAccommodationApiResponse = {
+  enabled: boolean;
+  options: EventAccommodationOptionApiResponse[];
+};
+
+/**
  * GET /api/v1/event-types/ — the dynamic, DB-backed Event Type registry
  * (Phase 2 foundation). `key` is the stable identifier that matches
  * EventApiResponse.event_type (immutable once created); `name` is the
@@ -252,6 +273,11 @@ export type EventApiResponse = {
    * typed optional/nullable defensively, same reasoning as event_type/modules.
    */
   meals?: EventMealsApiResponse | null;
+  /**
+   * Event-level accommodation configuration (Phase 2.7). Same resolution
+   * behavior as meals — always resolved server-side, typed defensively.
+   */
+  accommodation?: EventAccommodationApiResponse | null;
   is_deleted?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -300,6 +326,13 @@ export type EventRegistrationRequest = {
    * when nothing was selected.
    */
   meal_selections?: string[];
+  /**
+   * Accommodation option ids (backend EventRegistrationCreate.
+   * accommodation_selections, Phase 2.7) — only meaningful when
+   * modules.accommodation is enabled; omit rather than send an empty
+   * array when nothing was selected.
+   */
+  accommodation_selections?: string[];
 };
 
 /**

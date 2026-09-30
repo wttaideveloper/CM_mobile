@@ -185,6 +185,7 @@ export function EventRegisterScreen() {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, EventFormFieldValue>>({});
   const [mealSelections, setMealSelections] = useState<string[]>([]);
+  const [accommodationSelections, setAccommodationSelections] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<EventRegistrationResult | null>(null);
@@ -252,6 +253,12 @@ export function EventRegisterScreen() {
   const mealsEnabled = !isPaid && isModuleEnabled(event, 'meals');
   // Retired options can't be newly selected — only ever offer active ones.
   const availableMealOptions = mealsEnabled ? event.meals.options.filter((o) => o.active) : [];
+  // Same constraint as meals: only the free-registration payload accepts
+  // accommodation_selections (EventRegistrationCreate), checkout does not.
+  const accommodationEnabled = !isPaid && isModuleEnabled(event, 'accommodation');
+  const availableAccommodationOptions = accommodationEnabled
+    ? event.accommodation.options.filter((o) => o.active)
+    : [];
 
   function validate(): boolean {
     let valid = true;
@@ -320,6 +327,9 @@ export function EventRegisterScreen() {
             : {}),
           ...(mealsEnabled && mealSelections.length > 0
             ? { meal_selections: mealSelections }
+            : {}),
+          ...(accommodationEnabled && accommodationSelections.length > 0
+            ? { accommodation_selections: accommodationSelections }
             : {}),
         },
       },
@@ -599,6 +609,42 @@ export function EventRegisterScreen() {
                         >
                           {option.name}
                           {option.date ? ` · ${option.date}` : ''}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+
+            {accommodationEnabled && availableAccommodationOptions.length > 0 ? (
+              <View style={styles.fieldGroup}>
+                <Text style={styles.formSectionTitle}>Accommodation</Text>
+                <View style={styles.optionList}>
+                  {availableAccommodationOptions.map((option) => {
+                    const isSelected = accommodationSelections.includes(option.id);
+                    return (
+                      <Pressable
+                        key={option.id}
+                        onPress={() =>
+                          setAccommodationSelections((current) =>
+                            isSelected
+                              ? current.filter((id) => id !== option.id)
+                              : [...current, option.id],
+                          )
+                        }
+                        accessibilityRole="button"
+                        accessibilityLabel={option.name}
+                        accessibilityState={{ selected: isSelected }}
+                        style={[styles.optionChip, isSelected && styles.optionChipSelected]}
+                      >
+                        <Text
+                          style={[
+                            styles.optionChipText,
+                            isSelected && styles.optionChipTextSelected,
+                          ]}
+                        >
+                          {option.name}
                         </Text>
                       </Pressable>
                     );

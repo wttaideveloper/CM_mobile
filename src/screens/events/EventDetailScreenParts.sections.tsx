@@ -27,6 +27,7 @@ import {
   OrganizerAvatar,
 } from '@/screens/events/EventDetailScreenParts.shared';
 import {
+  EventAccommodationSection,
   EventAddToCalendarAction,
   EventInstructionsSection,
   EventLocationSection,
@@ -203,6 +204,7 @@ export function EventDetailContent({
       <EventSessionsSection event={event} availability={availability} isRegistered={isRegistered} />
       <EventMeetingSection event={event} availability={availability} isRegistered={isRegistered} />
       <EventMealsSection event={event} />
+      <EventAccommodationSection event={event} />
       <EventResourcesSection resources={event.resources} />
       <EventInstructionsSection event={event} />
     </View>

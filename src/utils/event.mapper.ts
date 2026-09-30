@@ -1,4 +1,11 @@
-import type { Event, EventFilterTag, EventMealOption, EventMeals } from '@/constants/events';
+import type {
+  Event,
+  EventAccommodation,
+  EventAccommodationOption,
+  EventFilterTag,
+  EventMealOption,
+  EventMeals,
+} from '@/constants/events';
 import type {
   EventApiResponse,
   EventFormField,
@@ -7,6 +14,8 @@ import type {
   EventFormFieldRenderer,
   EventFormSection,
   EventFormSectionApiResponse,
+  EventAccommodationApiResponse,
+  EventAccommodationOptionApiResponse,
   EventMealOptionApiResponse,
   EventMealsApiResponse,
   EventMeetingAccess,
@@ -120,6 +129,38 @@ function normalizeEventMeals(meals?: EventMealsApiResponse | null): EventMeals {
         .filter((option): option is EventMealOption => option !== null)
     : [];
   return { enabled: Boolean(meals?.enabled), options };
+}
+
+function normalizeEventAccommodationOption(
+  option: EventAccommodationOptionApiResponse,
+): EventAccommodationOption | null {
+  const id = option?.id != null ? String(option.id).trim() : '';
+  const name = option?.name?.trim();
+  if (!id || !name) return null;
+
+  return {
+    id,
+    name,
+    description: option.description?.trim() || null,
+    active: Boolean(option.active),
+  };
+}
+
+/**
+ * Mirrors the backend's own accommodation resolution — same shape/rules as
+ * normalizeEventMeals, minus date (accommodation options aren't day-
+ * specific). `enabled` is a read-only mirror of modules.accommodation,
+ * never the capability check itself.
+ */
+function normalizeEventAccommodation(
+  accommodation?: EventAccommodationApiResponse | null,
+): EventAccommodation {
+  const options = Array.isArray(accommodation?.options)
+    ? accommodation!.options
+        .map(normalizeEventAccommodationOption)
+        .filter((option): option is EventAccommodationOption => option !== null)
+    : [];
+  return { enabled: Boolean(accommodation?.enabled), options };
 }
 
 function textOrNa(value?: string | null): string {
@@ -410,6 +451,7 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
     eventType: resolveEventType(api.event_type),
     modules: normalizeEventModules(api.modules),
     meals: normalizeEventMeals(api.meals),
+    accommodation: normalizeEventAccommodation(api.accommodation),
   };
 }
 

@@ -19,6 +19,19 @@ export type EventMeals = {
   options: EventMealOption[];
 };
 
+/** Normalized accommodation option — identical shape to EventMealOption minus `date` (accommodation options aren't day-specific). */
+export type EventAccommodationOption = {
+  id: string;
+  name: string;
+  description: string | null;
+  active: boolean;
+};
+
+export type EventAccommodation = {
+  enabled: boolean;
+  options: EventAccommodationOption[];
+};
+
 export const EVENT_FILTERS = ['All', 'Upcoming', 'This Week', 'Online', 'Free'] as const;
 
 export type EventFilterTag = 'upcoming' | 'thisWeek' | 'online' | 'free';
@@ -79,4 +92,6 @@ export type Event = {
   modules: EventModules;
   /** Meals configuration (Phase 7) — always fully populated by the mapper ({enabled:false, options:[]} for legacy/unconfigured events). Gate visibility with isModuleEnabled(event, 'meals'), not options.length. */
   meals: EventMeals;
+  /** Accommodation configuration (Phase 8) — same shape/rules as meals, minus date. Gate visibility with isModuleEnabled(event, 'accommodation'), not options.length. */
+  accommodation: EventAccommodation;
 };
