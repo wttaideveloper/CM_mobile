@@ -13,6 +13,7 @@ import { AUTH_BG_LOGIN, AUTH_BG_SIGNUP } from '@/constants/images';
 import { useLoginAuth } from '@/hooks/useLoginAuth';
 import { useScreenPrivacy } from '@/hooks/useScreenPrivacy';
 import { styles } from '@/screens/auth/LoginScreen.styles';
+import { useAuthStore } from '@/stores/auth.store';
 import { getSpacing, isSmallDevice } from '@/utils/responsive';
 
 type LoginScreenProps = {
@@ -31,7 +32,12 @@ export function LoginScreen({
   const insets = useSafeAreaInsets();
   const auth = useLoginAuth(onKeyboardVisibilityChange);
   const isSignup = auth.authMode === 'signup';
+  const showBack = auth.authMode !== 'login';
   const scrollRef = useRef<KeyboardAwareScrollViewRef>(null);
+
+  useEffect(() => {
+    useAuthStore.getState().consumePreferLoginOnAuthEntry();
+  }, []);
 
   // iOS focuses the first TextInput when this page slides in from onboarding.
   useEffect(() => {
@@ -80,7 +86,15 @@ export function LoginScreen({
     auth.authMode === 'login' ? AUTH_BG_LOGIN : AUTH_BG_SIGNUP;
 
   return (
-    <AuthScreenLayout backgroundImage={backgroundImage} contentTopRatio={0}>
+    <AuthScreenLayout
+      backgroundImage={backgroundImage}
+      contentTopRatio={0}
+      showBack={showBack}
+      onBack={() => {
+        Keyboard.dismiss();
+        auth.openLoginMode();
+      }}
+    >
       <View style={styles.flex}>
         <View style={[styles.formViewport, { top: contentTop }]}>
           <KeyboardAwareScrollView
@@ -147,7 +161,7 @@ export function LoginScreen({
               onResendVerification={auth.handleResendVerification}
               onResendResetCode={auth.handleResendResetCode}
               onOpenLoginMode={auth.openLoginMode}
-              onOpenSignupMode={() => auth.setAuthMode('signup')}
+              onOpenSignupMode={auth.openSignupMode}
               onSignupNameFocus={scrollSignupNameIntoView}
               onSocialLogin={(provider) => void auth.handleSocialLogin(provider)}
               suppressInitialFocus={Platform.OS === 'ios' && isActive}

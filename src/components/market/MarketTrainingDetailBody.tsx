@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -35,16 +35,22 @@ import { getTrainingProgressPath } from '@/components/market/marketTrainingProgr
 import { TrainingAnnouncementsPanel } from '@/components/market/TrainingAnnouncementsPanel';
 import { TrainingStickyVideoPlayer } from '@/components/market/TrainingStickyVideoPlayer';
 import {
-  useMyTrainingEnrolments,
   useTraining,
   useTrainingReviews,
+  useMyTrainingEnrolments,
 } from '@/hooks/useTrainings';
 import type {
   TrainingCurriculumItemType,
   TrainingDetailView,
 } from '@/types/training.types';
 import { buildStaticTrainingDetail } from '@/utils/buildStaticTrainingDetail';
-import { openTrainingFile } from '@/utils/downloadTrainingFile';
+import {
+  openTrainingFile,
+  probeTrainingFileSizeBytes,
+  saveTrainingFileToDevice,
+} from '@/utils/downloadTrainingFile';
+import { formatTrainingFileSize } from '@/utils/trainingFileSize';
+import { isYoutubeUrl } from '@/utils/trainingLessonMedia';
 import { c, NU } from '@/utils/newUiCompact';
 
 type CurriculumItemView = {
@@ -87,6 +93,64 @@ function CurriculumChevron({ expanded }: { expanded: boolean }) {
           strokeLinejoin="round"
         />
       </Svg>
+    </View>
+  );
+}
+
+function TrainingFaqList({
+  faqs,
+}: {
+  faqs: { id: string; question: string; answer: string }[];
+}) {
+  const [expandedId, setExpandedId] = useState<string | null>(faqs[0]?.id ?? null);
+
+  return (
+    <View style={styles.faqList}>
+      {faqs.map((faq, index) => {
+        const expanded = expandedId === faq.id;
+        return (
+          <View
+            key={faq.id}
+            style={[styles.faqCard, expanded && styles.faqCardOpen]}
+          >
+            <Pressable
+              onPress={() =>
+                setExpandedId((prev) => (prev === faq.id ? null : faq.id))
+              }
+              style={({ pressed }) => [
+                styles.faqHeader,
+                pressed && styles.faqHeaderPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ expanded }}
+              accessibilityLabel={faq.question || `FAQ ${index + 1}`}
+            >
+              <View style={[styles.faqIndex, expanded && styles.faqIndexOpen]}>
+                <Text
+                  style={[
+                    styles.faqIndexText,
+                    expanded && styles.faqIndexTextOpen,
+                  ]}
+                >
+                  {String(index + 1).padStart(2, '0')}
+                </Text>
+              </View>
+              <Text
+                style={[styles.faqQuestion, expanded && styles.faqQuestionOpen]}
+                numberOfLines={expanded ? undefined : 2}
+              >
+                {faq.question || `Question ${index + 1}`}
+              </Text>
+              <CurriculumChevron expanded={expanded} />
+            </Pressable>
+            {expanded && faq.answer ? (
+              <View style={styles.faqAnswerWrap}>
+                <Text style={styles.faqAnswer}>{faq.answer}</Text>
+              </View>
+            ) : null}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -306,7 +370,7 @@ function ReviewPreviewCard({
       <View style={styles.reviewTop}>
         <View style={styles.reviewAvatar}>
           <Text style={styles.reviewAvatarText}>
-            {author.charAt(0).toUpperCase()}
+            {(author.trim().charAt(0) || 'L').toUpperCase()}
           </Text>
         </View>
         <View style={styles.reviewCopy}>
@@ -404,13 +468,8 @@ function CurriculumItemRow({
     !locked &&
     (item.type === 'video' || item.type === 'youtube') &&
     Boolean(item.videoUrl?.trim());
-  const canOpenFile =
-    !locked &&
-    (item.type === 'pdf' || item.type === 'notes') &&
-    Boolean(item.fileUrl?.trim());
   const canOpenQuiz = !locked && item.type === 'quiz';
-  const interactive =
-    Boolean(onPress) && (canPlayVideo || canOpenFile || canOpenQuiz || !locked);
+  const interactive = Boolean(onPress);
 
   const rightIcon = locked ? (
     <MarketCheckoutLockIcon color={TRAINING_MUTED} size={16} />
@@ -444,7 +503,7 @@ function CurriculumItemRow({
   if (interactive && onPress) {
     return (
       <Pressable
-        style={styles.curriculumItem}
+        style={[styles.curriculumItem, locked && styles.curriculumItemLocked]}
         onPress={onPress}
         accessibilityRole="button"
       >
@@ -529,13 +588,7 @@ function CurriculumSectionRow({
                     key={item.id}
                     item={item}
                     locked={locked}
-                    onPress={
-                      locked
-                        ? undefined
-                        : () => {
-                            onItemPress(item);
-                          }
-                    }
+                    onPress={() => onItemPress(item)}
                   />
                 );
               })
@@ -553,6 +606,8 @@ function CurriculumSectionRow({
 
 function CurriculumBlock({
   trainingId,
+  enrollTitle,
+  enrollPrice,
   sessions,
   materials,
   onOpenMaterial,
@@ -561,6 +616,8 @@ function CurriculumBlock({
   enrolled = false,
 }: {
   trainingId?: string;
+  enrollTitle?: string;
+  enrollPrice?: string;
   sessions: TrainingDetailView['sessions'];
   materials: TrainingDetailView['materials'];
   onOpenMaterial: (url?: string) => void;
@@ -601,8 +658,56 @@ function CurriculumBlock({
     return !item.isPreview;
   };
 
+  const promptGoToLearning = () => {
+    Alert.alert(
+      'Open My Learning',
+      'You’re already enrolled in this program. Lessons, videos, quizzes, and progress are tracked in My Learning — open them there so your completion and watch progress stay up to date.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        {
+          text: 'Go to learning',
+          onPress: () => {
+            router.push({
+              pathname: '/(main)/market/my-training-progress',
+              params: { id: trainingId ?? '' },
+            });
+          },
+        },
+      ],
+    );
+  };
+
   const onItemPress = (item: CurriculumItemView) => {
-    if (isItemLocked(item)) return;
+    // Enrolled users should use My Learning (progress is tracked there).
+    if (enrolled) {
+      promptGoToLearning();
+      return;
+    }
+
+    if (isItemLocked(item)) {
+      Alert.alert(
+        'Enroll to unlock',
+        'Enroll in this program to access locked lessons.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          {
+            text: 'Enroll now',
+            onPress: () => {
+              if (!trainingId) return;
+              router.push({
+                pathname: '/(main)/market/training-checkout',
+                params: {
+                  id: trainingId,
+                  title: enrollTitle ?? '',
+                  price: enrollPrice ?? '',
+                },
+              });
+            },
+          },
+        ],
+      );
+      return;
+    }
 
     if (item.type === 'quiz') {
       const examId = item.examId?.trim();
@@ -624,10 +729,19 @@ function CurriculumBlock({
       return;
     }
 
-    if (
-      (item.type === 'video' || item.type === 'youtube') &&
-      item.videoUrl?.trim()
-    ) {
+    if (item.type === 'youtube' || isYoutubeUrl(item.videoUrl)) {
+      const url = item.videoUrl?.trim();
+      if (!url) {
+        Alert.alert('YouTube', 'No YouTube link is attached to this item yet.');
+        return;
+      }
+      void Linking.openURL(url).catch(() => {
+        Alert.alert('YouTube', url);
+      });
+      return;
+    }
+
+    if (item.type === 'video' && item.videoUrl?.trim()) {
       setActivePreview({
         id: item.id,
         title: item.title,
@@ -644,6 +758,14 @@ function CurriculumBlock({
         url: item.fileUrl.trim(),
         suggestedName: item.title,
       });
+      return;
+    }
+
+    if (item.type === 'pdf' || item.type === 'notes') {
+      Alert.alert(
+        'Document unavailable',
+        'This document has no file link yet. Try again later, or open it from My Learning after enrolling.',
+      );
       return;
     }
 
@@ -670,7 +792,11 @@ function CurriculumBlock({
         <Text style={styles.curriculumHint}>
           {sessionCount} section{sessionCount === 1 ? '' : 's'}
           {totalItems > 0 ? ` · ${totalItems} items` : ''}
-          {isSelfPaced ? ' · Preview lessons unlocked' : ''}
+          {enrolled
+            ? ' · Open lessons in My Learning'
+            : isSelfPaced
+              ? ' · Preview lessons unlocked'
+              : ''}
         </Text>
         <View style={styles.curriculumCard}>
           {useDayCurriculum
@@ -753,22 +879,40 @@ function CurriculumBlock({
           <Text style={[styles.sectionLabel, styles.docsLabel]}>Documents</Text>
           <Card>
             {materials.map((material, index) => (
-              <Pressable
+              <View
                 key={material.id}
                 style={[
                   styles.sessionRow,
                   index < materials.length - 1 && styles.infoBorder,
                 ]}
-                onPress={() => onOpenMaterial(material.url)}
               >
-                <View style={styles.sessionCopy}>
+                <Pressable
+                  style={styles.sessionCopy}
+                  onPress={() => onOpenMaterial(material.url)}
+                  accessibilityRole="button"
+                >
                   <Text style={styles.sessionTitle}>{material.title}</Text>
                   <Text style={styles.infoMeta}>
-                    {material.type} · {material.size}
-                    {material.downloadable ? ' · Offline ready' : ''}
+                    {[material.type, material.size !== '—' ? material.size : null]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </Text>
-                </View>
-              </Pressable>
+                </Pressable>
+                {material.url ? (
+                  <Pressable
+                    onPress={() => {
+                      void saveTrainingFileToDevice({
+                        url: material.url,
+                        suggestedName: material.title,
+                      });
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Download ${material.title}`}
+                  >
+                    <Text style={styles.linkText}>Download</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             ))}
           </Card>
         </>
@@ -784,8 +928,41 @@ export function MarketTrainingDetailBody() {
     useTraining(id);
   const reviewsQuery = useTrainingReviews(isApiId ? id : undefined);
   const enrolments = useMyTrainingEnrolments();
+  const [noteSizeById, setNoteSizeById] = useState<Record<string, string>>({});
+  const [openingNoteId, setOpeningNoteId] = useState<string | null>(null);
+  const [downloadingNoteId, setDownloadingNoteId] = useState<string | null>(
+    null,
+  );
 
   const d = isApiId ? training : buildStaticTrainingDetail(id);
+
+  useEffect(() => {
+    const notes = d?.notes ?? [];
+    const missing = notes.filter(
+      (note) => !note.sizeLabel && !noteSizeById[note.id] && note.url,
+    );
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      const next: Record<string, string> = {};
+      await Promise.all(
+        missing.map(async (note) => {
+          const bytes = await probeTrainingFileSizeBytes(note.url);
+          const label = formatTrainingFileSize(bytes);
+          if (label) next[note.id] = label;
+        }),
+      );
+      if (!cancelled && Object.keys(next).length > 0) {
+        setNoteSizeById((prev) => ({ ...prev, ...next }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d?.notes]);
 
   if (isApiId && isLoading && !d) {
     return null;
@@ -808,7 +985,14 @@ export function MarketTrainingDetailBody() {
 
   if (!d) return null;
 
-  const enrolled = isApiId ? enrolments.isEnrolled(d.id) : false;
+  const enrolled =
+    Boolean(d.canContinueLearning) ||
+    (isApiId &&
+      enrolments.isEnrolled(d.id) &&
+      !enrolments.isPendingApproval(d.id));
+  const pendingApproval =
+    Boolean(d.isPendingApproval) ||
+    (isApiId && enrolments.isPendingApproval(d.id));
   const reviews = isApiId ? reviewsQuery.reviews : d.reviews;
   const averageRating = isApiId
     ? reviewsQuery.averageRating ?? d.averageRating
@@ -869,12 +1053,16 @@ export function MarketTrainingDetailBody() {
     ? d.meetingProvider
     : '';
   const attendMeetingLink = hasReal(d.meetingLink) ? d.meetingLink : '';
-  const attendTitle = [attendModeLabel, attendVenue].filter(Boolean).join(' · ');
-  const attendMeta = [attendAddress, attendProvider].filter(Boolean).join(' · ');
+  const attendMeetingId = hasReal(d.meetingId) ? d.meetingId : '';
+  const attendPasscode = hasReal(d.meetingPasscode) ? d.meetingPasscode : '';
   const showAttend =
-    Boolean(attendTitle) ||
-    Boolean(attendMeta) ||
-    Boolean(attendMeetingLink);
+    Boolean(attendModeLabel) ||
+    Boolean(attendVenue) ||
+    Boolean(attendAddress) ||
+    Boolean(attendProvider) ||
+    Boolean(attendMeetingLink) ||
+    Boolean(attendMeetingId) ||
+    Boolean(attendPasscode);
 
   const seatsTitle = [
     hasReal(d.enrolled, ['—']) ? `${d.enrolled} people joined` : null,
@@ -932,9 +1120,28 @@ export function MarketTrainingDetailBody() {
             </Text>
           </View>
           <View style={styles.titlePriceRow}>
-            <Text style={[styles.title, styles.titleFlex]}>{d.title}</Text>
-            <Text style={styles.priceInline}>{d.priceLabel}</Text>
+            <Text style={[styles.title, styles.titleFlex]} numberOfLines={3}>
+              {d.title}
+            </Text>
+            <View style={styles.priceCol}>
+              <Text style={styles.priceInline}>
+                {d.promoPriceLabel || d.priceLabel}
+              </Text>
+              {d.promoPriceLabel ? (
+                <Text style={styles.priceWas}>{d.priceLabel}</Text>
+              ) : null}
+            </View>
           </View>
+          {d.couponCode || d.discountLabel ? (
+            <View style={styles.couponChip}>
+              <Text style={styles.couponChipText}>
+                {d.couponCode ? `Coupon ${d.couponCode}` : d.discountLabel}
+              </Text>
+            </View>
+          ) : null}
+          {d.subtitle ? (
+            <Text style={styles.programSubtitle}>{d.subtitle}</Text>
+          ) : null}
           {averageRating != null ? (
             <View style={styles.ratingSummary}>
               <RatingStars rating={averageRating} size="md" />
@@ -946,7 +1153,9 @@ export function MarketTrainingDetailBody() {
               </Text>
             </View>
           ) : null}
-          <Text style={styles.description}>{d.description}</Text>
+          <Text style={styles.description} selectable>
+            {d.description}
+          </Text>
           {d.tags.length > 0 ? (
             <View style={styles.tagRow}>
               {d.tags.map((tag) => (
@@ -958,11 +1167,30 @@ export function MarketTrainingDetailBody() {
           ) : null}
         </View>
 
+        {pendingApproval ? (
+          <View style={styles.pendingBanner}>
+            <Text style={styles.pendingBannerEyebrow}>Enrolment submitted</Text>
+            <Text style={styles.pendingBannerText}>
+              Waiting for admin approval before course content unlocks.
+            </Text>
+          </View>
+        ) : null}
+
         <Section label="At a glance">
           <View style={styles.factRow}>
             <FactChip label="Level" value={d.difficulty} />
             <FactChip label="Language" value={d.language} />
           </View>
+          {d.accessDuration || d.accessExpiry ? (
+            <View style={styles.factRow}>
+              {d.accessDuration ? (
+                <FactChip label="Access" value={d.accessDuration} />
+              ) : null}
+              {d.accessExpiry ? (
+                <FactChip label="Expiry" value={d.accessExpiry} />
+              ) : null}
+            </View>
+          ) : null}
           <Text style={styles.glanceHint}>
             Pick this if the level matches you — beginners welcome when marked
             Beginner / All levels.
@@ -972,6 +1200,8 @@ export function MarketTrainingDetailBody() {
         {d.sessions.length > 0 || d.materials.length > 0 ? (
           <CurriculumBlock
             trainingId={d.id}
+            enrollTitle={d.title}
+            enrollPrice={d.promoPriceLabel || d.priceLabel}
             sessions={d.sessions}
             materials={d.materials}
             onOpenMaterial={openLink}
@@ -1014,16 +1244,34 @@ export function MarketTrainingDetailBody() {
                   </View>
                   <View style={styles.infoCopy}>
                     <Text style={styles.infoEyebrow}>How you attend</Text>
-                    {attendTitle ? (
-                      <Text style={styles.infoTitle}>{attendTitle}</Text>
+                    {attendModeLabel ? (
+                      <Text style={styles.infoTitle}>{attendModeLabel}</Text>
                     ) : null}
-                    {attendMeta ? (
-                      <Text style={styles.infoMeta}>{attendMeta}</Text>
+                    {attendVenue ? (
+                      <Text style={styles.infoMeta}>{attendVenue}</Text>
+                    ) : null}
+                    {attendAddress ? (
+                      <Text style={styles.infoMeta}>{attendAddress}</Text>
+                    ) : null}
+                    {attendProvider ? (
+                      <Text style={styles.infoMeta}>
+                        Meeting: {attendProvider}
+                      </Text>
+                    ) : null}
+                    {attendMeetingId ? (
+                      <Text style={styles.infoMeta}>
+                        Meeting ID {attendMeetingId}
+                      </Text>
+                    ) : null}
+                    {attendPasscode ? (
+                      <Text style={styles.infoMeta}>
+                        Passcode {attendPasscode}
+                      </Text>
                     ) : null}
                     {attendMeetingLink ? (
                       <Pressable onPress={() => openLink(attendMeetingLink)}>
                         <Text style={styles.linkText} numberOfLines={1}>
-                          Open meeting link
+                          {attendMeetingLink}
                         </Text>
                       </Pressable>
                     ) : null}
@@ -1057,22 +1305,34 @@ export function MarketTrainingDetailBody() {
           <View style={styles.instructorCard}>
             <View style={styles.instructorRow}>
               <View style={styles.instructorAvatar}>
-                <Text style={styles.instructorAvatarText}>
-                  {(d.trainerName || 'T')
-                    .split(/\s+/)
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .map((part) => part[0]?.toUpperCase() ?? '')
-                    .join('') || 'T'}
-                </Text>
+                {d.trainerPhoto ? (
+                  <Image
+                    source={{ uri: d.trainerPhoto }}
+                    style={styles.instructorAvatarImage}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <Text style={styles.instructorAvatarText}>
+                    {(d.trainerName || 'T')
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((part) => part[0]?.toUpperCase() ?? '')
+                      .join('') || 'T'}
+                  </Text>
+                )}
               </View>
               <View style={styles.instructorCopy}>
                 <Text style={styles.instructorName}>{d.trainerName}</Text>
-                <Text style={styles.infoMeta}>
-                  {d.trainerRole && d.trainerRole !== '—'
-                    ? d.trainerRole
-                    : 'Instructor'}
-                </Text>
+                {d.trainerCredentials ? (
+                  <Text style={styles.infoMeta}>{d.trainerCredentials}</Text>
+                ) : (
+                  <Text style={styles.infoMeta}>
+                    {d.trainerRole && d.trainerRole !== '—'
+                      ? d.trainerRole
+                      : 'Instructor'}
+                  </Text>
+                )}
               </View>
             </View>
             {d.trainerBio && d.trainerBio !== '—' ? (
@@ -1086,6 +1346,12 @@ export function MarketTrainingDetailBody() {
             <Text style={styles.proseText}>{d.prerequisites}</Text>
           </View>
         </Section>
+
+        {(d.faqs ?? []).length > 0 ? (
+          <Section label="FAQs">
+            <TrainingFaqList faqs={d.faqs ?? []} />
+          </Section>
+        ) : null}
 
         {d.deliveryInstructions || d.accessInfo || d.exceptions ? (
           <Section label="Delivery instructions">
@@ -1124,36 +1390,75 @@ export function MarketTrainingDetailBody() {
         <Section label="Notes">
           {d.notes.length > 0 ? (
             <View style={styles.notesList}>
-              {d.notes.map((note) => (
-                <Pressable
-                  key={note.id}
-                  style={({ pressed }) => [
-                    styles.noteTile,
-                    pressed && styles.noteTilePressed,
-                  ]}
-                  onPress={() => {
-                    void openTrainingFile({
-                      url: note.url,
-                      suggestedName: note.title,
-                    });
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open note ${note.title}`}
-                >
-                  <View style={styles.noteIconWrap}>
-                    <Text style={styles.noteIconText}>PDF</Text>
+              {d.notes.map((note) => {
+                const sizeLabel =
+                  note.sizeLabel || noteSizeById[note.id] || '';
+                const busy =
+                  openingNoteId === note.id || downloadingNoteId === note.id;
+                return (
+                  <View key={note.id} style={styles.noteTile}>
+                    <View style={styles.noteIconWrap}>
+                      <Text style={styles.noteIconText}>PDF</Text>
+                    </View>
+                    <View style={styles.noteCopy}>
+                      <Text style={styles.noteTitle} numberOfLines={2}>
+                        {note.title}
+                      </Text>
+                      <Text style={styles.noteMeta}>
+                        {sizeLabel
+                          ? `PDF · ${sizeLabel}`
+                          : 'PDF · preview or download'}
+                      </Text>
+                    </View>
+                    <View style={styles.noteActions}>
+                      <Pressable
+                        disabled={busy}
+                        style={({ pressed }) => [
+                          styles.noteOpenPill,
+                          pressed && styles.noteTilePressed,
+                          busy && styles.noteActionDisabled,
+                        ]}
+                        onPress={() => {
+                          setOpeningNoteId(note.id);
+                          void openTrainingFile({
+                            url: note.url,
+                            suggestedName: note.title,
+                          }).finally(() => setOpeningNoteId(null));
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Preview note ${note.title}`}
+                      >
+                        <Text style={styles.noteOpenText}>
+                          {openingNoteId === note.id ? 'Opening…' : 'Preview'}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        disabled={busy}
+                        style={({ pressed }) => [
+                          styles.noteDownloadPill,
+                          pressed && styles.noteTilePressed,
+                          busy && styles.noteActionDisabled,
+                        ]}
+                        onPress={() => {
+                          setDownloadingNoteId(note.id);
+                          void saveTrainingFileToDevice({
+                            url: note.url,
+                            suggestedName: note.title,
+                          }).finally(() => setDownloadingNoteId(null));
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Download note ${note.title}`}
+                      >
+                        <Text style={styles.noteDownloadText}>
+                          {downloadingNoteId === note.id
+                            ? 'Saving…'
+                            : 'Download'}
+                        </Text>
+                      </Pressable>
+                    </View>
                   </View>
-                  <View style={styles.noteCopy}>
-                    <Text style={styles.noteTitle} numberOfLines={2}>
-                      {note.title}
-                    </Text>
-                    <Text style={styles.noteMeta}>Tap to open</Text>
-                  </View>
-                  <View style={styles.noteOpenPill}>
-                    <Text style={styles.noteOpenText}>Open</Text>
-                  </View>
-                </Pressable>
-              ))}
+                );
+              })}
             </View>
           ) : (
             <View style={styles.notesEmpty}>
@@ -1289,6 +1594,28 @@ const styles = StyleSheet.create({
   titleBlock: {
     gap: c(8, 6),
   },
+  pendingBanner: {
+    backgroundColor: '#fff6e8',
+    borderWidth: 1,
+    borderColor: '#f0d9a8',
+    borderRadius: NU.cardRadius,
+    paddingVertical: c(12, 10),
+    paddingHorizontal: c(12, 10),
+    gap: c(4, 3),
+  },
+  pendingBannerEyebrow: {
+    fontSize: c(11, 10),
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: '#8a6a2b',
+  },
+  pendingBannerText: {
+    fontSize: c(13, 12),
+    lineHeight: c(18, 16),
+    fontWeight: '600',
+    color: TRAINING_TEAL,
+  },
   kindRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1320,6 +1647,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: c(12, 10),
+  },
+  priceCol: {
+    alignItems: 'flex-end',
+    gap: c(2, 1),
+  },
+  priceWas: {
+    fontSize: c(12.5, 11.5),
+    fontWeight: '600',
+    color: TRAINING_MUTED,
+    textDecorationLine: 'line-through',
+  },
+  couponChip: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#e6f4e8',
+    borderWidth: 1,
+    borderColor: '#b7dfc0',
+    borderRadius: 999,
+    paddingHorizontal: c(10, 8),
+    paddingVertical: c(4, 3),
+  },
+  couponChipText: {
+    fontSize: c(12, 11),
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    color: TRAINING_GREEN,
+  },
+  programSubtitle: {
+    fontSize: NU.subtitle,
+    lineHeight: c(20, 18),
+    fontWeight: '600',
+    color: TRAINING_MUTED,
   },
   priceInline: {
     fontSize: NU.heading,
@@ -1734,6 +2092,76 @@ const styles = StyleSheet.create({
     lineHeight: c(18, 16),
     color: TRAINING_MUTED,
   },
+  faqList: {
+    gap: c(10, 8),
+  },
+  faqCard: {
+    backgroundColor: '#f4f8f5',
+    borderRadius: NU.cardRadius,
+    borderWidth: 1,
+    borderColor: '#e8f0ea',
+    overflow: 'hidden',
+  },
+  faqCardOpen: {
+    backgroundColor: '#eef7f0',
+    borderColor: '#cfe3d4',
+  },
+  faqHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: c(10, 8),
+    paddingVertical: c(13, 11),
+    paddingHorizontal: c(12, 10),
+  },
+  faqHeaderPressed: {
+    opacity: 0.88,
+  },
+  faqIndex: {
+    width: c(34, 30),
+    height: c(34, 30),
+    borderRadius: NU.cardRadiusSm,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#dfeae2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  faqIndexOpen: {
+    backgroundColor: TRAINING_GREEN,
+    borderColor: TRAINING_GREEN,
+  },
+  faqIndexText: {
+    fontSize: c(11, 10),
+    fontWeight: '800',
+    color: TRAINING_MUTED,
+    letterSpacing: 0.2,
+  },
+  faqIndexTextOpen: {
+    color: '#ffffff',
+  },
+  faqQuestion: {
+    flex: 1,
+    fontSize: NU.link,
+    lineHeight: c(20, 18),
+    fontWeight: '700',
+    color: TRAINING_TEAL,
+  },
+  faqQuestionOpen: {
+    color: TRAINING_GREEN,
+  },
+  faqAnswerWrap: {
+    marginHorizontal: c(12, 10),
+    marginBottom: c(13, 11),
+    paddingTop: c(10, 8),
+    borderTopWidth: 1,
+    borderTopColor: '#d7eadc',
+  },
+  faqAnswer: {
+    fontSize: c(13, 12),
+    lineHeight: c(20, 18),
+    color: TRAINING_TEAL,
+    fontWeight: '500',
+  },
   learnList: {
     gap: c(8, 6),
   },
@@ -1817,8 +2245,18 @@ const styles = StyleSheet.create({
     color: TRAINING_MUTED,
     fontWeight: '500',
   },
+  noteActions: {
+    alignItems: 'flex-end',
+    gap: c(6, 5),
+  },
   noteOpenPill: {
     backgroundColor: '#e6f4e8',
+    paddingHorizontal: c(10, 8),
+    paddingVertical: c(6, 5),
+    borderRadius: 99,
+  },
+  noteDownloadPill: {
+    backgroundColor: '#eef6f4',
     paddingHorizontal: c(10, 8),
     paddingVertical: c(6, 5),
     borderRadius: 99,
@@ -1827,6 +2265,14 @@ const styles = StyleSheet.create({
     fontSize: c(12, 11),
     fontWeight: '800',
     color: TRAINING_GREEN,
+  },
+  noteDownloadText: {
+    fontSize: c(12, 11),
+    fontWeight: '800',
+    color: TRAINING_TEAL,
+  },
+  noteActionDisabled: {
+    opacity: 0.45,
   },
   notesEmpty: {
     backgroundColor: '#f4f8f5',
@@ -2098,6 +2544,11 @@ const styles = StyleSheet.create({
     borderColor: '#d7eadc',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  instructorAvatarImage: {
+    width: '100%',
+    height: '100%',
   },
   instructorAvatarText: {
     fontSize: c(17, 15),

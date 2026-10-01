@@ -78,6 +78,11 @@ export type TrainingLesson = {
   /** Lesson-wise live/venue attendance from content API */
   isAttended?: boolean;
   attendedAt?: string;
+  /**
+   * Live / venue session start (ISO or parseable datetime).
+   * Used to block open/join before the scheduled time.
+   */
+  startsAt?: string;
 };
 
 export type TrainingDay = {
@@ -126,6 +131,7 @@ export type TrainingProgressPath = {
     title: string;
     url: string;
     kind: 'notes_pdf' | 'note' | 'document';
+    sizeLabel?: string;
   }[];
   /** Resume targets from content/progress API */
   resumeSectionId?: string;

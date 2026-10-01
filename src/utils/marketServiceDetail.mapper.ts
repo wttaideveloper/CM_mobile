@@ -102,5 +102,7 @@ export function mapServiceDetailToMarketUI(
     // Reviews API not available — keep static review card.
     review: fallback.review,
     enterpriseId: item.enterpriseId || undefined,
+    provider: item.provider,
+    providerUserId: item.providerUserId,
   };
 }

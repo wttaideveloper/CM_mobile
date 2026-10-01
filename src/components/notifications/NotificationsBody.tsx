@@ -27,8 +27,10 @@ type NotificationsBodyProps = {
   filter: NotifFilter;
   onFilterChange: (filter: NotifFilter) => void;
   groups: { label: string; items: StaticNotification[] }[];
-  readIds: ReadonlySet<string>;
-  onMarkRead: (id: string) => void;
+  /** @deprecated Local-only readIds; prefer mutating `item.unread` in parent. */
+  readIds?: ReadonlySet<string>;
+  onMarkRead?: (id: string) => void;
+  onItemPress?: (item: StaticNotification) => void;
 };
 
 function NotifIcon({ kind, color }: { kind: NotifIconKind; color: string }) {
@@ -54,6 +56,7 @@ export function NotificationsBody({
   groups,
   readIds,
   onMarkRead,
+  onItemPress,
 }: NotificationsBodyProps) {
   return (
     <View style={styles.body}>
@@ -85,7 +88,11 @@ export function NotificationsBody({
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>No notifications</Text>
           <Text style={styles.emptyBody}>
-            Nothing in this filter right now. Try another category.
+            {filter === 'Unread'
+              ? 'You’re all caught up. New updates will show here.'
+              : filter === 'All'
+                ? 'You’ll see your updates here when new activity arrives.'
+                : 'Nothing in this filter right now. Try another category.'}
           </Text>
         </View>
       ) : (
@@ -94,7 +101,8 @@ export function NotificationsBody({
             <Text style={styles.groupLabel}>{group.label}</Text>
             <View style={styles.card}>
               {group.items.map((item, index) => {
-                const unread = item.unread && !readIds.has(item.id);
+                const unread =
+                  item.unread && !(readIds?.has(item.id) ?? false);
                 const isLast = index === group.items.length - 1;
                 const rowContent = (
                   <>
@@ -121,31 +129,27 @@ export function NotificationsBody({
                 );
                 const a11yLabel = `${item.title}${unread ? ', unread' : ''}. ${item.body}. ${item.time}.`;
 
-                return unread ? (
+                return (
                   <Pressable
                     key={item.id}
-                    onPress={() => onMarkRead(item.id)}
+                    onPress={() => {
+                      onItemPress?.(item);
+                      if (unread) onMarkRead?.(item.id);
+                    }}
                     style={({ pressed }) => [
                       styles.row,
-                      styles.rowUnread,
+                      unread && styles.rowUnread,
                       isLast && styles.rowLast,
                       pressed && styles.rowPressed,
                     ]}
                     accessibilityRole="button"
                     accessibilityLabel={a11yLabel}
-                    accessibilityHint="Double tap to mark as read"
+                    accessibilityHint={
+                      unread ? 'Double tap to mark as read' : undefined
+                    }
                   >
                     {rowContent}
                   </Pressable>
-                ) : (
-                  <View
-                    key={item.id}
-                    style={[styles.row, isLast && styles.rowLast]}
-                    accessible
-                    accessibilityLabel={a11yLabel}
-                  >
-                    {rowContent}
-                  </View>
                 );
               })}
             </View>

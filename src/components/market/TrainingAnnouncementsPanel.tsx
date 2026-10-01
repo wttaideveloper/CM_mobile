@@ -13,12 +13,14 @@ import {
 } from '@/components/market/marketTrainingData';
 import { useTrainingAnnouncements } from '@/hooks/useTrainings';
 import type { TrainingAnnouncementApiItem } from '@/types/training.types';
+import { asPlainText } from '@/utils/trainingLessonMedia';
 import { c, NU } from '@/utils/newUiCompact';
 
 function formatAnnouncementDate(value?: string | null): string {
-  if (!value?.trim()) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.trim();
+  const raw = asPlainText(value);
+  if (!raw) return '';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
   return date.toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
@@ -27,7 +29,7 @@ function formatAnnouncementDate(value?: string | null): string {
 }
 
 function authorLabel(author?: string | null): string {
-  const raw = author?.trim() || 'Instructor';
+  const raw = asPlainText(author, 'Instructor');
   if (raw.includes('@')) {
     return raw.split('@')[0] || raw;
   }
@@ -35,7 +37,7 @@ function authorLabel(author?: string | null): string {
 }
 
 function channelLabel(channel?: string | null): string {
-  const raw = channel?.trim();
+  const raw = asPlainText(channel);
   if (!raw) return '';
   return raw
     .split(/[_-]/)
@@ -46,11 +48,12 @@ function channelLabel(channel?: string | null): string {
 
 function AnnouncementCard({ item }: { item: TrainingAnnouncementApiItem }) {
   const displayName = authorLabel(item.author);
-  const title = item.title?.trim() || 'Announcement';
-  const message = item.message?.trim() || '';
+  // Bug_61: show full title + body — no line clamp / short truncation.
+  const title = asPlainText(item.title, 'Announcement');
+  const message = asPlainText(item.message);
   const dateLabel = formatAnnouncementDate(item.sent_at);
   const channel = channelLabel(item.channel);
-  const initial = displayName.charAt(0).toUpperCase() || 'A';
+  const initial = (displayName.trim().charAt(0) || 'A').toUpperCase();
 
   return (
     <View style={styles.card}>
@@ -73,8 +76,14 @@ function AnnouncementCard({ item }: { item: TrainingAnnouncementApiItem }) {
         ) : null}
       </View>
 
-      <Text style={styles.titleText}>{title}</Text>
-      {message ? <Text style={styles.messageText}>{message}</Text> : null}
+      <Text style={styles.titleText} selectable>
+        {title}
+      </Text>
+      {message ? (
+        <Text style={styles.messageText} selectable>
+          {message}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -145,8 +154,11 @@ export function TrainingAnnouncementsPanel({
 
       {announcements.length > 0 ? (
         <View style={styles.list}>
-          {announcements.map((item) => (
-            <AnnouncementCard key={item.id} item={item} />
+          {announcements.map((item, index) => (
+            <AnnouncementCard
+              key={asPlainText(item.id) || `announcement-${index}`}
+              item={item}
+            />
           ))}
         </View>
       ) : null}

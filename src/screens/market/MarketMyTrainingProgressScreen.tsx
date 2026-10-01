@@ -3,8 +3,11 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Keyboard,
   Linking,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -13,7 +16,8 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
-import { downloadTrainingToLibrary, openTrainingFile } from '@/utils/downloadTrainingFile';
+import { downloadTrainingToLibrary, openTrainingFile, probeTrainingFileSizeBytes } from '@/utils/downloadTrainingFile';
+import { formatTrainingFileSize } from '@/utils/trainingFileSize';
 
 import {
   CourseCheckIcon,
@@ -40,9 +44,11 @@ import {
 import {
   isApiTrainingId,
   useCompleteTrainingLesson,
+  useMyTrainingEnrolments,
   useRecordLessonAttendance,
   useRecordLiveSessionAttendance,
   useSaveLessonProgress,
+  useTraining,
   useTrainingCertificate,
   useTrainingContent,
   useTrainingDiscussions,
@@ -55,8 +61,14 @@ import {
   VIDEO_COMPLETE_THRESHOLD,
 } from '@/stores/trainingProgress.store';
 import { ENDPOINTS } from '@/services/api/endpoints';
-import { formatAttendanceDateTime } from '@/utils/dateTime';
-import { resolveAbsoluteApiUrl } from '@/utils/trainingLessonMedia';
+import { formatAttendanceDateTime, formatSessionStartLabel, parseSessionStart } from '@/utils/dateTime';
+import {
+  asPlainText,
+  clampDisplayText,
+  isPlayableVideoUrl,
+  isYoutubeUrl,
+  resolveAbsoluteApiUrl,
+} from '@/utils/trainingLessonMedia';
 import { c, NU } from '@/utils/newUiCompact';
 
 const FALLBACK_BANNER =
@@ -74,6 +86,47 @@ const LESSON_TYPE_META: Record<
   text: { label: 'Topic', color: '#4a5568', bg: '#eef1f5' },
   document: { label: 'PDF', color: '#b42318', bg: '#fdecea' },
 };
+
+function isStickyCourseVideo(lesson: TrainingLesson): boolean {
+  const url = asPlainText(lesson.videoUrl);
+  if (!url || !isPlayableVideoUrl(url)) return false;
+  if (lesson.kind === 'youtube' || isYoutubeUrl(url)) return false;
+  return lesson.kind === 'video';
+}
+
+function useIosKeyboardOpen() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return undefined;
+    const show = Keyboard.addListener('keyboardWillShow', () => setOpen(true));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return open;
+}
+
+/** Keyboard height for scroll-into-view (both platforms). */
+function useKeyboardBottomInset() {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, (event) => {
+      setHeight(event.endCoordinates?.height ?? 0);
+    });
+    const hide = Keyboard.addListener(hideEvent, () => setHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return height;
+}
 
 function LessonDownloadIcon({ color }: { color: string }) {
   return (
@@ -281,11 +334,15 @@ const EMPTY_BUCKET = {
   activeLessonId: undefined as string | undefined,
 };
 
-function FieldRow({ label, value }: { label: string; value?: string | null }) {
+function FieldRow({ label, value }: { label: string; value?: unknown }) {
+  const text = clampDisplayText(asPlainText(value), 2_000);
+  if (!text) return null;
   return (
     <View style={styles.fieldRow}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <Text style={styles.fieldValue}>{value ?? ''}</Text>
+      <Text style={styles.fieldValue} selectable>
+        {text}
+      </Text>
     </View>
   );
 }
@@ -297,14 +354,16 @@ function ApiLessonJoinPanel({
   lesson: TrainingLesson;
   onJoin: () => void;
 }) {
-  const meetingLink = lesson.joinUrl ?? '';
-  const canJoin = Boolean(meetingLink.trim());
+  const meetingLink = asPlainText(lesson.joinUrl);
+  const canJoin = Boolean(meetingLink);
 
   return (
     <View style={styles.inlineLive}>
       <View style={styles.liveJoinCard}>
         <Text style={styles.liveJoinEyebrow}>Session details</Text>
-        <Text style={styles.liveJoinTitle}>{lesson.title}</Text>
+        <Text style={styles.liveJoinTitle} numberOfLines={4}>
+          {clampDisplayText(asPlainText(lesson.title, 'Session'), 200)}
+        </Text>
         <FieldRow label="Meeting link" value={meetingLink} />
         <FieldRow label="Meeting ID" value={lesson.joinMeta ?? ''} />
         <FieldRow
@@ -332,18 +391,19 @@ function SessionMeetingPanel({
   day: TrainingDay;
   onJoin: () => void;
 }) {
-  const meetingLink = day.meetingLink?.trim() ?? '';
-  const schedule = day.schedule?.trim() ?? '';
-  const venue = day.venue?.trim() ?? '';
-  const address = day.address?.trim() ?? '';
-  const passCode = day.passCode?.trim() ?? '';
-  const qrImageUri = day.qrImageBase64?.trim() ?? '';
+  const meetingLink = asPlainText(day.meetingLink);
+  const schedule = asPlainText(day.schedule);
+  const venue = asPlainText(day.venue);
+  const address = asPlainText(day.address);
+  const passCode = asPlainText(day.passCode);
+  const qrImageUri = asPlainText(day.qrImageBase64);
   const attended = Boolean(day.isAttended);
   const attendedLabel = formatAttendanceDateTime(day.attendedAt);
+  const sectionType = asPlainText(day.sectionType).toLowerCase();
   const isVenueSection =
-    (day.sectionType ?? '').toLowerCase() === 'venue' ||
+    sectionType === 'venue' ||
     ((!meetingLink && (venue || address || passCode || qrImageUri)) &&
-      (day.sectionType ?? '').toLowerCase() !== 'live');
+      sectionType !== 'live');
 
   if (isVenueSection) {
     if (!schedule && !venue && !address && !passCode && !qrImageUri && !attended) {
@@ -360,7 +420,9 @@ function SessionMeetingPanel({
           <Text style={styles.liveJoinEyebrow}>
             {attended ? 'Venue · attended' : 'Venue check-in'}
           </Text>
-          <Text style={styles.liveJoinTitle}>{day.dayLabel}</Text>
+          <Text style={styles.liveJoinTitle} numberOfLines={4}>
+            {clampDisplayText(asPlainText(day.dayLabel, 'Session'), 200)}
+          </Text>
           {schedule ? <FieldRow label="When" value={schedule} /> : null}
           {attended ? (
             <>
@@ -406,7 +468,9 @@ function SessionMeetingPanel({
         <Text style={styles.liveJoinEyebrow}>
           {attended ? 'Live · attended' : 'Live meeting'}
         </Text>
-        <Text style={styles.liveJoinTitle}>{day.dayLabel}</Text>
+        <Text style={styles.liveJoinTitle} numberOfLines={4}>
+          {clampDisplayText(asPlainText(day.dayLabel, 'Session'), 200)}
+        </Text>
         {schedule ? <FieldRow label="When" value={schedule} /> : null}
         {attended ? (
           <>
@@ -485,8 +549,9 @@ function StaticQrPass({ seed }: { seed: string }) {
     paintFinder(size - 7, 0);
     paintFinder(0, size - 7);
     let hash = 0;
-    for (let i = 0; i < seed.length; i += 1) {
-      hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+    const safeSeed = seed.slice(0, 64) || 'qr';
+    for (let i = 0; i < safeSeed.length; i += 1) {
+      hash = (hash * 31 + safeSeed.charCodeAt(i)) >>> 0;
     }
     for (let y = 0; y < size; y += 1) {
       for (let x = 0; x < size; x += 1) {
@@ -528,14 +593,16 @@ function SessionQrImage({
   uri?: string | null;
   seed: string;
 }) {
-  const imageUri = uri?.trim() ?? '';
-  if (imageUri) {
+  const [failed, setFailed] = useState(false);
+  const imageUri = asPlainText(uri);
+  if (imageUri && !failed && imageUri.length < 350_000) {
     return (
       <View style={styles.qrOuter}>
         <Image
           source={{ uri: imageUri }}
           style={styles.qrApiImage}
           contentFit="contain"
+          onError={() => setFailed(true)}
         />
       </View>
     );
@@ -544,17 +611,23 @@ function SessionQrImage({
 }
 
 function InlineTextLessonPanel({ lesson }: { lesson: TrainingLesson }) {
-  const body =
-    lesson.bodyText?.trim() ||
-    lesson.detail?.trim() ||
-    'No written content for this topic yet.';
+  const body = clampDisplayText(
+    asPlainText(lesson.bodyText) ||
+      asPlainText(lesson.detail) ||
+      'No written content for this topic yet.',
+    8_000,
+  );
 
   return (
     <View style={styles.inlineLive}>
       <View style={styles.liveJoinCard}>
         <Text style={styles.liveJoinEyebrow}>Topic</Text>
-        <Text style={styles.liveJoinTitle}>{lesson.title}</Text>
-        <Text style={styles.lessonBodyText}>{body}</Text>
+        <Text style={styles.liveJoinTitle} numberOfLines={6}>
+          {clampDisplayText(asPlainText(lesson.title, 'Topic'), 200)}
+        </Text>
+        <Text style={styles.lessonBodyText} selectable>
+          {body}
+        </Text>
       </View>
     </View>
   );
@@ -620,14 +693,32 @@ function InlineVideoPlayer({
 
 export function MarketMyTrainingProgressScreen() {
   const router = useRouter();
+  const iosKeyboardOpen = useIosKeyboardOpen();
+  const keyboardBottomInset = useKeyboardBottomInset();
+  const keyboardHeightRef = useRef(0);
+  keyboardHeightRef.current = keyboardBottomInset;
   const { id: idParam } = useLocalSearchParams<{ id?: string | string[] }>();
   const id = Array.isArray(idParam) ? idParam[0] : idParam;
   const isApiId = isApiTrainingId(id);
-  const contentQuery = useTrainingContent(id);
-  // Fetch Q&A in parallel with content (not only after panel mounts)
-  useTrainingDiscussions(isApiId ? id : undefined);
-  const certificateQuery = useTrainingCertificate(isApiId ? id : undefined);
-  const progressQuery = useTrainingProgress(isApiId ? id : undefined);
+  const trainingQuery = useTraining(id);
+  const enrolments = useMyTrainingEnrolments();
+  const pendingApproval =
+    Boolean(trainingQuery.training?.isPendingApproval) ||
+    enrolments.isPendingApproval(id);
+  const contentQuery = useTrainingContent(pendingApproval ? undefined : id);
+  // Wait for curriculum before secondary calls — avoids a 4-request storm
+  // during token refresh that often logs as Network Error on My Learning.
+  const contentReady =
+    !pendingApproval &&
+    Boolean(contentQuery.path) &&
+    !contentQuery.isError;
+  useTrainingDiscussions(isApiId && contentReady ? id : undefined);
+  const certificateQuery = useTrainingCertificate(
+    isApiId && contentReady ? id : undefined,
+  );
+  const progressQuery = useTrainingProgress(
+    isApiId && contentReady ? id : undefined,
+  );
   const completeLessonMutation = useCompleteTrainingLesson(
     isApiId ? id : undefined,
   );
@@ -653,6 +744,12 @@ export function MarketMyTrainingProgressScreen() {
   const [downloadingLessonId, setDownloadingLessonId] = useState<string | null>(
     null,
   );
+  const [downloadingNoteId, setDownloadingNoteId] = useState<string | null>(
+    null,
+  );
+  const [openingNoteId, setOpeningNoteId] = useState<string | null>(null);
+  const [noteSizeById, setNoteSizeById] = useState<Record<string, string>>({});
+  const [checkingApproval, setCheckingApproval] = useState(false);
   const [openingCertificate, setOpeningCertificate] = useState(false);
   const path =
     isApiId
@@ -666,6 +763,35 @@ export function MarketMyTrainingProgressScreen() {
   useEffect(() => {
     void hydrateDownloads();
   }, [hydrateDownloads]);
+
+  useEffect(() => {
+    const notes = path.courseNotes ?? [];
+    const missing = notes.filter(
+      (note) => !note.sizeLabel && !noteSizeById[note.id] && note.url,
+    );
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      const next: Record<string, string> = {};
+      await Promise.all(
+        missing.map(async (note) => {
+          const bytes = await probeTrainingFileSizeBytes(asPlainText(note.url));
+          const label = formatTrainingFileSize(bytes);
+          if (label) next[note.id] = label;
+        }),
+      );
+      if (!cancelled && Object.keys(next).length > 0) {
+        setNoteSizeById((prev) => ({ ...prev, ...next }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally depend on note ids/urls, not noteSizeById (avoids loop).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path.courseNotes]);
 
   const markLessonComplete = (lessonId: string) => {
     completeLesson(trainingId, lessonId);
@@ -687,7 +813,7 @@ export function MarketMyTrainingProgressScreen() {
 
   const openCertificate = () => {
     if (!isApiId || !trainingId || openingCertificate) return;
-    const fromApi = certificateQuery.certificate?.certificate_url?.trim();
+    const fromApi = asPlainText(certificateQuery.certificate?.certificate_url);
     const url = resolveAbsoluteApiUrl(
       fromApi || ENDPOINTS.TRAININGS.CERTIFICATE_PDF(trainingId),
     );
@@ -734,6 +860,74 @@ export function MarketMyTrainingProgressScreen() {
   const resolvedExpandedDayId =
     expandedDayId === undefined ? firstDayId : expandedDayId;
 
+  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollOffsetYRef = useRef(0);
+  const sectionRefs = useRef<Record<string, View | null>>({});
+  const pendingDiscussionFocusRef = useRef<View | null>(null);
+
+  const scrollExpandedSectionIntoView = (dayId: string) => {
+    // Wait for accordion collapse/expand layout, then pin the opened header
+    // near the top of the scroll viewport (Session 2+ jump fix).
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const section = sectionRefs.current[dayId];
+        const scroll = scrollRef.current;
+        if (!section || !scroll) return;
+        section.measureInWindow((_x, y) => {
+          scroll.measureInWindow((_sx, sy) => {
+            const targetY = Math.max(0, scrollOffsetYRef.current + (y - sy) - 8);
+            scroll.scrollTo({ y: targetY, animated: true });
+          });
+        });
+      }, 80);
+    });
+  };
+
+  /** Keep Q&A reply/ask fields above the keyboard without keyboard insets. */
+  const scrollDiscussionInputIntoView = (target: View | null) => {
+    pendingDiscussionFocusRef.current = target;
+    if (!target) return;
+    const run = () => {
+      const scroll = scrollRef.current;
+      const node = pendingDiscussionFocusRef.current;
+      if (!scroll || !node) return;
+      node.measureInWindow((_x, y, _w, h) => {
+        scroll.measureInWindow((_sx, sy, _sw, sh) => {
+          const kb = keyboardHeightRef.current;
+          const gap = 20;
+          const visibleBottom = sy + sh - kb - gap;
+          const fieldBottom = y + h;
+          if (fieldBottom <= visibleBottom) return;
+          const delta = fieldBottom - visibleBottom;
+          scroll.scrollTo({
+            y: Math.max(0, scrollOffsetYRef.current + delta),
+            animated: true,
+          });
+        });
+      });
+    };
+    requestAnimationFrame(() => {
+      setTimeout(run, Platform.OS === 'ios' ? 120 : 60);
+    });
+  };
+
+  useEffect(() => {
+    if (keyboardBottomInset <= 0) return;
+    if (!pendingDiscussionFocusRef.current) return;
+    scrollDiscussionInputIntoView(pendingDiscussionFocusRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyboardBottomInset]);
+
+  const toggleExpandedDay = (dayId: string) => {
+    const openId = expandedDayId === undefined ? firstDayId : expandedDayId;
+    if (openId === dayId) {
+      setExpandedDayId('');
+      return;
+    }
+    setExpandedDayId(dayId);
+    scrollExpandedSectionIntoView(dayId);
+  };
+
   useEffect(() => {
     // New course → open first section again
     setExpandedDayId(undefined);
@@ -752,7 +946,7 @@ export function MarketMyTrainingProgressScreen() {
     const items: { day: TrainingDay; lesson: TrainingLesson }[] = [];
     for (const day of path.days) {
       for (const lesson of day.lessons) {
-        if (lesson.kind !== 'video') continue;
+        if (!isStickyCourseVideo(lesson)) continue;
         if (isApiId && !lesson.videoUrl) continue;
         items.push({ day, lesson });
       }
@@ -934,12 +1128,35 @@ export function MarketMyTrainingProgressScreen() {
     }
 
     didAutoResumeRef.current = trainingId;
+
+    const resumeSeconds =
+      resumeLesson.progressSeconds ??
+      (() => {
+        const row = progressQuery.data?.lessons?.find(
+          (item) => item.lesson_id === resumeLesson.id,
+        );
+        const raw = row?.position_seconds;
+        if (typeof raw === 'number') return raw;
+        if (typeof raw === 'string') {
+          const n = Number(raw);
+          return Number.isFinite(n) ? n : 0;
+        }
+        return 0;
+      })();
+    const alreadyStarted =
+      resumeLesson.apiCompleted ||
+      (typeof resumeSeconds === 'number' && resumeSeconds > 1);
+
+    // Fresh enroll: open the first section only. Do not mount/play a video
+    // until the learner taps a lesson — autoplay is confusing.
+    if (!alreadyStarted) {
+      setExpandedDayId(contentQuery.path.days[0]?.id ?? resumeDay.id);
+      return;
+    }
+
     setExpandedDayId(resumeDay.id);
     setActiveLesson(trainingId, resumeLesson.id);
-    if (
-      (resumeLesson.kind === 'video' || resumeLesson.kind === 'youtube') &&
-      resumeLesson.videoUrl
-    ) {
+    if (isStickyCourseVideo(resumeLesson)) {
       setActiveVideoLessonId(resumeLesson.id);
       setOpenLessonId(null);
     } else {
@@ -954,34 +1171,9 @@ export function MarketMyTrainingProgressScreen() {
     setActiveLesson,
   ]);
 
-  const findLessonPosition = (lessonId: string) => {
-    for (let dayIndex = 0; dayIndex < path.days.length; dayIndex += 1) {
-      const day = path.days[dayIndex];
-      if (!day) continue;
-      const lessonIndex = day.lessons.findIndex((item) => item.id === lessonId);
-      if (lessonIndex >= 0) {
-        return { day, dayIndex, lessonIndex, lesson: day.lessons[lessonIndex]! };
-      }
-    }
-    return null;
-  };
-
   const goAdjacentVideo = (delta: number) => {
     const next = videoPlaylist[activeVideoIndex + delta];
     if (!next) return;
-    const position = findLessonPosition(next.lesson.id);
-    if (
-      position &&
-      (position.lesson.locked ||
-        isSequentiallyLocked(position.dayIndex, position.lessonIndex))
-    ) {
-      Alert.alert(
-        'Locked',
-        position.day.unlockHint ||
-          'Finish the previous lesson (and earlier sessions) first.',
-      );
-      return;
-    }
     selectVideoLesson(next.day, next.lesson);
   };
 
@@ -990,9 +1182,9 @@ export function MarketMyTrainingProgressScreen() {
     if (lesson.isDownloadable !== true) return null;
     // Live online sessions are meeting-based — don't offer course-video downloads.
     if (isLiveOnlineTraining && lesson.kind === 'video') return null;
-    if (lesson.kind === 'video') return lesson.videoUrl?.trim() || null;
+    if (lesson.kind === 'video') return asPlainText(lesson.videoUrl) || null;
     if (lesson.kind === 'document') {
-      return lesson.documentUrls?.[0]?.trim() || null;
+      return asPlainText(lesson.documentUrls?.[0]) || null;
     }
     return null;
   };
@@ -1245,24 +1437,24 @@ export function MarketMyTrainingProgressScreen() {
     if (path.deliveryMode === 'Physical') {
       return {
         title: 'How venue check-in works',
-        text: `1. Open a session and tap the venue item\n2. Show the QR pass at the door\n3. Tap “Checked in” — the checkbox turns on and the quiz unlocks`,
+        text: `1. Open a venue item at the scheduled start time\n2. Show the QR pass at the door\n3. Tap “Checked in” — the checkbox turns on and the quiz unlocks`,
       };
     }
     if (path.deliveryMode === 'Hybrid') {
       return {
         title: 'How hybrid days work',
-        text: `1. Online days: open the session and Join meeting\n2. Venue days: show QR at the studio\n3. Quizzes unlock after that day’s session is done`,
+        text: `1. Online / venue items open at their scheduled start time\n2. Videos, topics, and PDFs can be opened anytime\n3. Quizzes unlock after that day’s session is done`,
       };
     }
     if (path.deliveryMode === 'Self-paced') {
       return {
         title: 'How self-paced learning works',
-        text: `1. Open a section and watch recorded videos in order\n2. Open PDFs / notes when you need them\n3. Complete quizzes to mark progress — go at your own pace`,
+        text: `1. Open any section and watch recorded videos\n2. Open PDFs / notes when you need them\n3. Complete quizzes to mark progress — go at your own pace`,
       };
     }
     return {
       title: 'How online live sessions work',
-      text: `1. Open a session to see the meeting link and time\n2. Join the live meeting from the top of the session\n3. Complete topics, PDFs, and other materials below in order`,
+      text: `1. Open a session to see the meeting link and time\n2. Join live / venue items when that session’s start time arrives\n3. Videos, topics, and PDFs can be opened anytime`,
     };
   }, [path.deliveryMode]);
 
@@ -1270,7 +1462,7 @@ export function MarketMyTrainingProgressScreen() {
     if (path.deliveryMode !== 'Virtual') return false;
     return path.days.some(
       (day) =>
-        day.sectionType === 'live' || Boolean(day.meetingLink?.trim()),
+        day.sectionType === 'live' || Boolean(asPlainText(day.meetingLink)),
     );
   }, [path.days, path.deliveryMode]);
 
@@ -1317,27 +1509,48 @@ export function MarketMyTrainingProgressScreen() {
   };
 
   /**
-   * Virtual path: finish lessons in order (can't skip ahead), and finish a
-   * whole session before the next session unlocks.
+   * Live Zoom / venue check-in: only open once the scheduled start time
+   * has arrived (15 minutes early for join/check-in). Videos/PDFs/topics
+   * are not order-locked.
    */
-  const isSequentiallyLocked = (dayIndex: number, lessonIndex: number) => {
-    if (path.deliveryMode !== 'Virtual') return false;
+  const getLiveVenueScheduleGate = (
+    day: TrainingDay,
+    lesson: TrainingLesson,
+  ): { blocked: boolean; whenLabel: string } | null => {
+    if (lesson.kind !== 'live' && lesson.kind !== 'venue') return null;
+    if (lesson.isAttended || lesson.apiCompleted) return null;
 
-    for (let d = 0; d < dayIndex; d += 1) {
-      const prevDay = path.days[d];
-      if (!prevDay) continue;
-      for (const prevLesson of prevDay.lessons) {
-        if (!isLessonDone(prevLesson)) return true;
-      }
-    }
+    const start = parseSessionStart(
+      lesson.startsAt,
+      day.schedule,
+      lesson.checkInWindow,
+    );
+    if (!start) return null;
 
-    const day = path.days[dayIndex];
-    if (!day) return false;
-    for (let i = 0; i < lessonIndex; i += 1) {
-      const prevLesson = day.lessons[i];
-      if (prevLesson && !isLessonDone(prevLesson)) return true;
-    }
-    return false;
+    const earlyMs = 15 * 60 * 1000;
+    const opensAt = start.getTime() - earlyMs;
+    if (Date.now() >= opensAt) return null;
+
+    return {
+      blocked: true,
+      whenLabel: formatSessionStartLabel(start),
+    };
+  };
+
+  const alertIfLiveVenueTooEarly = (
+    day: TrainingDay,
+    lesson: TrainingLesson,
+  ): boolean => {
+    const gate = getLiveVenueScheduleGate(day, lesson);
+    if (!gate?.blocked) return false;
+    const kindLabel = lesson.kind === 'venue' ? 'Venue session' : 'Live session';
+    Alert.alert(
+      'Not started yet',
+      `${kindLabel} opens at ${gate.whenLabel}. Come back at that time to ${
+        lesson.kind === 'venue' ? 'check in' : 'join'
+      }.`,
+    );
+    return true;
   };
 
   const onLessonPress = (
@@ -1346,12 +1559,10 @@ export function MarketMyTrainingProgressScreen() {
     dayIndex: number,
     lessonIndex: number,
   ) => {
-    if (lesson.locked || isSequentiallyLocked(dayIndex, lessonIndex)) {
-      Alert.alert(
-        'Locked',
-        day.unlockHint ||
-          'Finish the previous lesson (and earlier sessions) first.',
-      );
+    void dayIndex;
+    void lessonIndex;
+
+    if (alertIfLiveVenueTooEarly(day, lesson)) {
       return;
     }
 
@@ -1424,12 +1635,13 @@ export function MarketMyTrainingProgressScreen() {
       return;
     }
 
-    if (lesson.kind === 'youtube') {
-      const url = lesson.videoUrl?.trim();
+    if (lesson.kind === 'youtube' || isYoutubeUrl(lesson.videoUrl)) {
+      const url = asPlainText(lesson.videoUrl);
       if (!url) {
         Alert.alert('YouTube', 'No YouTube link is attached to this item yet.');
         return;
       }
+      setActiveVideoLessonId(null);
       void Linking.openURL(url)
         .then(() => {
           if (!done) markLessonComplete(lesson.id);
@@ -1440,11 +1652,11 @@ export function MarketMyTrainingProgressScreen() {
       return;
     }
 
-    if (lesson.kind === 'video') {
+    if (isStickyCourseVideo(lesson)) {
       // Online live trainings are meeting-based — open clip links externally,
       // never the sticky course video player.
       if (isLiveOnlineTraining) {
-        const url = lesson.videoUrl?.trim();
+        const url = asPlainText(lesson.videoUrl);
         if (!url) {
           Alert.alert('Link', 'No link is attached to this item yet.');
           return;
@@ -1472,7 +1684,7 @@ export function MarketMyTrainingProgressScreen() {
     setOpenLessonId(willOpen ? lesson.id : null);
     setPlaying(false);
     setActiveLesson(trainingId, lesson.id);
-    if (!isLiveOnlineTraining && lesson.videoUrl) {
+    if (!isLiveOnlineTraining && isStickyCourseVideo(lesson)) {
       setActiveVideoLessonId(lesson.id);
     } else {
       setActiveVideoLessonId(null);
@@ -1483,7 +1695,7 @@ export function MarketMyTrainingProgressScreen() {
   };
 
   const recordSessionAttendance = async (sessionId: string) => {
-    if (!isApiId || !sessionId.trim()) return;
+    if (!isApiId || !asPlainText(sessionId)) return;
     if (attendingSessionIdsRef.current.has(sessionId)) return;
     attendingSessionIdsRef.current.add(sessionId);
     try {
@@ -1498,7 +1710,7 @@ export function MarketMyTrainingProgressScreen() {
   };
 
   const recordLessonAttendance = async (lessonId: string) => {
-    if (!isApiId || !lessonId.trim()) return;
+    if (!isApiId || !asPlainText(lessonId)) return;
     if (attendingLessonIdsRef.current.has(lessonId)) return;
     attendingLessonIdsRef.current.add(lessonId);
     try {
@@ -1520,7 +1732,18 @@ export function MarketMyTrainingProgressScreen() {
       );
       return;
     }
-    const link = (day.meetingLink ?? '').trim();
+    const liveLesson =
+      day.lessons.find((item) => item.kind === 'live') ??
+      ({
+        id: day.id,
+        kind: 'live' as const,
+        title: day.title,
+        duration: '—',
+        detail: '',
+        startsAt: day.schedule,
+      } satisfies TrainingLesson);
+    if (alertIfLiveVenueTooEarly(day, liveLesson)) return;
+    const link = asPlainText(day.meetingLink);
     if (!link) {
       Alert.alert('Join link', 'Meeting link is empty.');
       return;
@@ -1534,7 +1757,7 @@ export function MarketMyTrainingProgressScreen() {
     }
   };
 
-  const joinLive = async (lesson: TrainingLesson) => {
+  const joinLive = async (lesson: TrainingLesson, day?: TrainingDay) => {
     if (lesson.isAttended) {
       Alert.alert(
         'Already attended',
@@ -1542,7 +1765,11 @@ export function MarketMyTrainingProgressScreen() {
       );
       return;
     }
-    const link = (lesson.joinUrl ?? '').trim();
+    const hostDay =
+      day ??
+      path.days.find((item) => item.lessons.some((row) => row.id === lesson.id));
+    if (hostDay && alertIfLiveVenueTooEarly(hostDay, lesson)) return;
+    const link = asPlainText(lesson.joinUrl);
     if (!link) {
       Alert.alert('Join link', 'meeting_link is empty.');
       return;
@@ -1579,10 +1806,13 @@ export function MarketMyTrainingProgressScreen() {
     done: boolean,
     lockedExam: boolean,
     watchPercent: number,
-    sequentialLocked?: boolean,
+    scheduleLocked?: boolean,
+    scheduleWhen?: string,
   ) => {
-    if (sequentialLocked) {
-      return 'Locked · finish previous item first';
+    if (scheduleLocked) {
+      return scheduleWhen
+        ? `Opens ${scheduleWhen}`
+        : 'Not started yet · wait for session time';
     }
     if (lesson.kind === 'video') {
       if (isLiveOnlineTraining) {
@@ -1623,6 +1853,65 @@ export function MarketMyTrainingProgressScreen() {
     return done ? 'Quiz · submitted' : `Quiz · ${lesson.duration}`;
   };
 
+  const onCheckApprovalStatus = async () => {
+    if (checkingApproval) return;
+    setCheckingApproval(true);
+    try {
+      // Refetch enrolment status. If approved, pending UI unmounts and content loads.
+      await Promise.all([trainingQuery.refetch(), enrolments.refetch()]);
+    } finally {
+      setCheckingApproval(false);
+    }
+  };
+
+  if (isApiId && pendingApproval) {
+    const title =
+      trainingQuery.training?.title?.trim() || 'Pending approval';
+    return (
+      <MarketTrainingScreenShell
+        eyebrow="My learning"
+        title={title}
+        flatBottom
+      >
+        <View style={styles.pendingWrap}>
+          <View style={styles.pendingCard}>
+            <View style={styles.pendingBadge}>
+              <Text style={styles.pendingBadgeText}>Pending approval</Text>
+            </View>
+            <Text style={styles.pendingTitle}>
+              Waiting for the admin to approve
+            </Text>
+            <Text style={styles.pendingBody}>
+              Your enrolment is submitted. Course content unlocks after the
+              training admin approves your request.
+            </Text>
+            <Pressable
+              style={[
+                styles.pendingCheckBtn,
+                checkingApproval && styles.pendingCheckBtnBusy,
+              ]}
+              onPress={() => {
+                void onCheckApprovalStatus();
+              }}
+              disabled={checkingApproval}
+              accessibilityRole="button"
+              accessibilityState={{ busy: checkingApproval }}
+            >
+              {checkingApproval ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.pendingCheckBtnText}>Check again</Text>
+              )}
+            </Pressable>
+            <Text style={styles.pendingHint}>
+              You can leave this screen and come back anytime after approval.
+            </Text>
+          </View>
+        </View>
+      </MarketTrainingScreenShell>
+    );
+  }
+
   if (isApiId && contentQuery.isLoading && !contentQuery.path) {
     return (
       <MarketTrainingScreenShell eyebrow="My learning" title="Loading…" flatBottom>
@@ -1635,11 +1924,72 @@ export function MarketMyTrainingProgressScreen() {
   }
 
   if (isApiId && contentQuery.isError && !contentQuery.path) {
+    const err = contentQuery.error as {
+      statusCode?: number;
+      message?: string;
+      code?: string;
+    } | null;
+    const errMessage = String(err?.message ?? '');
+    const networkFail =
+      err?.statusCode === 0 || /network/i.test(errMessage);
+    const contentPendingApproval =
+      err?.code === 'ENROLMENT_PENDING_APPROVAL' ||
+      (err?.statusCode === 403 &&
+        /not approved|pending approval|enrolment/i.test(errMessage));
+
+    if (contentPendingApproval) {
+      return (
+        <MarketTrainingScreenShell
+          eyebrow="My learning"
+          title="Pending approval"
+          flatBottom
+        >
+          <View style={styles.pendingWrap}>
+            <View style={styles.pendingCard}>
+              <View style={styles.pendingBadge}>
+                <Text style={styles.pendingBadgeText}>Pending approval</Text>
+              </View>
+              <Text style={styles.pendingTitle}>
+                Waiting for the admin to approve
+              </Text>
+              <Text style={styles.pendingBody}>
+                {errMessage.trim() ||
+                  'Admin has not approved your enrolment yet. Course content unlocks after approval.'}
+              </Text>
+              <Pressable
+                style={[
+                  styles.pendingCheckBtn,
+                  checkingApproval && styles.pendingCheckBtnBusy,
+                ]}
+                onPress={() => {
+                  void onCheckApprovalStatus();
+                }}
+                disabled={checkingApproval}
+                accessibilityRole="button"
+                accessibilityState={{ busy: checkingApproval }}
+              >
+                {checkingApproval ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.pendingCheckBtnText}>Check again</Text>
+                )}
+              </Pressable>
+              <Text style={styles.pendingHint}>
+                You can leave this screen and come back anytime after approval.
+              </Text>
+            </View>
+          </View>
+        </MarketTrainingScreenShell>
+      );
+    }
+
     return (
       <MarketTrainingScreenShell eyebrow="My learning" title="Course" flatBottom>
         <View style={styles.stateWrap}>
           <Text style={styles.stateText}>
-            Could not load course content. Pull back and try again.
+            {networkFail
+              ? 'Connection interrupted while loading this course. Check your network and try again.'
+              : 'Could not load course content. Pull back and try again.'}
           </Text>
           <Pressable
             onPress={() => {
@@ -1663,9 +2013,13 @@ export function MarketMyTrainingProgressScreen() {
             ? 'Self-paced'
             : path.deliveryMode
       } · My learning`}
-      title={path.title}
+      title={clampDisplayText(asPlainText(path.title, 'Course'), 80)}
       flatBottom
-      keyboardAware
+      scrollViewRef={scrollRef}
+      onScrollOffsetChange={(y) => {
+        scrollOffsetYRef.current = y;
+      }}
+      keyboardBottomInset={keyboardBottomInset}
       rightLabel={isApiId ? 'My Assessments' : undefined}
       onRightPress={
         isApiId
@@ -1677,11 +2031,28 @@ export function MarketMyTrainingProgressScreen() {
           : undefined
       }
       stickyBelowHeader={
-        !isLiveOnlineTraining && activeVideo?.lesson.videoUrl ? (
+        iosKeyboardOpen &&
+        !isLiveOnlineTraining &&
+        activeVideo &&
+        (isStickyCourseVideo(activeVideo.lesson) || !isApiId) ? (
+          <View style={styles.keyboardPausedBar}>
+            <Text style={styles.keyboardPausedText} numberOfLines={1}>
+              Video paused while typing
+            </Text>
+          </View>
+        ) : !isLiveOnlineTraining &&
+        activeVideo &&
+        isStickyCourseVideo(activeVideo.lesson) ? (
           <TrainingStickyVideoPlayer
-            url={activeVideo.lesson.videoUrl}
-            title={activeVideo.lesson.title}
-            subtitle={`${activeVideo.day.dayLabel} · ${path.title}`}
+            url={asPlainText(activeVideo.lesson.videoUrl)}
+            title={clampDisplayText(
+              asPlainText(activeVideo.lesson.title, 'Lesson'),
+              120,
+            )}
+            subtitle={clampDisplayText(
+              `${asPlainText(activeVideo.day.dayLabel)} · ${asPlainText(path.title)}`,
+              160,
+            )}
             initialSeekSeconds={progressSecondsForLesson(activeVideo.lesson.id)}
             hasPrevious={activeVideoIndex > 0}
             hasNext={
@@ -1758,10 +2129,13 @@ export function MarketMyTrainingProgressScreen() {
         <View style={styles.heroBannerCopy}>
           <Text style={styles.heroBannerEyebrow}>Your course</Text>
           <Text style={styles.heroBannerTitle} numberOfLines={2}>
-            {path.title}
+            {clampDisplayText(asPlainText(path.title, 'Course'), 120)}
           </Text>
-          <Text style={styles.heroBannerMeta}>
-            {path.instructor} · {path.vendor}
+          <Text style={styles.heroBannerMeta} numberOfLines={1}>
+            {clampDisplayText(asPlainText(path.instructor), 80)}
+            {asPlainText(path.vendor)
+              ? ` · ${clampDisplayText(asPlainText(path.vendor), 80)}`
+              : ''}
           </Text>
         </View>
       </View>
@@ -1859,6 +2233,10 @@ export function MarketMyTrainingProgressScreen() {
           return (
             <View
               key={day.id}
+              ref={(node) => {
+                sectionRefs.current[day.id] = node;
+              }}
+              collapsable={false}
               style={
                 dayIndex < path.days.length - 1
                   ? styles.curriculumSectionBorder
@@ -1870,13 +2248,7 @@ export function MarketMyTrainingProgressScreen() {
                   styles.curriculumSectionHeader,
                   expanded && styles.curriculumSectionHeaderOpen,
                 ]}
-                onPress={() =>
-                  setExpandedDayId((current) => {
-                    const openId =
-                      current === undefined ? firstDayId : current;
-                    return openId === day.id ? '' : day.id;
-                  })
-                }
+                onPress={() => toggleExpandedDay(day.id)}
                 accessibilityRole="button"
                 accessibilityState={{ expanded }}
               >
@@ -1897,7 +2269,7 @@ export function MarketMyTrainingProgressScreen() {
                 </View>
                 <View style={styles.curriculumSectionCopy}>
                   <Text style={styles.curriculumSectionTitle} numberOfLines={2}>
-                    {day.title}
+                    {clampDisplayText(asPlainText(day.title, 'Section'), 120)}
                   </Text>
                   <Text style={styles.curriculumSectionMeta} numberOfLines={1}>
                     {day.isAttended
@@ -1936,15 +2308,14 @@ export function MarketMyTrainingProgressScreen() {
                         const done = isLessonDone(lesson);
                         const lockedExam =
                           lesson.kind === 'exam' && !examOpen && !done;
-                        const sequentialLocked = isSequentiallyLocked(
-                          dayIndex,
-                          lessonIndex,
+                        const scheduleGate = getLiveVenueScheduleGate(
+                          day,
+                          lesson,
                         );
-                        const locked =
-                          Boolean(lesson.locked) ||
-                          lockedExam ||
-                          sequentialLocked;
-                        const typeMeta = LESSON_TYPE_META[lesson.kind];
+                        const scheduleLocked = Boolean(scheduleGate?.blocked);
+                        const locked = lockedExam || scheduleLocked;
+                        const typeMeta =
+                          LESSON_TYPE_META[lesson.kind] ?? LESSON_TYPE_META.text;
                         const isActiveVideo =
                           activeVideoLessonId === lesson.id;
                         const open =
@@ -1958,7 +2329,7 @@ export function MarketMyTrainingProgressScreen() {
 
                         return (
                           <View
-                            key={lesson.id}
+                            key={`${day.id}-${lesson.id}-${lessonIndex}`}
                             style={styles.curriculumLessonWrap}
                           >
                             <Pressable
@@ -1971,6 +2342,7 @@ export function MarketMyTrainingProgressScreen() {
                                   styles.curriculumLessonActive,
                                 done && styles.curriculumLessonDone,
                               ]}
+                              delayPressIn={40}
                               onPress={() =>
                                 onLessonPress(
                                   day,
@@ -2010,7 +2382,10 @@ export function MarketMyTrainingProgressScreen() {
                                   ]}
                                   numberOfLines={2}
                                 >
-                                  {lesson.title}
+                                  {clampDisplayText(
+                                    asPlainText(lesson.title, 'Lesson'),
+                                    160,
+                                  )}
                                 </Text>
                                 <Text
                                   style={styles.curriculumLessonMeta}
@@ -2027,7 +2402,8 @@ export function MarketMyTrainingProgressScreen() {
                                     done,
                                     lockedExam,
                                     watchPercent,
-                                    sequentialLocked,
+                                    scheduleLocked,
+                                    scheduleGate?.whenLabel,
                                   )}
                                 </Text>
                               </View>
@@ -2092,7 +2468,7 @@ export function MarketMyTrainingProgressScreen() {
                               <ApiLessonJoinPanel
                                 lesson={lesson}
                                 onJoin={() => {
-                                  void joinLive(lesson);
+                                  void joinLive(lesson, day);
                                 }}
                               />
                             ) : null}
@@ -2133,8 +2509,11 @@ export function MarketMyTrainingProgressScreen() {
                                   <Text style={styles.liveJoinEyebrow}>
                                     Online live session
                                   </Text>
-                                  <Text style={styles.liveJoinTitle}>
-                                    {lesson.title}
+                                  <Text style={styles.liveJoinTitle} numberOfLines={4}>
+                                    {clampDisplayText(
+                                      asPlainText(lesson.title, 'Session'),
+                                      160,
+                                    )}
                                   </Text>
                                   <Text style={styles.lessonMeta}>
                                     {lesson.duration}
@@ -2152,7 +2531,7 @@ export function MarketMyTrainingProgressScreen() {
                                   ) : null}
                                   <Pressable
                                     style={styles.primaryBtn}
-                                    onPress={() => joinLive(lesson)}
+                                    onPress={() => joinLive(lesson, day)}
                                   >
                                     <Text style={styles.primaryBtnText}>
                                       Join Zoom now
@@ -2180,8 +2559,12 @@ export function MarketMyTrainingProgressScreen() {
                                     ? 'Venue · attended'
                                     : 'Venue check-in'}
                                 </Text>
-                                <Text style={styles.venueName}>
-                                  {lesson.venue ?? path.title}
+                                <Text style={styles.venueName} numberOfLines={4}>
+                                  {clampDisplayText(
+                                    asPlainText(lesson.venue) ||
+                                      asPlainText(path.title, 'Venue'),
+                                    160,
+                                  )}
                                 </Text>
                                 {lesson.isAttended ? (
                                   <Text style={styles.attendedBanner}>
@@ -2193,7 +2576,10 @@ export function MarketMyTrainingProgressScreen() {
                                 ) : (
                                   <>
                                     {lesson.address ? (
-                                      <Text style={styles.lessonMeta}>
+                                      <Text
+                                        style={styles.lessonMeta}
+                                        numberOfLines={4}
+                                      >
                                         {lesson.address}
                                       </Text>
                                     ) : (
@@ -2203,7 +2589,10 @@ export function MarketMyTrainingProgressScreen() {
                                       </Text>
                                     )}
                                     {lesson.checkInWindow ? (
-                                      <Text style={styles.lessonMeta}>
+                                      <Text
+                                        style={styles.lessonMeta}
+                                        numberOfLines={2}
+                                      >
                                         {lesson.checkInWindow}
                                       </Text>
                                     ) : null}
@@ -2214,7 +2603,10 @@ export function MarketMyTrainingProgressScreen() {
                                       seed={lesson.passCode ?? lesson.id}
                                     />
                                     {lesson.passCode ? (
-                                      <Text style={styles.passCode}>
+                                      <Text
+                                        style={styles.passCode}
+                                        numberOfLines={2}
+                                      >
                                         Pass {lesson.passCode}
                                       </Text>
                                     ) : null}
@@ -2239,42 +2631,98 @@ export function MarketMyTrainingProgressScreen() {
         <View style={styles.notesSection}>
           <Text style={styles.notesLabel}>Notes</Text>
           <Text style={styles.notesHelp}>
-            Course notes and documents · tap to open
+            Course notes and documents · preview or download
           </Text>
           <View style={styles.notesCard}>
-            {path.courseNotes.map((note, index) => (
-              <Pressable
-                key={note.id}
-                style={[
-                  styles.notesRow,
-                  index < path.courseNotes.length - 1 && styles.notesRowBorder,
-                ]}
-                onPress={() => {
-                  void openTrainingFile({
-                    url: note.url,
-                    suggestedName: `${note.title}.pdf`,
-                  });
-                }}
-                accessibilityRole="button"
-              >
-                <View style={styles.notesIconWrap}>
-                  <LessonTypeIcon kind="document" color="#b42318" />
+            {path.courseNotes.map((note, index) => {
+              const sizeLabel =
+                note.sizeLabel || noteSizeById[note.id] || '';
+              const kindLabel =
+                note.kind === 'notes_pdf'
+                  ? 'Course notes · PDF'
+                  : note.kind === 'note'
+                    ? 'Note · PDF'
+                    : 'Document · PDF';
+              const meta = sizeLabel
+                ? `${kindLabel} · ${sizeLabel}`
+                : kindLabel;
+              const busy =
+                openingNoteId === note.id || downloadingNoteId === note.id;
+
+              return (
+                <View
+                  key={note.id}
+                  style={[
+                    styles.notesRow,
+                    index < path.courseNotes.length - 1 &&
+                      styles.notesRowBorder,
+                  ]}
+                >
+                  <View style={styles.notesIconWrap}>
+                    <LessonTypeIcon kind="document" color="#b42318" />
+                  </View>
+                  <View style={styles.notesCopy}>
+                    <Text style={styles.notesTitle} numberOfLines={2}>
+                      {clampDisplayText(asPlainText(note.title, 'Note'), 120)}
+                    </Text>
+                    <Text style={styles.notesMeta}>{meta}</Text>
+                  </View>
+                  <View style={styles.notesActions}>
+                    <Pressable
+                      disabled={busy}
+                      onPress={() => {
+                        setOpeningNoteId(note.id);
+                        void openTrainingFile({
+                          url: asPlainText(note.url),
+                          suggestedName: `${asPlainText(note.title, 'note')}.pdf`,
+                        }).finally(() => setOpeningNoteId(null));
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Preview ${asPlainText(note.title, 'note')}`}
+                    >
+                      <Text
+                        style={[
+                          styles.notesActionText,
+                          busy && styles.notesActionTextDisabled,
+                        ]}
+                      >
+                        {openingNoteId === note.id ? 'Opening…' : 'Preview'}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      disabled={busy}
+                      onPress={() => {
+                        if (downloadingNoteId) return;
+                        setDownloadingNoteId(note.id);
+                        void downloadTrainingToLibrary({
+                          trainingId,
+                          trainingTitle: path.title,
+                          lessonId: note.id,
+                          lessonTitle: asPlainText(note.title, 'Note'),
+                          kind: 'document',
+                          url: asPlainText(note.url),
+                          suggestedName: `${asPlainText(note.title, 'note')}.pdf`,
+                        }).finally(() => setDownloadingNoteId(null));
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Download ${asPlainText(note.title, 'note')}`}
+                    >
+                      <Text
+                        style={[
+                          styles.notesActionText,
+                          styles.notesDownloadText,
+                          busy && styles.notesActionTextDisabled,
+                        ]}
+                      >
+                        {downloadingNoteId === note.id
+                          ? 'Saving…'
+                          : 'Download'}
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
-                <View style={styles.notesCopy}>
-                  <Text style={styles.notesTitle} numberOfLines={2}>
-                    {note.title}
-                  </Text>
-                  <Text style={styles.notesMeta}>
-                    {note.kind === 'notes_pdf'
-                      ? 'Course notes · PDF'
-                      : note.kind === 'note'
-                        ? 'Note · open'
-                        : 'Document · open'}
-                  </Text>
-                </View>
-                <Text style={styles.notesOpen}>Open</Text>
-              </Pressable>
-            ))}
+              );
+            })}
           </View>
         </View>
       ) : null}
@@ -2287,6 +2735,7 @@ export function MarketMyTrainingProgressScreen() {
       <TrainingDiscussionsPanel
         trainingId={isApiId ? (id ?? trainingId) : trainingId}
         enabled={isApiId}
+        onEnsureInputVisible={scrollDiscussionInputIntoView}
       />
     </MarketTrainingScreenShell>
   );
@@ -2300,6 +2749,75 @@ const styles = StyleSheet.create({
     gap: c(12, 10),
     paddingHorizontal: c(12, 10),
   },
+  pendingWrap: {
+    minHeight: Math.max(Dimensions.get('window').height * 0.62, 360),
+    justifyContent: 'center',
+    paddingHorizontal: c(4, 2),
+  },
+  pendingCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#f0d9a8',
+    borderRadius: NU.cardRadius,
+    paddingVertical: c(22, 18),
+    paddingHorizontal: c(18, 14),
+    gap: c(12, 10),
+    alignItems: 'center',
+  },
+  pendingBadge: {
+    backgroundColor: '#fff6e8',
+    borderWidth: 1,
+    borderColor: '#f0d9a8',
+    borderRadius: 99,
+    paddingHorizontal: c(12, 10),
+    paddingVertical: c(6, 5),
+  },
+  pendingBadgeText: {
+    fontSize: c(11, 10),
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: '#8a6a2b',
+  },
+  pendingTitle: {
+    fontSize: c(18, 16),
+    fontWeight: '800',
+    color: TRAINING_TEAL,
+    textAlign: 'center',
+    letterSpacing: -0.2,
+  },
+  pendingBody: {
+    fontSize: c(14, 13),
+    lineHeight: c(21, 19),
+    color: TRAINING_MUTED,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  pendingCheckBtn: {
+    marginTop: c(4, 2),
+    minWidth: c(160, 140),
+    minHeight: c(48, 44),
+    paddingHorizontal: c(20, 16),
+    borderRadius: c(14, 12),
+    backgroundColor: TRAINING_GREEN,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingCheckBtnBusy: {
+    opacity: 0.85,
+  },
+  pendingCheckBtnText: {
+    fontSize: c(14, 13),
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  pendingHint: {
+    fontSize: c(12, 11),
+    lineHeight: c(17, 15),
+    color: TRAINING_MUTED,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
   stateText: {
     fontSize: c(13.5, 12.5),
     color: TRAINING_MUTED,
@@ -2311,6 +2829,16 @@ const styles = StyleSheet.create({
     fontSize: NU.link,
     fontWeight: '700',
     color: TRAINING_GREEN,
+  },
+  keyboardPausedBar: {
+    backgroundColor: '#0b1f18',
+    paddingHorizontal: c(14, 12),
+    paddingVertical: c(10, 8),
+  },
+  keyboardPausedText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: c(12, 11),
+    fontWeight: '700',
   },
   heroBanner: {
     height: c(160, 140),
@@ -2575,6 +3103,21 @@ const styles = StyleSheet.create({
     color: TRAINING_MUTED,
     fontWeight: '500',
   },
+  notesActions: {
+    alignItems: 'flex-end',
+    gap: c(6, 5),
+  },
+  notesActionText: {
+    fontSize: c(12, 11),
+    fontWeight: '700',
+    color: TRAINING_GREEN,
+  },
+  notesDownloadText: {
+    color: TRAINING_TEAL,
+  },
+  notesActionTextDisabled: {
+    opacity: 0.45,
+  },
   notesOpen: {
     fontSize: c(12, 11),
     fontWeight: '700',
@@ -2771,6 +3314,7 @@ const styles = StyleSheet.create({
     lineHeight: c(16, 15),
     fontWeight: '600',
     color: TRAINING_TEAL,
+    flexShrink: 1,
   },
   curriculumLessonTitleDone: {
     color: TRAINING_MUTED,
@@ -2945,6 +3489,7 @@ const styles = StyleSheet.create({
     fontSize: c(13, 12),
     color: TRAINING_TEAL,
     lineHeight: c(18, 16),
+    flexShrink: 1,
   },
   liveJoinEyebrow: {
     fontSize: c(11, 10),
@@ -2957,6 +3502,7 @@ const styles = StyleSheet.create({
     fontSize: NU.body,
     fontWeight: '800',
     color: '#14352a',
+    flexShrink: 1,
   },
   inlineVenue: {
     paddingHorizontal: c(14, 12),

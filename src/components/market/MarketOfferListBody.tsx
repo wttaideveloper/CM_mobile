@@ -64,7 +64,7 @@ export function MarketOfferListBody({
   onFilterChange,
 }: MarketOfferListBodyProps) {
   const router = useRouter();
-  const { openServiceChat, isOpeningChat } = useOpenServiceChat();
+  const { openServiceChat, openingServiceId } = useOpenServiceChat();
   const { data: products = [], isLoading: productsLoading } =
     useMarketProductsList();
   const { data: services = [], isLoading: servicesLoading } =
@@ -189,31 +189,47 @@ export function MarketOfferListBody({
                         <Pressable
                           onPress={() => openChat(offer)}
                           disabled={
-                            isOpeningChat || !offer.providerUserId?.trim()
+                            openingServiceId === offer.id ||
+                            !offer.providerUserId?.trim()
                           }
                           hitSlop={8}
                           accessibilityRole="button"
                           accessibilityLabel="Chat"
                           style={[
                             styles.chatBtn,
-                            (isOpeningChat || !offer.providerUserId?.trim()) &&
+                            (openingServiceId === offer.id ||
+                              !offer.providerUserId?.trim()) &&
                               styles.chatBtnDisabled,
                           ]}
                         >
-                          {isOpeningChat ? (
+                          {openingServiceId === offer.id ? (
                             <ActivityIndicator
                               size="small"
                               color={OFFER_LIST_GREEN}
                             />
                           ) : (
-                            <MarketChatIcon
-                              color={
-                                offer.providerUserId?.trim()
-                                  ? OFFER_LIST_GREEN
-                                  : OFFER_LIST_SOFT
-                              }
-                              size={16}
-                            />
+                            <>
+                              <MarketChatIcon
+                                color={
+                                  offer.providerUserId?.trim()
+                                    ? OFFER_LIST_GREEN
+                                    : OFFER_LIST_SOFT
+                                }
+                                size={14}
+                              />
+                              <Text
+                                style={[
+                                  styles.chatBtnText,
+                                  {
+                                    color: offer.providerUserId?.trim()
+                                      ? OFFER_LIST_GREEN
+                                      : OFFER_LIST_SOFT,
+                                  },
+                                ]}
+                              >
+                                Chat
+                              </Text>
+                            </>
                           )}
                         </Pressable>
                       ) : null}
@@ -336,12 +352,17 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   chatBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#e6f4e8',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: c(8, 6),
+    paddingVertical: c(4, 3),
+    borderRadius: 8,
+    backgroundColor: '#e6f4e8',
+  },
+  chatBtnText: {
+    fontSize: c(11, 10),
+    fontWeight: '700',
   },
   chatBtnDisabled: {
     opacity: 0.45,

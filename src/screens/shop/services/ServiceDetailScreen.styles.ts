@@ -322,8 +322,32 @@ export const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: H_PAD,
     backgroundColor: PAGE_BG,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  footerChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: isSmallDevice ? 46 : 52,
+    paddingHorizontal: isSmallDevice ? 12 : 14,
+    borderRadius: 14,
+    backgroundColor: MINT,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D1E7D6',
+  },
+  footerChatBtnDisabled: {
+    opacity: 0.55,
+  },
+  footerChatBtnText: {
+    fontSize: isSmallDevice ? 13 : 14,
+    fontWeight: '700',
+    color: PRIMARY,
   },
   footerBtn: {
+    flex: 1,
     height: isSmallDevice ? 46 : 52,
     alignItems: 'center',
     justifyContent: 'center',
@@ -335,6 +359,7 @@ export const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   footerBtnDisabled: {
+    flex: 1,
     height: isSmallDevice ? 46 : 52,
     borderRadius: 14,
     backgroundColor: '#ECEEEE',

@@ -13,8 +13,34 @@ export const TRAINING_LIST_FILTERS = [
   'Physical',
 ] as const;
 
+/** Query value matches DB `delivery_mode` on GET /api/v1/trainings/. */
+export function deliveryModeQueryValue(
+  filter: (typeof TRAINING_LIST_FILTERS)[number],
+): string | undefined {
+  switch (filter) {
+    case 'Virtual':
+      return 'online';
+    case 'Self-paced':
+      return 'self_paced';
+    case 'Hybrid':
+      return 'hybrid';
+    case 'Physical':
+      return 'physical';
+    default:
+      return undefined;
+  }
+}
+
 /** Delivery types shown as cards on trainings list (matches detail modes). */
 export const TRAINING_TYPE_CARDS = [
+  {
+    id: 'All' as const,
+    title: 'All',
+    subtitle: 'Every delivery type',
+    color: '#164744',
+    bg: '#eef4ee',
+    mode: null,
+  },
   {
     id: 'Virtual' as const,
     title: 'Virtual',

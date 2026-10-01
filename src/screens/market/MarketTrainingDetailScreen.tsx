@@ -52,7 +52,23 @@ export function MarketTrainingDetailScreen() {
   const wishlisted = isApiId
     ? apiWishlist.has(trainingId)
     : localWishlisted;
-  const enrolled = isApiId ? enrolments.isEnrolled(trainingId) : false;
+  const footerCta = (() => {
+    if (!isApiId) return 'enroll' as const;
+    if (
+      training?.isPendingApproval ||
+      enrolments.isPendingApproval(trainingId)
+    ) {
+      return 'pending' as const;
+    }
+    if (training?.canContinueLearning) return 'continue' as const;
+    if (
+      enrolments.isEnrolled(trainingId) &&
+      !enrolments.isPendingApproval(trainingId)
+    ) {
+      return 'continue' as const;
+    }
+    return 'enroll' as const;
+  })();
   const showLoading = isApiId && isLoading && !training;
 
   const openWishlist = () => {
@@ -131,7 +147,7 @@ export function MarketTrainingDetailScreen() {
           </ScrollView>
           <MarketTrainingDetailFooter
             wishlisted={wishlisted}
-            enrolled={enrolled}
+            cta={footerCta}
             busy={isApiId && toggleApiWishlist.isPending}
             onToggleWishlist={onToggleWishlist}
             onEnroll={() =>

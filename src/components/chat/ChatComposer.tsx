@@ -247,12 +247,11 @@ export function ChatComposer({
     speechToText;
 
   useEffect(() => {
-    if (state.phase !== 'idle') {
-      setEmojiOpen(false);
-      inputRef.current?.blur();
-      stopListening();
-    }
-  }, [state.phase, stopListening]);
+    if (state.phase === 'idle') return;
+    setEmojiOpen(false);
+    inputRef.current?.blur();
+    stopListening();
+  }, [state.phase]);
 
   useEffect(() => () => stopListening(), [stopListening]);
 

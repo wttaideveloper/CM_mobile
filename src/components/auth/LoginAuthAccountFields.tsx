@@ -55,29 +55,28 @@ export function LoginAuthAccountFields({
   suppressInitialFocus = false,
 }: LoginAuthAccountFieldsProps) {
   const { t } = useTranslation();
-  const nameInputRef = useRef<TextInput>(null);
   const emailInputRef = useRef<TextInput>(null);
   const [emailReady, setEmailReady] = useState(!suppressInitialFocus);
 
   useEffect(() => {
-    if (authMode !== 'signup') return undefined;
+    emailInputRef.current?.blur();
+    Keyboard.dismiss();
 
-    const timer = setTimeout(() => {
-      nameInputRef.current?.focus();
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [authMode]);
-
-  useEffect(() => {
-    if (!suppressInitialFocus || authMode !== 'login') {
+    if (authMode !== 'login') {
       setEmailReady(true);
       return;
     }
 
+    if (!suppressInitialFocus) {
+      setEmailReady(true);
+      const timer = setTimeout(() => {
+        emailInputRef.current?.blur();
+        Keyboard.dismiss();
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+
     setEmailReady(false);
-    emailInputRef.current?.blur();
-    Keyboard.dismiss();
     const timer = setTimeout(() => {
       setEmailReady(true);
       requestAnimationFrame(() => {
@@ -94,7 +93,6 @@ export function LoginAuthAccountFields({
         <>
           <Text style={styles.label}>{t('auth.enterName')}</Text>
           <TextInput
-            ref={nameInputRef}
             style={styles.input}
             value={name}
             onChangeText={setName}
@@ -102,7 +100,7 @@ export function LoginAuthAccountFields({
             placeholderTextColor={colors.brandLightGray}
             autoCapitalize="words"
             autoCorrect={false}
-            autoFocus
+            autoFocus={false}
             returnKeyType="next"
             onFocus={onSignupNameFocus}
             accessibilityLabel={t('auth.fullName')}

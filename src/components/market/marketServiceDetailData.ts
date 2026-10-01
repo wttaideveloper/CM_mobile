@@ -42,6 +42,8 @@ export type MarketServiceDetail = {
     body: string;
   };
   enterpriseId?: string;
+  provider?: string | null;
+  providerUserId?: string | null;
 };
 
 export const MARKET_SERVICE_DETAILS: Record<string, MarketServiceDetail> = {

@@ -7,10 +7,15 @@ import type {
   TrainingLessonApi,
 } from '@/types/training.types';
 import { formatMoney } from '@/utils/currency';
+import { formatTrainingFileSize } from '@/utils/trainingFileSize';
 import {
+  asPlainText,
+  clampDisplayText,
   firstMediaUrl,
   resolveAbsoluteApiUrl,
 } from '@/utils/trainingLessonMedia';
+
+const TITLE_MAX = 400;
 
 const CURRICULUM_TYPES = new Set<TrainingCurriculumItemType>([
   'topic',
@@ -65,7 +70,10 @@ function curriculumMetaFor(
       : 'Quiz';
   }
   if (type === 'pdf' || type === 'notes') {
-    return text(lesson.file_size) || (lesson.is_downloadable ? 'Download' : '');
+    return (
+      formatTrainingFileSize(lesson.file_size) ||
+      (lesson.is_downloadable ? 'Download' : '')
+    );
   }
   if (type === 'live') return 'Live session';
   if (type === 'venue') return 'In-person';
@@ -91,17 +99,33 @@ function lessonPreviewVideoUrl(lesson: TrainingLessonApi): string | undefined {
 }
 
 function lessonPreviewFileUrl(lesson: TrainingLessonApi): string | undefined {
-  for (const doc of lesson.documents ?? []) {
+  const docs = Array.isArray(lesson.documents) ? lesson.documents : [];
+  for (const doc of docs) {
     const url = mediaEntryUrl(doc);
     if (url) {
       const absolute = resolveAbsoluteApiUrl(url);
       if (absolute) return absolute;
     }
   }
-  for (const note of lesson.notes ?? []) {
+  const notes = Array.isArray(lesson.notes) ? lesson.notes : [];
+  for (const note of notes) {
     const url = mediaEntryUrl(note);
     if (url) {
       const absolute = resolveAbsoluteApiUrl(url);
+      if (absolute) return absolute;
+    }
+  }
+  const contentUrl = text(lesson.content_url);
+  if (contentUrl) {
+    const type = text(lesson.type).toLowerCase();
+    if (
+      type === 'pdf' ||
+      type === 'document' ||
+      type === 'file' ||
+      type === 'notes' ||
+      contentUrl.toLowerCase().includes('.pdf')
+    ) {
+      const absolute = resolveAbsoluteApiUrl(contentUrl);
       if (absolute) return absolute;
     }
   }
@@ -124,7 +148,8 @@ function mapSectionCurriculumItems(section: {
   const items: TrainingDetailView['sessions'][number]['items'] = [];
 
   source.forEach((lesson, index) => {
-    const title = text(lesson.title);
+    if (!lesson || typeof lesson !== 'object') return;
+    const title = safeTitle(lesson.title);
     if (!title) return;
 
     const locked = Boolean(lesson.is_locked);
@@ -161,7 +186,7 @@ function mapSectionCurriculumItems(section: {
         videoUrl,
         fileUrl,
       });
-      const quizTitle = text(lesson.assessment?.title, 'Quiz');
+      const quizTitle = safeTitle(lesson.assessment?.title, 'Quiz');
       const questionCount = Array.isArray(lesson.assessment?.questions)
         ? lesson.assessment.questions.length
         : 0;
@@ -187,7 +212,7 @@ function mapSectionCurriculumItems(section: {
       type: resolvedType,
       title:
         resolvedType === 'quiz'
-          ? text(lesson.assessment?.title, title)
+          ? safeTitle(lesson.assessment?.title, title)
           : title,
       meta: curriculumMetaFor(resolvedType, lesson),
       locked,
@@ -207,7 +232,7 @@ function mapSectionCurriculumItems(section: {
     items.push({
       id: sectionQuiz.id || `section-quiz-${section.id ?? 'x'}`,
       type: 'quiz',
-      title: text(sectionQuiz.title, 'Section quiz'),
+      title: safeTitle(sectionQuiz.title, 'Section quiz'),
       meta:
         questionCount > 0
           ? `${questionCount} question${questionCount === 1 ? '' : 's'}`
@@ -264,14 +289,98 @@ const DEFAULT_STYLE = {
   sideColor: '#257d3f',
 };
 
-function text(value: string | null | undefined, fallback = ''): string {
-  return typeof value === 'string' ? value.trim() : fallback;
+function text(value: unknown, fallback = ''): string {
+  return asPlainText(value, fallback);
+}
+
+function safeTitle(value: unknown, fallback = ''): string {
+  return clampDisplayText(text(value, fallback), TITLE_MAX);
+}
+
+function asBool(value: unknown): boolean | undefined {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  if (typeof value === 'string') {
+    const key = value.trim().toLowerCase();
+    if (key === 'true' || key === '1' || key === 'yes') return true;
+    if (key === 'false' || key === '0' || key === 'no') return false;
+  }
+  return undefined;
+}
+
+const CONTINUE_STATUSES = new Set([
+  'enrolled',
+  'approved',
+  'active',
+  'completed',
+]);
+
+function resolveViewerEnrolment(item: TrainingApiItem): {
+  hasViewerEnrolment: boolean;
+  isEnrolled: boolean;
+  canContinueLearning: boolean;
+  isPendingApproval: boolean;
+  enrolmentStatus: string | null;
+  rejectionReason: string;
+} {
+  const status = text(item.enrolment_status).toLowerCase() || null;
+  const flag = asBool(item.is_enrolled);
+  const hasViewerEnrolment = flag != null || Boolean(status);
+  const isPendingApproval =
+    status === 'pending_approval' || status === 'pending';
+  const isEnded = status === 'rejected' || status === 'cancelled';
+  const canContinueLearning =
+    !isEnded &&
+    !isPendingApproval &&
+    (CONTINUE_STATUSES.has(status ?? '') || flag === true);
+  const isEnrolled =
+    !isEnded &&
+    (flag === true ||
+      isPendingApproval ||
+      CONTINUE_STATUSES.has(status ?? ''));
+
+  return {
+    hasViewerEnrolment,
+    isEnrolled,
+    canContinueLearning,
+    isPendingApproval,
+    enrolmentStatus: status,
+    rejectionReason: text(item.rejection_reason),
+  };
 }
 
 function parseAmount(value: string | number | null | undefined): number | null {
   if (value == null || value === '') return null;
   const num = typeof value === 'number' ? value : Number(String(value).trim());
   return Number.isFinite(num) ? num : null;
+}
+
+function parseMoneyAmount(
+  value: string | number | null | undefined,
+): number | null {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  const cleaned = String(value).replace(/[^0-9.]/g, '');
+  if (!cleaned) return null;
+  const num = Number(cleaned);
+  return Number.isFinite(num) ? num : null;
+}
+
+function formatApiPrice(
+  value: string | number | null | undefined,
+  currency?: string | null,
+): string {
+  const amount = parseMoneyAmount(value);
+  if (amount != null) {
+    if (amount <= 0) return 'Free';
+    return formatMoney(amount, currency);
+  }
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function parseCount(value: string | number | null | undefined): number | null {
@@ -315,10 +424,18 @@ function mediaFileName(
   fallback: string,
 ): string {
   if (entry && typeof entry === 'object') {
-    const name = text(entry.name);
+    const name = text(entry.name) || text(entry.title);
     if (name) return name;
   }
   return fallback;
+}
+
+function mediaFileSizeLabel(
+  entry: TrainingContentMediaFileApi | null | undefined,
+): string | undefined {
+  if (!entry || typeof entry === 'string') return undefined;
+  const label = formatTrainingFileSize(entry.size ?? entry.file_size ?? null);
+  return label || undefined;
 }
 
 /** Course notes from detail API: notes_pdf_url, notes[], notes_documents[]. */
@@ -328,11 +445,21 @@ function mapTrainingNotes(
   const items: TrainingDetailView['notes'] = [];
   const seen = new Set<string>();
 
-  const push = (rawUrl: string, title: string, id: string) => {
+  const push = (
+    rawUrl: string,
+    title: string,
+    id: string,
+    sizeLabel?: string,
+  ) => {
     const url = resolveAbsoluteApiUrl(rawUrl);
     if (!url || seen.has(url)) return;
     seen.add(url);
-    items.push({ id, title, url });
+    items.push({
+      id,
+      title,
+      url,
+      ...(sizeLabel ? { sizeLabel } : {}),
+    });
   };
 
   const notesPdf = text(item.notes_pdf_url);
@@ -340,15 +467,25 @@ function mapTrainingNotes(
     push(notesPdf, 'Course notes PDF', 'notes-pdf');
   }
 
-  (item.notes ?? []).forEach((entry, index) => {
-    push(mediaFileUrl(entry), mediaFileName(entry, `Note ${index + 1}`), `note-${index}`);
+  const notesList = Array.isArray(item.notes) ? item.notes : [];
+  notesList.forEach((entry, index) => {
+    push(
+      mediaFileUrl(entry),
+      mediaFileName(entry, `Note ${index + 1}`),
+      `note-${index}`,
+      mediaFileSizeLabel(entry),
+    );
   });
 
-  (item.notes_documents ?? []).forEach((entry, index) => {
+  const notesDocs = Array.isArray(item.notes_documents)
+    ? item.notes_documents
+    : [];
+  notesDocs.forEach((entry, index) => {
     push(
       mediaFileUrl(entry),
       mediaFileName(entry, `Notes document ${index + 1}`),
       `notes-doc-${index}`,
+      mediaFileSizeLabel(entry),
     );
   });
 
@@ -394,7 +531,7 @@ export function mapTrainingApiToListItem(item: TrainingApiItem): TrainingListIte
     badgeColor: style.badgeColor,
     badgeBg: style.badgeBg,
     when: duration || text(item.status, 'Open'),
-    title: text(item.title, 'Untitled training'),
+    title: safeTitle(item.title, 'Untitled training'),
     detail: detailParts.join(' · '),
     sideTop: side.top,
     sideBottom: side.bottom,
@@ -490,9 +627,17 @@ export function mapTrainingApiToDetailView(item: TrainingApiItem): TrainingDetai
     (item.enterprise_name
       ? `Hosted by ${item.enterprise_name}`
       : 'Instructor details coming soon');
+  const trainerPhotoRaw =
+    text(item.instructor_photo) || text(item.instructor?.photo);
+  const trainerPhoto = trainerPhotoRaw
+    ? resolveAbsoluteApiUrl(trainerPhotoRaw)
+    : '';
+  const trainerCredentials =
+    text(item.instructor_credentials) || text(item.instructor?.credentials);
 
-  const sessions =
-    item.sections?.map((section, sectionIndex) => {
+  const sessions = (Array.isArray(item.sections) ? item.sections : [])
+    .filter((section) => Boolean(section && typeof section === 'object'))
+    .map((section, sectionIndex) => {
       const items = mapSectionCurriculumItems(section);
       const typeCounts = items.reduce<Record<string, number>>((acc, entry) => {
         acc[entry.type] = (acc[entry.type] ?? 0) + 1;
@@ -527,7 +672,7 @@ export function mapTrainingApiToDetailView(item: TrainingApiItem): TrainingDetai
 
       return {
         id: section.id || `section-${sectionIndex}`,
-        name: text(section.title, `Section ${sectionIndex + 1}`),
+        name: safeTitle(section.title, `Section ${sectionIndex + 1}`),
         when:
           text(section.schedule) ||
           (metaParts.length > 0
@@ -541,47 +686,54 @@ export function mapTrainingApiToDetailView(item: TrainingApiItem): TrainingDetai
         concepts: items.map((entry) => entry.title),
         items,
       };
-    }) ?? [];
+    });
 
-  const materials =
-    item.documents?.map((doc, index) => ({
+  const materials = (Array.isArray(item.documents) ? item.documents : []).map(
+    (doc, index) => ({
       id: text(doc.id, `doc-${index}`),
-      title: text(doc.title || doc.name, `Document ${index + 1}`),
+      title: safeTitle(doc.title || doc.name, `Document ${index + 1}`),
       type: text(doc.type, 'File'),
-      size: text(doc.size, '—'),
+      size: formatTrainingFileSize(doc.size) || '—',
       visible: text(doc.visibility, 'Enrolled'),
-      url: text(doc.url),
+      url: resolveAbsoluteApiUrl(text(doc.url)),
       downloadable: Boolean(doc.downloadable ?? doc.url),
-    })) ?? [];
+    }),
+  );
 
-  const downloadableLessons =
-    item.sections?.flatMap((section) =>
-      (section.lessons ?? [])
-        .filter((lesson) => lesson.is_downloadable)
-        .map((lesson, index) => ({
-          id: lesson.id || `dl-${section.id}-${index}`,
-          title: text(lesson.title, 'Downloadable lesson'),
-          size: text(lesson.file_size, '—'),
-          downloadable: true,
-        })),
-    ) ?? [];
+  const downloadableLessons = (
+    Array.isArray(item.sections) ? item.sections : []
+  ).flatMap((section) =>
+    (Array.isArray(section.lessons) ? section.lessons : [])
+      .filter((lesson) => lesson && lesson.is_downloadable)
+      .map((lesson, index) => ({
+        id: lesson.id || `dl-${section.id}-${index}`,
+        title: safeTitle(lesson.title, 'Downloadable lesson'),
+        size: formatTrainingFileSize(lesson.file_size) || '—',
+        downloadable: true,
+      })),
+  );
 
-  const instructorNotes =
-    item.instructor_notes?.map((note, index) => ({
-      id: text(note.id, `note-${index}`),
-      title: text(note.title, `Instructor note ${index + 1}`),
-      url: text(note.url),
-    })) ?? [];
+  const instructorNotes = (
+    Array.isArray(item.instructor_notes) ? item.instructor_notes : []
+  ).map((note, index) => ({
+    id: text(note.id, `note-${index}`),
+    title: safeTitle(note.title, `Instructor note ${index + 1}`),
+    url: text(note.url),
+  }));
 
-  const reviews =
-    item.reviews?.map((review, index) => ({
+  const reviews = (Array.isArray(item.reviews) ? item.reviews : []).map(
+    (review, index) => ({
       id: text(review.id, `review-${index}`),
-      author: text(review.author, 'Learner'),
+      author: safeTitle(
+        review.participant_name || review.author,
+        'Learner',
+      ),
       rating: parseAmount(review.rating) ?? 0,
-      comment: text(review.comment),
+      comment: clampDisplayText(text(review.comment), 2_000),
       date: formatDateLabel(review.created_at) || 'Recently',
       verified: Boolean(review.verified),
-    })) ?? [];
+    }),
+  );
 
   const startDate =
     formatDateLabel(item.start_date) || formatDateLabel(item.enrolment_start);
@@ -592,16 +744,24 @@ export function mapTrainingApiToDetailView(item: TrainingApiItem): TrainingDetai
     parseCount(item.reviews_count) ??
     parseCount(item.review_count) ??
     reviews.length;
-  const detailPriceAmount = parseAmount(item.price);
+  const detailPriceAmount = parseMoneyAmount(item.price);
   const detailPriceLabel =
     detailPriceAmount == null || detailPriceAmount <= 0
       ? 'Free'
       : formatMoney(detailPriceAmount, item.currency);
+  const promoPriceLabel = formatApiPrice(item.promo_price, item.currency);
+  const couponCode = text(item.coupon_code);
+  const showPromoPrice =
+    Boolean(promoPriceLabel) && promoPriceLabel !== detailPriceLabel;
 
   return {
     id: list.id,
     title: list.title,
-    description: text(item.description, 'No description available yet.'),
+    subtitle: safeTitle(item.subtitle),
+    description: clampDisplayText(
+      text(item.description, 'No description available yet.'),
+      20_000,
+    ),
     category: text(item.category, 'Training'),
     subcategory: text(item.subcategory),
     courseType: text(item.course_type, 'Course'),
@@ -630,18 +790,22 @@ export function mapTrainingApiToDetailView(item: TrainingApiItem): TrainingDetai
     ),
     deliveryInstructions: text(item.delivery_instructions),
     accessInfo: text(item.access_information),
-    meetingProvider: text(item.meeting_provider),
+    meetingProvider:
+      text(item.meeting_provider) || text(item.meeting_platform),
     meetingLink: text(item.meeting_link),
+    meetingId: text(item.meeting_id),
+    meetingPasscode: text(item.meeting_passcode),
     venue: text(item.venue),
     address: text(item.address),
-    // Detail shows list `price`, not `promo_price`.
     priceLabel: detailPriceLabel,
     priceType:
       detailPriceAmount == null || detailPriceAmount <= 0 ? 'Free' : 'Paid',
-    discountLabel: text(item.coupon_code)
-      ? `Code ${text(item.coupon_code)}`
-      : parseAmount(item.promo_price) != null
-        ? 'Promo price applied'
+    promoPriceLabel: showPromoPrice ? promoPriceLabel : '',
+    couponCode,
+    discountLabel: couponCode
+      ? `Coupon ${couponCode}`
+      : showPromoPrice
+        ? `Promo ${promoPriceLabel}`
         : '',
     capacityMax: capacityMax != null ? String(capacityMax) : '—',
     enrolled: enrolled != null ? String(enrolled) : '—',
@@ -650,6 +814,15 @@ export function mapTrainingApiToDetailView(item: TrainingApiItem): TrainingDetai
     registrationStatus: text(item.status, 'Open'),
     requiresApproval: Boolean(item.requires_approval),
     prerequisites: text(item.requirements, 'No prerequisites listed'),
+    faqs: Array.isArray(item.faqs)
+      ? item.faqs
+          .map((faq, index) => ({
+            id: `faq-${index}`,
+            question: text(faq?.question),
+            answer: text(faq?.answer),
+          }))
+          .filter((faq) => Boolean(faq.question || faq.answer))
+      : [],
     objectives: Array.isArray(item.learning_objectives)
       ? item.learning_objectives.filter(Boolean)
       : [],
@@ -658,6 +831,8 @@ export function mapTrainingApiToDetailView(item: TrainingApiItem): TrainingDetai
     trainerName,
     trainerBio,
     trainerRole: text(item.instructor?.role, 'Trainer'),
+    trainerPhoto,
+    trainerCredentials,
     sessions,
     materials,
     targetAudience: text(item.target_audience, 'General learners'),
@@ -666,6 +841,14 @@ export function mapTrainingApiToDetailView(item: TrainingApiItem): TrainingDetai
       'All levels',
     ),
     language: text(item.language, 'English'),
+    accessDuration:
+      item.access_duration_days == null || item.access_duration_days === ''
+        ? ''
+        : String(item.access_duration_days).trim(),
+    accessExpiry:
+      item.access_expiry_days == null || item.access_expiry_days === ''
+        ? ''
+        : String(item.access_expiry_days).trim(),
     averageRating,
     reviewCount,
     offlineEnabled: Boolean(
@@ -676,5 +859,6 @@ export function mapTrainingApiToDetailView(item: TrainingApiItem): TrainingDetai
     downloadableLessons,
     instructorNotes,
     notes: mapTrainingNotes(item),
+    ...resolveViewerEnrolment(item),
   };
 }

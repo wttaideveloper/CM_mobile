@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -16,7 +17,7 @@ import {
   TRAINING_MUTED,
   TRAINING_TEAL,
   TRAINING_TYPE_CARDS,
-  type TrainingListItem,
+  deliveryModeQueryValue,
 } from '@/components/market/marketTrainingData';
 import { TrainingSection } from '@/components/market/MarketTrainingUi';
 import { useTrainingsList } from '@/hooks/useTrainings';
@@ -26,9 +27,10 @@ import { c, NU } from '@/utils/newUiCompact';
 type TypeFilter = (typeof TRAINING_TYPE_CARDS)[number]['id'];
 
 export function MarketTrainingListScreen() {
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('Virtual');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('All');
   const [query, setQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [pulling, setPulling] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(query.trim()), 350);
@@ -46,29 +48,37 @@ export function MarketTrainingListScreen() {
     refetch,
   } = useTrainingsList({
     search: debouncedSearch || undefined,
+    delivery_mode: deliveryModeQueryValue(typeFilter),
     page: 1,
     page_size: 50,
   });
 
+  const refreshing = pulling;
+
   const items = useMemo(() => {
+    if (debouncedSearch || typeFilter !== 'All') {
+      return apiItems;
+    }
     const apiIds = new Set(apiItems.map((item) => item.id));
     const staticExtras = MARKET_TRAININGS.filter((item) => !apiIds.has(item.id));
-    const merged: TrainingListItem[] = [...apiItems, ...staticExtras];
-
-    return merged.filter((item) => {
-      if (item.mode !== selectedType.mode) return false;
-      if (!debouncedSearch) return true;
-      const q = debouncedSearch.toLowerCase();
-      return (
-        item.title.toLowerCase().includes(q) ||
-        item.detail.toLowerCase().includes(q) ||
-        item.badge.toLowerCase().includes(q)
-      );
-    });
-  }, [apiItems, selectedType.mode, debouncedSearch]);
+    return [...apiItems, ...staticExtras];
+  }, [apiItems, debouncedSearch, typeFilter]);
 
   return (
-    <MarketTrainingScreenShell eyebrow="Browse" title="Trainings">
+    <MarketTrainingScreenShell
+      eyebrow="Browse"
+      title="Trainings"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setPulling(true);
+            void refetch().finally(() => setPulling(false));
+          }}
+          tintColor={TRAINING_GREEN}
+        />
+      }
+    >
       <TrainingSection label="Choose training type">
         <Text style={styles.helper}>
           Pick Virtual, Self-paced, Hybrid, or Physical — same types as on the
@@ -147,8 +157,9 @@ export function MarketTrainingListScreen() {
 
         {!isLoading && items.length === 0 ? (
           <Text style={styles.stateText}>
-            No {selectedType.title.toLowerCase()} trainings yet. Try another
-            type.
+            {selectedType.id === 'All'
+              ? 'No trainings yet.'
+              : `No ${selectedType.title.toLowerCase()} trainings yet. Try another type.`}
           </Text>
         ) : null}
 

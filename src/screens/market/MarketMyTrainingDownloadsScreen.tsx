@@ -184,19 +184,6 @@ export function MarketMyTrainingDownloadsScreen() {
       }
     >
       <View style={styles.page}>
-        <View style={styles.hero}>
-          <Text style={styles.heroTitle}>Your offline files</Text>
-          <Text style={styles.heroHelp}>
-            Saved inside the app only. Tap a video to play it here like My
-            Learning.
-          </Text>
-          {hydrated && items.length > 0 ? (
-            <Text style={styles.heroCount}>
-              {items.length} saved file{items.length === 1 ? '' : 's'}
-            </Text>
-          ) : null}
-        </View>
-
         {!hydrated ? (
           <View style={styles.stateBox}>
             <ActivityIndicator color={TRAINING_GREEN} />
@@ -332,30 +319,6 @@ export function MarketMyTrainingDownloadsScreen() {
 const styles = StyleSheet.create({
   page: {
     gap: c(14, 12),
-  },
-  hero: {
-    backgroundColor: '#eef7f0',
-    borderRadius: NU.cardRadius,
-    borderWidth: 1,
-    borderColor: '#d7eadc',
-    padding: c(14, 12),
-    gap: c(6, 5),
-  },
-  heroTitle: {
-    fontSize: NU.cardTitle,
-    fontWeight: '800',
-    color: TRAINING_TEAL,
-  },
-  heroHelp: {
-    fontSize: c(12.5, 11.5),
-    lineHeight: c(18, 16),
-    color: TRAINING_MUTED,
-  },
-  heroCount: {
-    marginTop: c(2, 1),
-    fontSize: c(12, 11),
-    fontWeight: '700',
-    color: TRAINING_GREEN,
   },
   stateBox: {
     paddingVertical: c(28, 24),

@@ -1,7 +1,7 @@
 import type { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 import { useAuthStore } from '@/stores/auth.store';
-import { getApiErrorMessage } from '@/utils/apiError';
+import { getApiErrorCode, getApiErrorMessage } from '@/utils/apiError';
 
 import { apiClient, authClient, workflowClient } from './client';
 import { ENDPOINTS } from './endpoints';
@@ -81,15 +81,24 @@ function rejectApiError(error: AxiosError) {
 
   devLog('❌ API ERROR:', error.response.status, error.response.data);
 
+  const body = error.response.data as {
+    message?: string;
+    code?: string;
+    detail?:
+      | string
+      | { message?: string; code?: string; msg?: string }
+      | Array<{ msg?: string }>;
+    errors?: unknown;
+  } | string;
+
   return Promise.reject({
-    message: getApiErrorMessage(
-      error.response.data as {
-        message?: string;
-        detail?: string | Array<{ msg?: string }>;
-      },
-    ),
+    message: getApiErrorMessage(body),
+    code: getApiErrorCode(body),
     statusCode: error.response.status,
-    errors: (error.response.data as { errors?: unknown })?.errors,
+    errors:
+      body && typeof body === 'object'
+        ? (body as { errors?: unknown }).errors
+        : undefined,
   });
 }
 

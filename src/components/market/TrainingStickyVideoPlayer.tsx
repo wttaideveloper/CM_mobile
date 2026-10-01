@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  PanResponder,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
@@ -9,7 +9,6 @@ import {
   View,
 } from 'react-native';
 import { useEventListener } from 'expo';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 import {
@@ -19,9 +18,12 @@ import {
 } from '@/components/market/marketTrainingData';
 import { API_CONFIG } from '@/config';
 import { useAuthStore } from '@/stores/auth.store';
+import {
+  asPlainText,
+  clampDisplayText,
+  resolveAbsoluteApiUrl,
+} from '@/utils/trainingLessonMedia';
 import { c, NU } from '@/utils/newUiCompact';
-
-const SPEED_STEPS = [0.75, 1, 1.25, 1.5, 2] as const;
 
 type Props = {
   url: string;
@@ -36,7 +38,6 @@ type Props = {
   onPrevious?: () => void;
   onNext?: () => void;
   onWatchPercent?: (percent: number) => void;
-  /** Raw playback clock for progress save APIs. */
   onPlaybackTime?: (currentSeconds: number, durationSeconds: number) => void;
   onClose?: () => void;
 };
@@ -50,10 +51,6 @@ function isLocalMediaUri(uri: string): boolean {
     value.startsWith('ph:') ||
     value.startsWith('assets-library:')
   );
-}
-
-function isIpHostname(hostname: string): boolean {
-  return /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
 }
 
 function isSignedOrPublicCdnUrl(uri: string): boolean {
@@ -78,17 +75,12 @@ function isSignedOrPublicCdnUrl(uri: string): boolean {
   }
 }
 
-/**
- * Training uploads live on the API host or a raw IP (http://13.x.x.x/api/v1/...).
- * Those endpoints return 401 unless Bearer is sent. Do not skip auth just
- * because the host differs from chat.wisdomtooth.tech.
- */
 function shouldAttachAuthHeader(uri: string): boolean {
   if (isLocalMediaUri(uri)) return false;
   if (isSignedOrPublicCdnUrl(uri)) return false;
   try {
     const parsed = new URL(uri);
-    if (isIpHostname(parsed.hostname)) return true;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(parsed.hostname)) return true;
     if (parsed.pathname.includes('/api/v1/trainings/upload')) return true;
     if (parsed.pathname.startsWith('/api/v1/')) return true;
     const mediaHost = parsed.host.toLowerCase();
@@ -101,18 +93,6 @@ function shouldAttachAuthHeader(uri: string): boolean {
   return true;
 }
 
-function formatClock(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
-  const total = Math.floor(seconds);
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const rest = total % 60;
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
-  }
-  return `${minutes}:${String(rest).padStart(2, '0')}`;
-}
-
 function inferContentType(uri: string): 'auto' | 'hls' | 'progressive' {
   const path = uri.split('?')[0]?.toLowerCase() ?? '';
   if (path.includes('.m3u8') || path.endsWith('.m3u')) return 'hls';
@@ -120,22 +100,9 @@ function inferContentType(uri: string): 'auto' | 'hls' | 'progressive' {
   return 'auto';
 }
 
-/** Same upload path on the official HTTPS API host, when media is on a raw IP. */
-function officialApiMediaUrl(uri: string): string | null {
-  try {
-    const parsed = new URL(uri);
-    if (!parsed.pathname.includes('/api/v1/')) return null;
-    const base = new URL(API_CONFIG.BASE_URL);
-    if (parsed.host.toLowerCase() === base.host.toLowerCase()) return null;
-    return `${base.origin}${parsed.pathname}${parsed.search}`;
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Udemy-style sticky course player: auth-aware source, native controls,
- * speed cycle, prev/next, and landscape fullscreen.
+ * Sticky course player — keep VideoView mounted and use native controls.
+ * Android sticky headers need TextureView or the picture goes black while audio plays.
  */
 export function TrainingStickyVideoPlayer({
   url,
@@ -143,42 +110,28 @@ export function TrainingStickyVideoPlayer({
   subtitle,
   requiresAuth,
   initialSeekSeconds,
-  hasPrevious = false,
-  hasNext = false,
-  onPrevious,
-  onNext,
   onWatchPercent,
   onPlaybackTime,
   onClose,
 }: Props) {
   const [loading, setLoading] = useState(true);
+  const [buffering, setBuffering] = useState(false);
+  const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [speedIndex, setSpeedIndex] = useState(1);
-  const [playing, setPlaying] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
-  const [displayTime, setDisplayTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [scrubbing, setScrubbing] = useState(false);
+  const [keyboardUp, setKeyboardUp] = useState(false);
   const needsAuth = requiresAuth ?? shouldAttachAuthHeader(url);
   const didSeekRef = useRef(false);
   const loadingSourceRef = useRef(false);
-  const videoRef = useRef<VideoView>(null);
-  const seekTrackRef = useRef<View>(null);
-  const scrubbingRef = useRef(false);
-  const durationRef = useRef(0);
-  const trackWidthRef = useRef(0);
-  const trackPageXRef = useRef(0);
-  const pendingSeekRef = useRef<number | null>(null);
-  const pendingSeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bufferTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const player = useVideoPlayer(null, (instance) => {
     instance.loop = false;
-    // Faster clock + keyframe-tolerant seeks so scrub/tap feels like YouTube.
-    instance.timeUpdateEventInterval = 0.2;
-    instance.seekTolerance = { toleranceBefore: 2, toleranceAfter: 2 };
+    instance.muted = false;
+    instance.timeUpdateEventInterval = 0.5;
     instance.bufferOptions = {
       preferredForwardBufferDuration: Platform.OS === 'android' ? 12 : 0,
-      minBufferForPlayback: 0.4,
+      minBufferForPlayback: 0.5,
       prioritizeTimeOverSizeThreshold: true,
       waitsToMinimizeStalling: false,
     };
@@ -186,34 +139,47 @@ export function TrainingStickyVideoPlayer({
 
   useEffect(() => {
     didSeekRef.current = false;
-    setDisplayTime(0);
-    setDuration(0);
-    durationRef.current = 0;
-    scrubbingRef.current = false;
-    setScrubbing(false);
-    pendingSeekRef.current = null;
-    if (pendingSeekTimerRef.current) {
-      clearTimeout(pendingSeekTimerRef.current);
-      pendingSeekTimerRef.current = null;
-    }
-  }, [url, initialSeekSeconds]);
+    setLoading(true);
+    setReady(false);
+    setBuffering(false);
+    setLoadError(null);
+  }, [url, initialSeekSeconds, reloadToken]);
 
   useEffect(() => {
     return () => {
-      if (pendingSeekTimerRef.current) {
-        clearTimeout(pendingSeekTimerRef.current);
+      if (bufferTimerRef.current) clearTimeout(bufferTimerRef.current);
+      try {
+        player.pause();
+      } catch {
+        // Native player may already be released.
       }
     };
-  }, []);
+  }, [player]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return undefined;
+    const pauseForKeyboard = () => {
+      try {
+        player.pause();
+      } catch {
+        // Ignore.
+      }
+      setKeyboardUp(true);
+    };
+    const resumeAfterKeyboard = () => setKeyboardUp(false);
+    const show = Keyboard.addListener('keyboardWillShow', pauseForKeyboard);
+    const hide = Keyboard.addListener('keyboardWillHide', resumeAfterKeyboard);
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [player]);
 
   useEffect(() => {
     let cancelled = false;
     loadingSourceRef.current = true;
 
-    const playUri = async (
-      uri: string,
-      token?: string,
-    ): Promise<boolean> => {
+    const playUri = async (uri: string, token?: string): Promise<boolean> => {
       try {
         const settled = new Promise<boolean>((resolve) => {
           const timer = setTimeout(() => {
@@ -248,10 +214,23 @@ export function TrainingStickyVideoPlayer({
     const load = async () => {
       setLoading(true);
       setLoadError(null);
-      setPlaying(false);
       try {
+        const trimmed = asPlainText(url);
+        if (
+          !trimmed ||
+          trimmed.length > 8_000 ||
+          trimmed.startsWith('data:') ||
+          (!/^https?:\/\//i.test(trimmed) && !isLocalMediaUri(trimmed))
+        ) {
+          setLoadError('This video cannot be played.');
+          setLoading(false);
+          return;
+        }
+
+        const playUrl = resolveAbsoluteApiUrl(trimmed) || trimmed;
+
         let token: string | undefined;
-        if (needsAuth) {
+        if (needsAuth && !isLocalMediaUri(playUrl)) {
           token = await useAuthStore.getState().ensureAccessToken(false);
           if (cancelled) return;
           if (!token) {
@@ -261,63 +240,31 @@ export function TrainingStickyVideoPlayer({
           }
         }
 
-        const uris = [url];
-        const apiMirror = officialApiMediaUrl(url);
-        if (apiMirror) uris.push(apiMirror);
-
-        let loaded = false;
-        for (const uri of uris) {
-          if (cancelled) return;
-          loaded = await playUri(uri, token);
-          if (loaded) break;
-        }
-
+        let loaded = await playUri(playUrl, token);
         if (!loaded && needsAuth && token) {
           const refreshed = await useAuthStore.getState().ensureAccessToken(true);
           if (cancelled) return;
-          token = refreshed;
-          loaded = await playUri(url, token);
-        }
-
-        if (
-          !loaded &&
-          Platform.OS === 'ios' &&
-          needsAuth &&
-          token &&
-          inferContentType(url) !== 'hls'
-        ) {
-          const dest = `${FileSystem.cacheDirectory}training-play-${Date.now()}.mp4`;
-          const downloaded = await FileSystem.downloadAsync(url, dest, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (cancelled) return;
-          if (downloaded.status === 200) {
-            loaded = await playUri(downloaded.uri);
-          }
+          loaded = await playUri(playUrl, refreshed);
         }
 
         if (!loaded) {
           throw new Error('Could not load this video.');
         }
 
-        player.playbackRate = SPEED_STEPS[speedIndex];
         const seekTo = initialSeekSeconds ?? 0;
-        if (seekTo > 1 && !didSeekRef.current && player.status === 'readyToPlay') {
-          pendingSeekRef.current = seekTo;
-          setDisplayTime(seekTo);
+        if (seekTo > 1 && !didSeekRef.current) {
           player.currentTime = seekTo;
           didSeekRef.current = true;
         }
-        player.play();
+        // Don't play yet — VideoView mounts after ready; play in a follow-up effect.
         if (!cancelled) {
           setLoadError(null);
           setLoading(false);
+          setReady(true);
         }
       } catch {
         if (!cancelled) {
-          setLoadError(
-            'Could not play this video. Sign in again, or tap retry.',
-          );
+          setLoadError('Could not play this video. Tap retry.');
           setLoading(false);
         }
       } finally {
@@ -330,163 +277,135 @@ export function TrainingStickyVideoPlayer({
       cancelled = true;
       loadingSourceRef.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- speed applied separately
   }, [url, player, needsAuth, initialSeekSeconds, reloadToken]);
 
-  useEventListener(player, 'statusChange', ({ status, error }) => {
-    if (loadingSourceRef.current) return;
-    if (status === 'error') {
-      setLoadError(
-        error?.message?.trim() ||
-          'Video failed to play. The file may need authentication.',
-      );
-      setLoading(false);
+  // Start playback only once the VideoView is on screen (after loader hides).
+  useEffect(() => {
+    if (!ready || loading || loadError || keyboardUp) return;
+    try {
+      player.muted = false;
+      player.play();
+    } catch {
+      // Ignore.
     }
-  });
+  }, [ready, loading, loadError, keyboardUp, player, url, reloadToken]);
 
-  useEventListener(player, 'playingChange', ({ isPlaying }) => {
-    setPlaying(isPlaying);
+  useEventListener(player, 'statusChange', ({ status, error }) => {
+    if (status === 'error') {
+      setLoadError(error?.message?.trim() || 'Video failed to play.');
+      setLoading(false);
+      setBuffering(false);
+      setReady(false);
+      return;
+    }
+
+    if (loadingSourceRef.current) return;
+
+    if (status === 'readyToPlay') {
+      if (bufferTimerRef.current) {
+        clearTimeout(bufferTimerRef.current);
+        bufferTimerRef.current = null;
+      }
+      setBuffering(false);
+      if (player.duration > 0) {
+        setReady(true);
+      }
+      return;
+    }
+
+    if (status === 'loading') {
+      if (bufferTimerRef.current) clearTimeout(bufferTimerRef.current);
+      bufferTimerRef.current = setTimeout(() => {
+        setBuffering(true);
+        bufferTimerRef.current = null;
+      }, 200);
+    }
   });
 
   useEventListener(player, 'timeUpdate', ({ currentTime }) => {
-    const nextDuration = player.duration;
-    if (!nextDuration || nextDuration <= 0) return;
-    durationRef.current = nextDuration;
-    setDuration(nextDuration);
-
-    const pending = pendingSeekRef.current;
-    // Ignore stale ticks from the old position until the seek actually lands.
-    if (pending != null && Math.abs(currentTime - pending) > 2.5) {
-      const percent = Math.min(100, Math.round((pending / nextDuration) * 100));
-      onWatchPercent?.(percent);
-      onPlaybackTime?.(pending, nextDuration);
-      return;
+    const duration = player.duration;
+    if (duration > 0) {
+      setReady(true);
     }
-    if (pending != null) {
-      pendingSeekRef.current = null;
-      if (pendingSeekTimerRef.current) {
-        clearTimeout(pendingSeekTimerRef.current);
-        pendingSeekTimerRef.current = null;
-      }
+    onPlaybackTime?.(currentTime, duration > 0 ? duration : 0);
+    if (duration > 0) {
+      onWatchPercent?.(
+        Math.min(100, Math.round((currentTime / duration) * 100)),
+      );
     }
-
-    if (!scrubbingRef.current) {
-      setDisplayTime(currentTime);
-    }
-    const percent = Math.min(100, Math.round((currentTime / nextDuration) * 100));
-    onWatchPercent?.(percent);
-    onPlaybackTime?.(currentTime, nextDuration);
   });
 
-  const speedLabel = useMemo(() => {
-    const rate = SPEED_STEPS[speedIndex];
-    return rate === 1 ? '1x' : `${rate}x`;
-  }, [speedIndex]);
+  useEventListener(player, 'sourceLoad', ({ duration }) => {
+    if (duration > 0) {
+      setReady(true);
+    }
+  });
 
-  const cycleSpeed = () => {
-    const next = (speedIndex + 1) % SPEED_STEPS.length;
-    setSpeedIndex(next);
-    player.playbackRate = SPEED_STEPS[next];
-  };
-
-  const applySeek = (seconds: number) => {
-    const max = durationRef.current || player.duration || 0;
-    const next = Math.max(0, Math.min(max, seconds));
-    pendingSeekRef.current = next;
-    setDisplayTime(next);
-    player.currentTime = next;
-    if (pendingSeekTimerRef.current) clearTimeout(pendingSeekTimerRef.current);
-    pendingSeekTimerRef.current = setTimeout(() => {
-      pendingSeekRef.current = null;
-      pendingSeekTimerRef.current = null;
-    }, 4000);
-  };
-
-  const beginScrub = () => {
-    if (scrubbingRef.current) return;
-    scrubbingRef.current = true;
-    setScrubbing(true);
-    player.scrubbingModeOptions = {
-      scrubbingModeEnabled: true,
-      allowSkippingMediaCodecFlush: true,
-      enableDynamicScheduling: true,
-      increaseCodecOperatingRate: true,
-      useDecodeOnlyFlag: true,
-    };
-    if (Platform.OS === 'ios') player.pause();
-  };
-
-  const endScrub = () => {
-    if (!scrubbingRef.current) return;
-    player.scrubbingModeOptions = { scrubbingModeEnabled: false };
-    scrubbingRef.current = false;
-    setScrubbing(false);
-    player.play();
-  };
-
-  const seekFromPageX = (pageX: number) => {
-    const width = trackWidthRef.current;
-    const max = durationRef.current || player.duration || 0;
-    if (width <= 0 || max <= 0) return;
-    const ratio = Math.max(0, Math.min(1, (pageX - trackPageXRef.current) / width));
-    applySeek(ratio * max);
-  };
-
-  const seekBarResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (event) => {
-        beginScrub();
-        seekFromPageX(event.nativeEvent.pageX);
-      },
-      onPanResponderMove: (event) => {
-        seekFromPageX(event.nativeEvent.pageX);
-      },
-      onPanResponderRelease: () => {
-        endScrub();
-      },
-      onPanResponderTerminate: () => {
-        endScrub();
-      },
-    }),
-  ).current;
-
-  const seekBy = (delta: number) => {
-    applySeek((scrubbingRef.current ? displayTime : player.currentTime) + delta);
-  };
-
-  const togglePlay = () => {
-    if (player.playing) player.pause();
-    else player.play();
-  };
-
-  const openLandscapeFullscreen = () => {
-    if (loading || loadError) return;
-    void videoRef.current?.enterFullscreen();
-  };
+  const safeTitle = clampDisplayText(asPlainText(title, 'Lesson'), 120);
+  const safeSubtitle = clampDisplayText(asPlainText(subtitle), 160);
+  // Full cover while source loads — hides Android's tiny bottom native spinner.
+  const showInitialLoader = !loadError && !keyboardUp && (loading || !ready);
+  // Light mid-play buffer chip after the picture is up.
+  const showBufferPill =
+    !loadError && !keyboardUp && ready && buffering && !loading;
+  // Do not mount VideoView under the loader — Android native surface breaks
+  // absolute overlay layout and pushes the spinner to the bottom edge.
+  const showVideo = !keyboardUp && !showInitialLoader && !loadError;
 
   return (
-    <View style={styles.wrap}>
-      <View style={styles.stage}>
-        <VideoView
-          ref={videoRef}
-          style={styles.video}
-          player={player}
-          nativeControls
-          contentFit="contain"
-          buttonOptions={{ showBottomBar: false }}
-          fullscreenOptions={{
-            enable: true,
-            orientation: 'landscape',
-          }}
-        />
-        {loading ? (
-          <View style={styles.centerState}>
-            <ActivityIndicator color="#FFFFFF" />
-            <Text style={styles.stateText}>Loading video…</Text>
+    <View style={styles.wrap} collapsable={false}>
+      <View style={styles.stage} collapsable={false}>
+        {showVideo ? (
+          <VideoView
+            key={`course-video-${url}-${reloadToken}`}
+            style={styles.video}
+            player={player}
+            nativeControls
+            contentFit="contain"
+            surfaceType={
+              Platform.OS === 'android' ? 'textureView' : 'surfaceView'
+            }
+            fullscreenOptions={{
+              enable: true,
+              orientation: 'landscape',
+            }}
+          />
+        ) : null}
+
+        {keyboardUp ? (
+          <View style={styles.initialLoader}>
+            <Text style={styles.stateText}>Paused while typing</Text>
           </View>
         ) : null}
+
+        {showInitialLoader ? (
+          <View
+            style={styles.initialLoader}
+            collapsable={false}
+            accessibilityRole="progressbar"
+            accessibilityLabel="Loading video"
+          >
+            <View style={styles.loaderInner}>
+              <ActivityIndicator color={TRAINING_GREEN} size="large" />
+              <Text style={styles.spinnerLabel}>Loading video…</Text>
+            </View>
+          </View>
+        ) : null}
+
+        {showBufferPill ? (
+          <View
+            style={styles.spinnerOverlay}
+            pointerEvents="none"
+            accessibilityRole="progressbar"
+            accessibilityLabel="Buffering"
+          >
+            <View style={styles.spinnerPill}>
+              <ActivityIndicator color="#FFFFFF" size="large" />
+              <Text style={styles.spinnerLabel}>Buffering…</Text>
+            </View>
+          </View>
+        ) : null}
+
         {!loading && loadError ? (
           <View style={styles.centerState}>
             <Text style={styles.stateText}>{loadError}</Text>
@@ -500,81 +419,17 @@ export function TrainingStickyVideoPlayer({
             </Pressable>
           </View>
         ) : null}
-        {!loading && !loadError ? (
-          <Pressable
-            style={styles.fullscreenFab}
-            onPress={openLandscapeFullscreen}
-            accessibilityRole="button"
-            accessibilityLabel="Fullscreen landscape"
-            hitSlop={8}
-          >
-            <Text style={styles.fullscreenFabText}>Full</Text>
-          </Pressable>
-        ) : null}
       </View>
-
-      {!loading && !loadError ? (
-        <View style={styles.seekRow}>
-          <Text style={styles.seekClock}>{formatClock(displayTime)}</Text>
-          <View
-            ref={seekTrackRef}
-            style={styles.seekHit}
-            onLayout={(event) => {
-              trackWidthRef.current = event.nativeEvent.layout.width;
-              seekTrackRef.current?.measureInWindow((x) => {
-                trackPageXRef.current = x;
-              });
-            }}
-            {...seekBarResponder.panHandlers}
-            accessibilityRole="adjustable"
-            accessibilityLabel="Video progress"
-            accessibilityValue={{
-              min: 0,
-              max: Math.round(duration),
-              now: Math.round(displayTime),
-            }}
-          >
-            <View style={styles.seekTrack}>
-              <View
-                style={[
-                  styles.seekFill,
-                  {
-                    width: `${
-                      duration > 0
-                        ? Math.min(100, (displayTime / duration) * 100)
-                        : 0
-                    }%`,
-                  },
-                ]}
-              />
-              <View
-                style={[
-                  styles.seekThumb,
-                  {
-                    left: `${
-                      duration > 0
-                        ? Math.min(100, (displayTime / duration) * 100)
-                        : 0
-                    }%`,
-                    transform: [{ scale: scrubbing ? 1.25 : 1 }],
-                  },
-                ]}
-              />
-            </View>
-          </View>
-          <Text style={styles.seekClock}>{formatClock(duration)}</Text>
-        </View>
-      ) : null}
 
       <View style={styles.metaRow}>
         <View style={styles.metaCopy}>
           <Text style={styles.nowPlaying}>Now playing</Text>
           <Text style={styles.title} numberOfLines={2}>
-            {title}
+            {safeTitle}
           </Text>
-          {subtitle ? (
+          {safeSubtitle ? (
             <Text style={styles.subtitle} numberOfLines={1}>
-              {subtitle}
+              {safeSubtitle}
             </Text>
           ) : null}
         </View>
@@ -589,64 +444,6 @@ export function TrainingStickyVideoPlayer({
           </Pressable>
         ) : null}
       </View>
-
-      <View style={styles.toolbar}>
-        <Pressable
-          style={[styles.toolBtn, !hasPrevious && styles.toolBtnDisabled]}
-          onPress={onPrevious}
-          disabled={!hasPrevious}
-          accessibilityRole="button"
-          accessibilityLabel="Previous lesson"
-        >
-          <Text style={styles.toolBtnText}>Prev</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.toolBtn}
-          onPress={() => seekBy(-15)}
-          accessibilityRole="button"
-          accessibilityLabel="Rewind 15 seconds"
-        >
-          <Text style={styles.toolBtnText}>−15s</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.playBtn}
-          onPress={togglePlay}
-          accessibilityRole="button"
-          accessibilityLabel={playing ? 'Pause' : 'Play'}
-        >
-          <Text style={styles.playBtnText}>{playing ? 'Pause' : 'Play'}</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.toolBtn}
-          onPress={() => seekBy(15)}
-          accessibilityRole="button"
-          accessibilityLabel="Forward 15 seconds"
-        >
-          <Text style={styles.toolBtnText}>+15s</Text>
-        </Pressable>
-
-        <Pressable
-          style={[styles.toolBtn, !hasNext && styles.toolBtnDisabled]}
-          onPress={onNext}
-          disabled={!hasNext}
-          accessibilityRole="button"
-          accessibilityLabel="Next lesson"
-        >
-          <Text style={styles.toolBtnText}>Next</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.speedBtn}
-          onPress={cycleSpeed}
-          accessibilityRole="button"
-          accessibilityLabel={`Playback speed ${speedLabel}`}
-        >
-          <Text style={styles.speedBtnText}>{speedLabel}</Text>
-        </Pressable>
-      </View>
     </View>
   );
 }
@@ -656,84 +453,83 @@ const styles = StyleSheet.create({
     backgroundColor: '#0b1f18',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255,255,255,0.12)',
+    flexShrink: 0,
+    zIndex: 20,
+    elevation: 20,
   },
   stage: {
     width: '100%',
     aspectRatio: 16 / 9,
     backgroundColor: '#000',
-    justifyContent: 'center',
+    overflow: 'hidden',
+    flexShrink: 0,
+    position: 'relative',
+    zIndex: 21,
+    elevation: 21,
   },
   video: {
     width: '100%',
     height: '100%',
   },
-  seekRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: c(8, 6),
-    paddingHorizontal: c(14, 12),
-    paddingTop: c(8, 6),
-    backgroundColor: '#FFFFFF',
-  },
-  seekClock: {
-    minWidth: c(36, 32),
-    fontSize: c(11, 10),
-    fontWeight: '700',
-    color: TRAINING_TEAL,
-    fontVariant: ['tabular-nums'],
-  },
-  seekHit: {
-    flex: 1,
-    height: 28,
-    justifyContent: 'center',
-  },
-  seekTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#d7e2dc',
-    overflow: 'visible',
-  },
-  seekFill: {
+  initialLoader: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    width: '100%',
     height: '100%',
-    borderRadius: 2,
-    backgroundColor: TRAINING_GREEN,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+    zIndex: 30,
+    elevation: 30,
   },
-  seekThumb: {
-    position: 'absolute',
-    top: -5,
-    marginLeft: -7,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: TRAINING_GREEN,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+  loaderInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: c(12, 10),
   },
-  fullscreenFab: {
+  spinnerOverlay: {
     position: 'absolute',
-    top: c(10, 8),
-    right: c(10, 8),
-    zIndex: 6,
-    paddingHorizontal: c(12, 10),
-    paddingVertical: c(7, 6),
-    borderRadius: NU.cardRadiusSm,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.28)',
+    zIndex: 25,
+    elevation: 25,
+  },
+  spinnerPill: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: c(10, 8),
+    paddingHorizontal: c(18, 14),
+    paddingVertical: c(14, 12),
+    borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.72)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.35)',
   },
-  fullscreenFabText: {
-    fontSize: c(12, 11),
-    fontWeight: '800',
+  spinnerLabel: {
     color: '#FFFFFF',
-    letterSpacing: 0.2,
+    fontSize: c(13, 12),
+    fontWeight: '700',
+    textAlign: 'center',
   },
   centerState: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     alignItems: 'center',
     justifyContent: 'center',
     gap: c(8, 6),
     paddingHorizontal: c(20, 16),
-    backgroundColor: '#122820',
+    backgroundColor: 'rgba(18,40,32,0.92)',
+    zIndex: 35,
+    elevation: 35,
   },
   stateText: {
     color: 'rgba(255,255,255,0.85)',
@@ -758,7 +554,7 @@ const styles = StyleSheet.create({
     gap: c(10, 8),
     paddingHorizontal: c(14, 12),
     paddingTop: c(10, 8),
-    paddingBottom: c(6, 4),
+    paddingBottom: c(10, 8),
     backgroundColor: '#FFFFFF',
   },
   metaCopy: {
@@ -792,50 +588,5 @@ const styles = StyleSheet.create({
     fontSize: c(12, 11),
     fontWeight: '700',
     color: TRAINING_TEAL,
-  },
-  toolbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: c(6, 5),
-    paddingHorizontal: c(12, 10),
-    paddingBottom: c(10, 8),
-    backgroundColor: '#FFFFFF',
-  },
-  toolBtn: {
-    paddingHorizontal: c(8, 7),
-    paddingVertical: c(7, 6),
-    borderRadius: NU.cardRadiusSm,
-    backgroundColor: '#eef3f0',
-  },
-  toolBtnDisabled: {
-    opacity: 0.4,
-  },
-  toolBtnText: {
-    fontSize: c(11.5, 10.5),
-    fontWeight: '700',
-    color: TRAINING_TEAL,
-  },
-  playBtn: {
-    paddingHorizontal: c(12, 10),
-    paddingVertical: c(7, 6),
-    borderRadius: NU.cardRadiusSm,
-    backgroundColor: TRAINING_GREEN,
-  },
-  playBtnText: {
-    fontSize: c(11.5, 10.5),
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  speedBtn: {
-    marginLeft: 'auto',
-    paddingHorizontal: c(10, 8),
-    paddingVertical: c(7, 6),
-    borderRadius: NU.cardRadiusSm,
-    backgroundColor: '#14352a',
-  },
-  speedBtnText: {
-    fontSize: c(11.5, 10.5),
-    fontWeight: '800',
-    color: '#FFFFFF',
   },
 });

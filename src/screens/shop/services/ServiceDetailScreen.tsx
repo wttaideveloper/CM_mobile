@@ -134,6 +134,7 @@ export function ServiceDetailScreen() {
             </ScrollView>
 
             <ServiceDetailFooter
+              service={service}
               selectedBooking={selectedBooking}
               price={service.price}
               paddingBottom={insets.bottom + 12}

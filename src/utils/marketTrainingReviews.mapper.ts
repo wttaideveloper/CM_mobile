@@ -25,12 +25,23 @@ function authorFromEmail(email?: string | null): string {
     .replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
+export function resolveReviewAuthor(item: {
+  participant_name?: string | null;
+  participant_email?: string | null;
+  author?: string | null;
+  name?: string | null;
+}): string {
+  const named = (item.participant_name ?? item.author ?? item.name ?? '').trim();
+  if (named) return named;
+  return authorFromEmail(item.participant_email);
+}
+
 export function mapTrainingReviewApiItem(
   item: TrainingReviewApiItem,
 ): TrainingReviewView {
   return {
     id: item.id,
-    author: authorFromEmail(item.participant_email),
+    author: resolveReviewAuthor(item),
     rating: Number(item.rating) || 0,
     comment: (item.comment ?? '').trim() || 'No comment',
     date: formatReviewDate(item.created_at),

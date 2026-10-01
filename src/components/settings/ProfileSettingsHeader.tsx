@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: SETTINGS_GREEN,
     paddingHorizontal: NU.hPad,
-    paddingTop: 0,
+    paddingTop: NU.headerPadTop,
     paddingBottom: NU.headerPadBottom,
     borderBottomLeftRadius: c(30, 26),
     borderBottomRightRadius: c(30, 26),

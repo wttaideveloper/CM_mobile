@@ -7,7 +7,13 @@ export const NOTIF_BORDER = '#dbeadd';
 export const NOTIF_CHIP_BORDER = '#d6ecd9';
 export const NOTIF_TIME = '#a8bdae';
 
-export type NotifFilter = 'All' | 'Reminders' | 'Milestones' | 'Insights' | 'Score';
+export type NotifFilter =
+  | 'All'
+  | 'Unread'
+  | 'Chat'
+  | 'Bookings'
+  | 'Courses'
+  | 'Other';
 
 export type NotifIconKind =
   | 'sun'
@@ -17,10 +23,15 @@ export type NotifIconKind =
   | 'trend'
   | 'drop';
 
+export type NotifGroupLabel = 'TODAY' | 'YESTERDAY' | 'EARLIER';
+
+/** Row model for the dash notifications UI (API-backed or static). */
 export type StaticNotification = {
   id: string;
-  group: 'TODAY' | 'YESTERDAY';
-  filter: Exclude<NotifFilter, 'All'>;
+  /** API `notification_id` for mark-read when different from row id. */
+  notificationId?: string;
+  group: NotifGroupLabel;
+  filter: Exclude<NotifFilter, 'All' | 'Unread'>;
   title: string;
   body: string;
   time: string;
@@ -28,21 +39,24 @@ export type StaticNotification = {
   color: string;
   bg: string;
   icon: NotifIconKind;
+  conversationId?: string;
+  notificationType?: string;
 };
 
 export const NOTIF_FILTERS: NotifFilter[] = [
   'All',
-  'Reminders',
-  'Milestones',
-  'Insights',
-  'Score',
+  'Unread',
+  'Chat',
+  'Bookings',
+  'Courses',
+  'Other',
 ];
 
 export const STATIC_NOTIFICATIONS: StaticNotification[] = [
   {
     id: '1',
     group: 'TODAY',
-    filter: 'Reminders',
+    filter: 'Other',
     title: 'Sunshine reminder',
     body: "You haven't logged outdoor exposure yet today. Step outside for 15 min!",
     time: 'Just now',
@@ -54,7 +68,7 @@ export const STATIC_NOTIFICATIONS: StaticNotification[] = [
   {
     id: '2',
     group: 'TODAY',
-    filter: 'Reminders',
+    filter: 'Bookings',
     title: 'Exercise pending',
     body: 'Your 60-min walk is still pending. Complete it to keep your streak going.',
     time: '1h ago',
@@ -66,7 +80,7 @@ export const STATIC_NOTIFICATIONS: StaticNotification[] = [
   {
     id: '3',
     group: 'TODAY',
-    filter: 'Milestones',
+    filter: 'Courses',
     title: '80-Day Streak achieved',
     body: "You've maintained your wellness practices for 80 days straight. Keep going!",
     time: '2h ago',
@@ -78,7 +92,7 @@ export const STATIC_NOTIFICATIONS: StaticNotification[] = [
   {
     id: '4',
     group: 'TODAY',
-    filter: 'Insights',
+    filter: 'Other',
     title: 'New daily insight',
     body: 'Why fibre is the foundation of gut health — Evidence-based · 4 min read',
     time: '5h ago',
@@ -90,7 +104,7 @@ export const STATIC_NOTIFICATIONS: StaticNotification[] = [
   {
     id: '5',
     group: 'YESTERDAY',
-    filter: 'Score',
+    filter: 'Other',
     title: 'HWI™ score improved',
     body: 'Your overall HWI™ score rose to 86 — up 4 pts from last week. Well done!',
     time: 'Yesterday',
@@ -102,7 +116,7 @@ export const STATIC_NOTIFICATIONS: StaticNotification[] = [
   {
     id: '6',
     group: 'YESTERDAY',
-    filter: 'Reminders',
+    filter: 'Other',
     title: 'Hydration check',
     body: "You've had 6 of 8 glasses today. Two more to hit your water goal!",
     time: 'Yesterday',

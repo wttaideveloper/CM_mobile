@@ -5,14 +5,14 @@ import { ENDPOINTS } from '@/services/api/endpoints';
 import { getSocket, isSocketConnected } from '@/services/socket/socket.client';
 import type { JoinRoomRequest, JoinRoomResponse, LeaveRoomRequest, LeaveRoomResponse } from '@/types/socket.types';
 
-function emitJoinRoom(payload: JoinRoomRequest): void {
+function emitJoinRoom(payload: JoinRoomRequest): boolean {
   const socket = getSocket();
 
   if (!socket || !isSocketConnected()) {
     if (__DEV__) {
       console.warn('[Socket JOIN] Socket not connected — skip emit join_room');
     }
-    return;
+    return false;
   }
 
   if (__DEV__) {
@@ -20,16 +20,17 @@ function emitJoinRoom(payload: JoinRoomRequest): void {
   }
 
   socket.emit(SOCKET_CLIENT_EVENTS.JOIN_ROOM, payload);
+  return true;
 }
 
-function emitLeaveRoom(payload: LeaveRoomRequest): void {
+function emitLeaveRoom(payload: LeaveRoomRequest): boolean {
   const socket = getSocket();
 
   if (!socket || !isSocketConnected()) {
     if (__DEV__) {
       console.warn('[Socket LEAVE] Socket not connected — skip emit leave_room');
     }
-    return;
+    return false;
   }
 
   if (__DEV__) {
@@ -37,46 +38,75 @@ function emitLeaveRoom(payload: LeaveRoomRequest): void {
   }
 
   socket.emit(SOCKET_CLIENT_EVENTS.LEAVE_ROOM, payload);
+  return true;
 }
 
-export async function joinConversationRoom(conversationId: string): Promise<JoinRoomResponse | null> {
-  if (!API_CONFIG.SOCKET_ENABLED) {
-    return null;
-  }
-
-  const payload: JoinRoomRequest = { conversation_id: conversationId };
+async function joinRoomViaRest(payload: JoinRoomRequest): Promise<JoinRoomResponse | null> {
   const path = ENDPOINTS.SOCKET_IO.JOIN_ROOM;
-  const url = `${API_CONFIG.BASE_URL}${path}`;
 
   if (__DEV__) {
-    console.log('[Socket JOIN] REST URL:', url);
-    console.log('[Socket JOIN] REST Payload:', payload);
+    console.log('[Socket JOIN] REST fallback URL:', `${API_CONFIG.BASE_URL}${path}`);
   }
 
   try {
     const response = await apiClient.post<JoinRoomResponse>(path, payload);
-
     if (__DEV__) {
       console.log('[Socket JOIN] REST Response:', response.data);
     }
-
-    if (!response.data.authorized) {
-      if (__DEV__) {
-        console.warn('[Socket JOIN] Not authorized for room:', response.data);
-      }
-      return response.data;
-    }
-
-    emitJoinRoom(payload);
     return response.data;
   } catch (error) {
     if (__DEV__) {
       console.warn('[Socket JOIN] REST failed:', error);
     }
-
-    emitJoinRoom(payload);
     return null;
   }
+}
+
+async function leaveRoomViaRest(payload: LeaveRoomRequest): Promise<LeaveRoomResponse | null> {
+  const path = ENDPOINTS.SOCKET_IO.LEAVE_ROOM;
+
+  if (__DEV__) {
+    console.log('[Socket LEAVE] REST fallback URL:', `${API_CONFIG.BASE_URL}${path}`);
+  }
+
+  try {
+    const response = await apiClient.post<LeaveRoomResponse>(path, payload);
+    if (__DEV__) {
+      console.log('[Socket LEAVE] REST Response:', response.data);
+    }
+    return response.data;
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[Socket LEAVE] REST failed:', error);
+    }
+    return null;
+  }
+}
+
+const pendingLeaves = new Map<string, ReturnType<typeof setTimeout>>();
+
+function roomPayload(conversationId: string): JoinRoomRequest {
+  return { conversation_id: conversationId };
+}
+
+function cancelPendingLeave(conversationId: string) {
+  const pending = pendingLeaves.get(conversationId);
+  if (!pending) return;
+  clearTimeout(pending);
+  pendingLeaves.delete(conversationId);
+}
+
+/** join_room with conversation_id (snake_case). Emit on this socket; REST if disconnected. */
+export async function joinConversationRoom(conversationId: string): Promise<JoinRoomResponse | null> {
+  if (!API_CONFIG.SOCKET_ENABLED) {
+    return null;
+  }
+
+  cancelPendingLeave(conversationId);
+  const payload = roomPayload(conversationId);
+  const rest = await joinRoomViaRest(payload);
+  emitJoinRoom(payload);
+  return rest;
 }
 
 export async function leaveConversationRoom(conversationId: string): Promise<LeaveRoomResponse | null> {
@@ -84,31 +114,25 @@ export async function leaveConversationRoom(conversationId: string): Promise<Lea
     return null;
   }
 
-  const payload: LeaveRoomRequest = { conversation_id: conversationId };
-  const path = ENDPOINTS.SOCKET_IO.LEAVE_ROOM;
-  const url = `${API_CONFIG.BASE_URL}${path}`;
+  cancelPendingLeave(conversationId);
 
-  if (__DEV__) {
-    console.log('[Socket LEAVE] REST URL:', url);
-    console.log('[Socket LEAVE] REST Payload:', payload);
-  }
+  return new Promise((resolve) => {
+    pendingLeaves.set(
+      conversationId,
+      setTimeout(() => {
+        pendingLeaves.delete(conversationId);
+        const payload = roomPayload(conversationId);
 
-  try {
-    const response = await apiClient.post<LeaveRoomResponse>(path, payload);
+        if (emitLeaveRoom(payload)) {
+          resolve(null);
+          return;
+        }
 
-    if (__DEV__) {
-      console.log('[Socket LEAVE] REST Response:', response.data);
-    }
-
-    emitLeaveRoom(payload);
-    return response.data;
-  } catch (error) {
-    if (__DEV__) {
-      console.warn('[Socket LEAVE] REST failed:', error);
-    }
-
-    emitLeaveRoom(payload);
-    return null;
-  }
+        void leaveRoomViaRest(payload).then((rest) => {
+          emitLeaveRoom(payload);
+          resolve(rest);
+        });
+      }, 400),
+    );
+  });
 }
- 

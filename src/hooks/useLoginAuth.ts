@@ -2,8 +2,13 @@ import { useEffect, useState } from 'react';
 import { Keyboard, Platform } from 'react-native';
 
 import { fetchPasswordRequirements } from '@/services/auth.service';
+import {
+  clearRememberedLogin,
+  loadRememberedLogin,
+  saveRememberedLogin,
+} from '@/services/rememberedLogin.storage';
 import { useAuthStore } from '@/stores/auth.store';
-import type { PasswordRequirements } from '@/types/auth.types';
+import type { LoginRequest, PasswordRequirements } from '@/types/auth.types';
 import { DEFAULT_PASSWORD_REQUIREMENTS } from '@/utils/passwordValidation';
 
 import { createLoginAuthAccountHandlers } from '@/hooks/useLoginAuthAccountHandlers';
@@ -18,6 +23,28 @@ export function useLoginAuth(onKeyboardVisibilityChange?: (isOpen: boolean) => v
   const login = useAuthStore((state) => state.login);
   const loginWithSocial = useAuthStore((state) => state.loginWithSocial);
   const isLoading = useAuthStore((state) => state.isLoading);
+  const persistRememberedEmail = async (shouldRemember: boolean, nextEmail?: string) => {
+    if (shouldRemember && nextEmail?.trim()) {
+      await saveRememberedLogin(nextEmail);
+      return;
+    }
+    await clearRememberedLogin();
+  };
+
+  const loginWithRememberedEmail = async (credentials: LoginRequest) => {
+    await login(credentials);
+    await persistRememberedEmail(credentials.rememberMe, credentials.email);
+  };
+
+  const loginWithSocialRemembered = async (
+    provider: 'google' | 'facebook',
+    shouldRemember: boolean,
+  ) => {
+    await loginWithSocial(provider, shouldRemember);
+    const userEmail = useAuthStore.getState().user?.email;
+    await persistRememberedEmail(shouldRemember, userEmail);
+  };
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -41,6 +68,28 @@ export function useLoginAuth(onKeyboardVisibilityChange?: (isOpen: boolean) => v
   const [passwordRequirements, setPasswordRequirements] = useState<PasswordRequirements>(
     DEFAULT_PASSWORD_REQUIREMENTS,
   );
+
+  const restoreRememberedLogin = () => {
+    void loadRememberedLogin().then((saved) => {
+      if (!saved) return;
+      setEmail(saved.email);
+      setRememberMe(true);
+    });
+  };
+
+  const handleSetRememberMe = (updater: (prev: boolean) => boolean) => {
+    setRememberMe((prev) => {
+      const next = updater(prev);
+      if (!next) {
+        void clearRememberedLogin();
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    restoreRememberedLogin();
+  }, []);
 
   const {
     forgotResendCooldown,
@@ -95,17 +144,26 @@ export function useLoginAuth(onKeyboardVisibilityChange?: (isOpen: boolean) => v
   const {
     openVerifyMode,
     openLoginMode,
+    openSignupMode,
     openForgotMode,
     openVerifyResetMode,
     openResetPasswordMode,
   } = createLoginAuthModeActions(setAuthMode, {
+    setEmail,
+    setPassword,
     setName,
     setOtp,
+    setAcceptedTerms,
     setForgotEmail,
     setResetOtp,
     setNewPassword,
     setConfirmPassword,
   });
+
+  const openLoginModeRestored = () => {
+    openLoginMode();
+    restoreRememberedLogin();
+  };
 
   const {
     handleLogin,
@@ -125,8 +183,8 @@ export function useLoginAuth(onKeyboardVisibilityChange?: (isOpen: boolean) => v
     resendCooldown,
     resendCooldownSeconds,
     passwordRequirements,
-    login,
-    loginWithSocial,
+    login: loginWithRememberedEmail,
+    loginWithSocial: loginWithSocialRemembered,
     setIsSigningUp,
     setIsVerifying,
     setIsResending,
@@ -134,7 +192,7 @@ export function useLoginAuth(onKeyboardVisibilityChange?: (isOpen: boolean) => v
     setAuthMode,
     startResendCooldown,
     openVerifyMode,
-    openLoginMode,
+    openLoginMode: openLoginModeRestored,
     isEmailNotVerifiedMessage,
   });
 
@@ -162,7 +220,7 @@ export function useLoginAuth(onKeyboardVisibilityChange?: (isOpen: boolean) => v
     startForgotResendCooldown,
     openVerifyResetMode,
     openResetPasswordMode,
-    openLoginMode,
+    openLoginMode: openLoginModeRestored,
   });
 
   const handlePrimaryAction = () => {
@@ -206,7 +264,7 @@ export function useLoginAuth(onKeyboardVisibilityChange?: (isOpen: boolean) => v
     otp,
     setOtp,
     rememberMe,
-    setRememberMe,
+    setRememberMe: handleSetRememberMe,
     acceptedTerms,
     setAcceptedTerms,
     isPasswordVisible,
@@ -231,7 +289,8 @@ export function useLoginAuth(onKeyboardVisibilityChange?: (isOpen: boolean) => v
     otpExpiryMinutes,
     resetOtpExpiryMinutes,
     isSubmitting,
-    openLoginMode,
+    openLoginMode: openLoginModeRestored,
+    openSignupMode,
     openForgotMode,
     handlePrimaryAction,
     handleSocialLogin,

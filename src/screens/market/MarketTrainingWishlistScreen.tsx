@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 
 import {
   TRAINING_BORDER,
@@ -48,13 +48,7 @@ export function MarketTrainingWishlistScreen() {
 
   const items = apiWishlist.items;
   const loading = apiWishlist.isLoading && items.length === 0;
-  const refreshing = apiWishlist.isFetching && !loading;
-
-  useFocusEffect(
-    useCallback(() => {
-      void apiWishlist.refetch();
-    }, [apiWishlist.refetch]),
-  );
+  const [pullRefreshing, setPullRefreshing] = useState(false);
 
   return (
     <MarketTrainingScreenShell
@@ -62,9 +56,12 @@ export function MarketTrainingWishlistScreen() {
       title="Wishlist"
       refreshControl={
         <RefreshControl
-          refreshing={refreshing}
+          refreshing={pullRefreshing}
           onRefresh={() => {
-            void apiWishlist.refetch();
+            setPullRefreshing(true);
+            void apiWishlist.refetch().finally(() => {
+              setPullRefreshing(false);
+            });
           }}
           tintColor={TRAINING_TEAL}
         />

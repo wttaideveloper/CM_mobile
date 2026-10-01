@@ -63,14 +63,17 @@ const PDF_ICON_COLOR = '#EF4444';
 const DOC_ICON_COLOR = '#2563EB';
 
 function ReadReceipt({ status }: { status?: ChatMessage['status'] }) {
-  if (!status) return null;
+  const isRead = status === 'read';
 
-  if (status === 'sent') {
-    return <Ionicons name="checkmark" size={14} color="rgba(255,255,255,0.75)" />;
-  }
-
-  const tickColor = status === 'read' ? '#53BDEB' : 'rgba(255,255,255,0.85)';
-  return <Ionicons name="checkmark-done" size={15} color={tickColor} />;
+  return (
+    <View style={styles.readReceiptSlot}>
+      <Ionicons
+        name="checkmark-done"
+        size={14}
+        color={isRead ? '#53BDEB' : 'rgba(255,255,255,0.75)'}
+      />
+    </View>
+  );
 }
 
 function Reactions({
@@ -700,7 +703,7 @@ export function ChatMessageItem({
             {message.isEdited ? (
               <Text style={[styles.editedLabel, isUser && styles.userTime]}>edited</Text>
             ) : null}
-            {isUser && message.status ? <ReadReceipt status={message.status} /> : null}
+            {isUser ? <ReadReceipt status={message.status} /> : null}
           </View>
 
           {/*
@@ -776,6 +779,12 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   bubbleFooterUser: { marginLeft: 12 },
+  readReceiptSlot: {
+    width: 16,
+    height: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   bubbleTime: { fontSize: 10, fontWeight: '500', color: TEXT_MUTED },
   userTime: { color: 'rgba(255,255,255,0.75)' },
   editedLabel: { fontSize: 10, fontWeight: '600', color: TEXT_MUTED, fontStyle: 'italic' },

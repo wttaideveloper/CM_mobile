@@ -8,6 +8,7 @@ import {
   SETTINGS_BG,
   SETTINGS_GREEN,
 } from '@/components/settings/settingsDashData';
+import { useInsideTabLayout } from '@/hooks/useInsideTabLayout';
 import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
 export function ProfileSettingsScreen({
@@ -16,6 +17,7 @@ export function ProfileSettingsScreen({
   showBack?: boolean;
 }) {
   const scrollRef = useScrollToTopOnFocus();
+  const { screenOffsetStyle } = useInsideTabLayout();
   const [toggles, setToggles] = useState({
     push: true,
     digest: true,
@@ -24,20 +26,22 @@ export function ProfileSettingsScreen({
   });
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, showBack ? null : screenOffsetStyle]}>
       {showBack ? (
         <>
           <AppStatusBar variant="light" backgroundColor={SETTINGS_GREEN} />
           <StatusBarFill lightColor={SETTINGS_GREEN} darkColor={SETTINGS_GREEN} />
         </>
       ) : null}
+      <ProfileSettingsHeader showBack={showBack} />
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
         contentContainerStyle={styles.content}
       >
-        <ProfileSettingsHeader showBack={showBack} />
         <SettingsDashBody
           toggles={toggles}
           onToggle={(key) =>

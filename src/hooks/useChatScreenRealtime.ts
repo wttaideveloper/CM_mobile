@@ -1,13 +1,15 @@
-import { useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 
 import { API_CONFIG } from '@/config';
 import { SOCKET_SERVER_EVENTS } from '@/constants/socket.events';
 import type { ChatMessage } from '@/constants/chat';
 import { getSocket } from '@/services/socket/socket.client';
 import {
+  subscribeToMessageDeletedEvents,
+  subscribeToMessageUpdatedEvents,
   subscribeToNewMessageEvents,
 } from '@/services/socket/socket.message.service';
-import { markMessageReadViaSocket } from '@/services/socket/socket.typing.service';
+import { markMessageReadViaSocket, subscribeToTypingEvents } from '@/services/socket/socket.typing.service';
 import type { Conversation } from '@/types/conversation.types';
 import { mapApiMessageToChatMessage } from '@/utils/message.mapper';
 import { hydrateSingleChatMessageFromApi } from '@/utils/attachment.hydration';
@@ -38,12 +40,29 @@ export function useChatScreenRealtime({
   setIsOtherUserOnline,
   refreshOtherPresence,
 }: UseChatScreenRealtimeArgs) {
+  const [isAnyoneTyping, setIsAnyoneTyping] = useState(false);
+
+  useEffect(() => {
+    if (!isLiveConversation || !API_CONFIG.SOCKET_ENABLED) {
+      setIsAnyoneTyping(false);
+      return undefined;
+    }
+
+    const unsubscribeTyping = subscribeToTypingEvents((event) => {
+      if (event.conversation_id !== conversationId) return;
+      if (event.user_id && event.user_id === currentUserId) return;
+      setIsAnyoneTyping(Boolean(event.is_typing));
+    });
+
+    return () => {
+      unsubscribeTyping();
+      setIsAnyoneTyping(false);
+    };
+  }, [conversationId, currentUserId, isLiveConversation]);
+
   useEffect(() => {
       if (!isLiveConversation) return undefined;
       if (!API_CONFIG.SOCKET_ENABLED) return undefined;
-
-      const socket = getSocket();
-      if (!socket) return undefined;
 
       const unsubscribeNewMessage = subscribeToNewMessageEvents((apiMessage) => {
         if (apiMessage.conversation_id !== conversationId) return;
@@ -84,8 +103,62 @@ export function useChatScreenRealtime({
 
         // Mark received messages as read so the other party sees read status quickly.
         if (apiMessage.sender_id !== currentUserId && !apiMessage.is_deleted) {
-          void markMessageReadViaSocket(apiMessage.id);
+          void markMessageReadViaSocket(apiMessage.id, conversationId);
         }
+      });
+
+      const unsubscribeMessageUpdated = subscribeToMessageUpdatedEvents((apiMessage) => {
+        if (apiMessage.conversation_id !== conversationId) return;
+
+        setMessages((prev) => {
+          const index = prev.findIndex((m) => m.id === apiMessage.id);
+          if (index < 0) return prev;
+
+          const existing = prev[index];
+          const mapped = mapApiMessageToChatMessage(apiMessage, currentUserId);
+          const next = {
+            ...mapped,
+            attachment: mapped.attachment ?? existing.attachment,
+            voice: mapped.voice ?? existing.voice,
+            attachmentId: mapped.attachmentId ?? existing.attachmentId,
+            status: mapped.status ?? existing.status,
+          };
+
+          if (
+            next.text === existing.text &&
+            next.messageType === existing.messageType &&
+            next.isEdited === existing.isEdited &&
+            next.status === existing.status
+          ) {
+            return prev;
+          }
+
+          const copy = [...prev];
+          copy[index] = next;
+          return copy;
+        });
+      });
+
+      const unsubscribeMessageDeleted = subscribeToMessageDeletedEvents((event) => {
+        if (event.conversationId !== conversationId) return;
+
+        setMessages((prev) => {
+          let changed = false;
+          const next = prev.map((message) => {
+            if (message.id !== event.messageId || message.messageType === 'deleted') {
+              return message;
+            }
+            changed = true;
+            return {
+              ...message,
+              messageType: 'deleted' as const,
+              text: 'This message was deleted',
+              attachment: undefined,
+              voice: undefined,
+            };
+          });
+          return changed ? next : prev;
+        });
       });
 
       const onMessageRead = (payload: unknown) => {
@@ -170,6 +243,15 @@ export function useChatScreenRealtime({
         }
       };
 
+      const socket = getSocket();
+      if (!socket) {
+        return () => {
+          unsubscribeNewMessage();
+          unsubscribeMessageUpdated();
+          unsubscribeMessageDeleted();
+        };
+      }
+
       socket.on(SOCKET_SERVER_EVENTS.MESSAGE_READ, onMessageRead);
       socket.on(SOCKET_SERVER_EVENTS.CONVERSATION_UPDATED, onConversationUpdated);
       socket.on(SOCKET_SERVER_EVENTS.USER_ONLINE, onUserOnline);
@@ -178,6 +260,8 @@ export function useChatScreenRealtime({
 
       return () => {
         unsubscribeNewMessage();
+        unsubscribeMessageUpdated();
+        unsubscribeMessageDeleted();
         socket.off(SOCKET_SERVER_EVENTS.MESSAGE_READ, onMessageRead);
         socket.off(SOCKET_SERVER_EVENTS.CONVERSATION_UPDATED, onConversationUpdated);
         socket.off(SOCKET_SERVER_EVENTS.USER_ONLINE, onUserOnline);
@@ -194,4 +278,6 @@ export function useChatScreenRealtime({
       setIsOtherUserOnline,
       setMessages,
     ]);
+
+  return { isAnyoneTyping };
 }

@@ -16,7 +16,7 @@ export function HomeNotificationBell() {
   const loadUnreadCount = useCallback(async () => {
     try {
       const data = await fetchNotificationUnreadCount();
-      setUnreadNotifications(data.unread_count);
+      setUnreadNotifications(Math.max(0, Number(data.unread_count) || 0));
     } catch (error) {
       if (__DEV__) {
         console.error('[NOTIFICATIONS] Unread count API ← failed', error);
@@ -48,9 +48,11 @@ export function HomeNotificationBell() {
       <View style={styles.headerIconWrap}>
         <BellIcon size={HOME_BELL_ICON_SIZE} color={HOME_WHITE} />
       </View>
-      <View style={styles.headerIconBadge}>
-        <Text style={styles.headerIconBadgeText}>{badgeLabel}</Text>
-      </View>
+      {unreadNotifications > 0 ? (
+        <View style={styles.headerIconBadge}>
+          <Text style={styles.headerIconBadgeText}>{badgeLabel}</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }

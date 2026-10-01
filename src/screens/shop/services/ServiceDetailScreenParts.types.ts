@@ -7,9 +7,11 @@ export type SelectedBooking = {
 };
 
 export type ServiceViewModel = {
+  id: string;
   name: string;
   category: string;
   provider: string | null;
+  providerUserId: string | null;
   enterprise: string;
   duration: string;
   price: string;
@@ -65,9 +67,11 @@ export function mapApiServiceToViewModel(
         : service.enterpriseName;
 
   return {
+    id: service.id,
     name: service.name,
     category: service.category,
     provider: service.provider,
+    providerUserId: service.providerUserId,
     enterprise,
     duration: service.duration,
     price: formatServicePrice(service.price, service.currency),

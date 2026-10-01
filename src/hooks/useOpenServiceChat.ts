@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
 import { openServiceConversation } from '@/services/conversation.service';
@@ -13,7 +13,8 @@ type ServiceChatTarget = Pick<
 
 export function useOpenServiceChat() {
   const router = useRouter();
-  const [isOpening, setIsOpening] = useState(false);
+  const openingIdRef = useRef<string | null>(null);
+  const [openingServiceId, setOpeningServiceId] = useState<string | null>(null);
 
   const openServiceChat = useCallback(
     async (service: ServiceChatTarget) => {
@@ -23,15 +24,16 @@ export function useOpenServiceChat() {
         providerName: service.provider,
         providerUserId: service.providerUserId,
         enterpriseName: service.enterpriseName,
-        alreadyOpening: isOpening,
+        alreadyOpening: openingIdRef.current,
       });
 
-      if (isOpening) {
+      if (openingIdRef.current) {
         console.log('[ServiceChat] STEP 2 skipped — chat open already in progress');
         return;
       }
 
-      setIsOpening(true);
+      openingIdRef.current = service.id;
+      setOpeningServiceId(service.id);
       console.log('[ServiceChat] STEP 3 — calling openServiceConversation (POST /conversations)');
 
       try {
@@ -78,12 +80,17 @@ export function useOpenServiceChat() {
 
         Alert.alert('Chat unavailable', message);
       } finally {
-        setIsOpening(false);
+        openingIdRef.current = null;
+        setOpeningServiceId(null);
         console.log('[ServiceChat] STEP 8 — openServiceChat() finished (spinner cleared)');
       }
     },
-    [isOpening, router],
+    [router],
   );
 
-  return { openServiceChat, isOpeningChat: isOpening };
+  return {
+    openServiceChat,
+    openingServiceId,
+    isOpeningChat: openingServiceId != null,
+  };
 }

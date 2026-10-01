@@ -6,7 +6,22 @@ import { SOCKET_PATH, SOCKET_SERVER_EVENTS } from '@/constants/socket.events';
 
 let socket: Socket | null = null;
 let listenersAttached = false;
+let handshakeToken: string | null = null;
 let statusCheckTimer: ReturnType<typeof setTimeout> | null = null;
+const socketWatchers = new Set<(activeSocket: Socket) => void>();
+
+function notifySocketWatchers(activeSocket: Socket) {
+  socketWatchers.forEach((watcher) => watcher(activeSocket));
+}
+
+/** Runs now if a socket exists, and again whenever a socket is created. */
+export function watchSocket(watcher: (activeSocket: Socket) => void): () => void {
+  socketWatchers.add(watcher);
+  if (socket) watcher(socket);
+  return () => {
+    socketWatchers.delete(watcher);
+  };
+}
 
 function logSocketStatus(reason: string) {
   if (!__DEV__) return;
@@ -45,6 +60,7 @@ function attachDevListeners(activeSocket: Socket) {
     console.log('[Socket STATUS] ✅ CONNECTED (event: connect)', {
       id: activeSocket.id,
     });
+    notifySocketWatchers(activeSocket);
   });
 
   activeSocket.on('disconnect', (reason) => {
@@ -91,16 +107,28 @@ export function connectSocket(accessToken: string): Socket | null {
     return null;
   }
 
-  if (socket?.connected) {
-    socket.auth = { token: accessToken };
+  const token = accessToken.trim();
+  const tokenChanged = handshakeToken !== token;
+
+  if (socket?.connected && !tokenChanged) {
     if (__DEV__) {
       logSocketStatus('already connected — reuse');
     }
+    notifySocketWatchers(socket);
     return socket;
   }
 
   if (socket) {
-    socket.auth = { token: accessToken };
+    socket.auth = { token };
+    handshakeToken = token;
+
+    if (socket.connected && tokenChanged) {
+      if (__DEV__) {
+        console.log('[Socket STATUS] token changed — reconnecting handshake');
+      }
+      socket.disconnect();
+    }
+
     if (__DEV__) {
       console.log('[Socket STATUS] existing socket — calling connect()…');
     }
@@ -110,9 +138,10 @@ export function connectSocket(accessToken: string): Socket | null {
     return socket;
   }
 
+  handshakeToken = token;
   socket = io(API_CONFIG.SOCKET_URL, {
     path: SOCKET_PATH,
-    auth: { token: accessToken },
+    auth: { token },
     transports: Platform.OS === 'web' ? ['websocket', 'polling'] : ['polling', 'websocket'],
     autoConnect: true,
     reconnection: true,
@@ -120,6 +149,7 @@ export function connectSocket(accessToken: string): Socket | null {
   });
 
   attachDevListeners(socket);
+  notifySocketWatchers(socket);
 
   if (__DEV__) {
     console.log('[Socket STATUS] new socket — connecting…', {
@@ -138,6 +168,7 @@ export function disconnectSocket(): void {
   socket.disconnect();
   socket = null;
   listenersAttached = false;
+  handshakeToken = null;
   if (statusCheckTimer) {
     clearTimeout(statusCheckTimer);
     statusCheckTimer = null;

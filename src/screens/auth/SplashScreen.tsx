@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import * as ExpoSplashScreen from 'expo-splash-screen';
+import { useAuthStore } from '@/stores/auth.store';
 import {
   Animated,
   StyleSheet,
@@ -75,6 +76,12 @@ export function SplashScreen() {
   }, [logoOpacity, logoTranslateY]);
 
   useEffect(() => {
+    const preferLogin = useAuthStore.getState().consumePreferLoginOnAuthEntry();
+    if (preferLogin) {
+      router.replace('/(auth)/login');
+      return;
+    }
+
     const timer = setTimeout(() => {
       router.replace('/(auth)/onboarding');
     }, SPLASH_DURATION_MS);

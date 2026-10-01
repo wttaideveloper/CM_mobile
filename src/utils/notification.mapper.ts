@@ -1,6 +1,13 @@
+import type {
+  NotifFilter,
+  NotifGroupLabel,
+  NotifIconKind,
+  StaticNotification,
+} from '@/components/notifications/notificationsData';
 import type { UserNotificationItem } from '@/types/notification.types';
 import {
   formatISTShortDate,
+  isTodayIST,
   isYesterdayIST,
   parseApiDate,
 } from '@/utils/dateTime';
@@ -18,9 +25,13 @@ export type NotificationListItem = {
   read: boolean;
   conversationId?: string;
   messageId?: string;
+  createdAt?: string;
 };
 
-const NOTIFICATION_TYPE_ICON: Record<string, { emoji: string; backgroundColor: string }> = {
+const NOTIFICATION_TYPE_ICON: Record<
+  string,
+  { emoji: string; backgroundColor: string }
+> = {
   chat_message: { emoji: '💬', backgroundColor: '#EAF4EC' },
   booking: { emoji: '✅', backgroundColor: '#F0FDF4' },
   enterprise: { emoji: '🏢', backgroundColor: '#EAF4EC' },
@@ -31,6 +42,46 @@ const NOTIFICATION_TYPE_ICON: Record<string, { emoji: string; backgroundColor: s
 };
 
 const DEFAULT_NOTIFICATION_ICON = { emoji: '🔔', backgroundColor: '#F3F4F6' };
+
+const DASH_TYPE_STYLE: Record<
+  string,
+  {
+    icon: NotifIconKind;
+    color: string;
+    bg: string;
+    filter: Exclude<NotifFilter, 'All' | 'Unread'>;
+  }
+> = {
+  chat_message: {
+    icon: 'book',
+    color: '#2f7d32',
+    bg: '#e6f4e8',
+    filter: 'Chat',
+  },
+  booking: {
+    icon: 'award',
+    color: '#2f7d32',
+    bg: '#e6f4e8',
+    filter: 'Bookings',
+  },
+  event: { icon: 'sun', color: '#e08b00', bg: '#fff4e0', filter: 'Bookings' },
+  course: { icon: 'book', color: '#1e6fd9', bg: '#e8f0fe', filter: 'Courses' },
+  review: { icon: 'trend', color: '#e08b00', bg: '#fff4e0', filter: 'Other' },
+  enterprise: {
+    icon: 'trend',
+    color: '#2f7d32',
+    bg: '#e6f4e8',
+    filter: 'Other',
+  },
+  sale: { icon: 'trend', color: '#d94848', bg: '#fde8e8', filter: 'Other' },
+};
+
+const DEFAULT_DASH_STYLE = {
+  icon: 'drop' as NotifIconKind,
+  color: '#1e6fd9',
+  bg: '#e8f0fe',
+  filter: 'Other' as Exclude<NotifFilter, 'All' | 'Unread'>,
+};
 
 export function getNotificationTypeIcon(notificationType: string) {
   return NOTIFICATION_TYPE_ICON[notificationType] ?? DEFAULT_NOTIFICATION_ICON;
@@ -55,6 +106,14 @@ function formatNotificationTimestamp(iso: string): string {
   return formatISTShortDate(date);
 }
 
+function notificationGroup(iso: string): NotifGroupLabel {
+  const date = parseApiDate(iso);
+  if (Number.isNaN(date.getTime())) return 'EARLIER';
+  if (isTodayIST(date)) return 'TODAY';
+  if (isYesterdayIST(date)) return 'YESTERDAY';
+  return 'EARLIER';
+}
+
 function readStringField(
   data: Record<string, unknown> | null | undefined,
   key: string,
@@ -71,7 +130,9 @@ function pickDisplayType(item: UserNotificationItem): string {
   return item.notification_type?.trim() || 'notification';
 }
 
-export function mapUserNotificationItem(item: UserNotificationItem): NotificationListItem {
+export function mapUserNotificationItem(
+  item: UserNotificationItem,
+): NotificationListItem {
   const metadata = item.metadata ?? undefined;
 
   return {
@@ -85,9 +146,36 @@ export function mapUserNotificationItem(item: UserNotificationItem): Notificatio
     read: item.is_read,
     conversationId: readStringField(metadata, 'conversation_id'),
     messageId: readStringField(metadata, 'message_id'),
+    createdAt: item.created_at,
   };
 }
 
-export function mapUserNotificationItems(items: UserNotificationItem[]): NotificationListItem[] {
+export function mapUserNotificationItems(
+  items: UserNotificationItem[],
+): NotificationListItem[] {
   return items.map(mapUserNotificationItem);
+}
+
+/** Map inbox API rows into the dash notifications card model. */
+export function mapUserNotificationsToDashItems(
+  items: UserNotificationItem[],
+): StaticNotification[] {
+  return mapUserNotificationItems(items).map((item) => {
+    const style = DASH_TYPE_STYLE[item.notificationType] ?? DEFAULT_DASH_STYLE;
+    return {
+      id: item.id,
+      notificationId: item.notificationId,
+      group: notificationGroup(item.createdAt || ''),
+      filter: style.filter,
+      title: item.title,
+      body: item.description,
+      time: item.timestamp,
+      unread: !item.read,
+      color: style.color,
+      bg: style.bg,
+      icon: style.icon,
+      conversationId: item.conversationId,
+      notificationType: item.notificationType,
+    };
+  });
 }

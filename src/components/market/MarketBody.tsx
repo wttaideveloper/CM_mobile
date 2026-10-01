@@ -214,10 +214,20 @@ function FeaturedOfferCard({ offer }: { offer: MarketOffer }) {
               {isOpeningChat ? (
                 <ActivityIndicator size="small" color={MARKET_GREEN} />
               ) : (
-                <MarketChatIcon
-                  color={canChat ? MARKET_GREEN : MARKET_SOFT}
-                  size={16}
-                />
+                <>
+                  <MarketChatIcon
+                    color={canChat ? MARKET_GREEN : MARKET_SOFT}
+                    size={14}
+                  />
+                  <Text
+                    style={[
+                      styles.offerChatBtnText,
+                      { color: canChat ? MARKET_GREEN : MARKET_SOFT },
+                    ]}
+                  >
+                    Chat
+                  </Text>
+                </>
               )}
             </Pressable>
           ) : null}
@@ -644,12 +654,17 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   offerChatBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#e6f4e8',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: c(8, 6),
+    paddingVertical: c(4, 3),
+    borderRadius: 8,
+    backgroundColor: '#e6f4e8',
+  },
+  offerChatBtnText: {
+    fontSize: c(11, 10),
+    fontWeight: '700',
   },
   offerChatBtnDisabled: {
     opacity: 0.45,

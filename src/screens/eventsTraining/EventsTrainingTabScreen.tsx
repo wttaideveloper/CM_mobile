@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,10 +22,14 @@ import { MarketTrainingCard } from '@/components/market/MarketTrainingCard';
 import {
   MARKET_TRAININGS,
   TRAINING_GREEN,
+  TRAINING_LIST_FILTERS,
   TRAINING_MUTED,
+  deliveryModeQueryValue,
 } from '@/components/market/marketTrainingData';
 import { useTrainingsList } from '@/hooks/useTrainings';
 import { c, NU } from '@/utils/newUiCompact';
+
+type ProgramFilter = (typeof TRAINING_LIST_FILTERS)[number];
 
 function SectionHeader({
   label,
@@ -53,6 +58,8 @@ function SectionHeader({
 function TrainingPanel({ searchQuery }: { searchQuery: string }) {
   const insets = useSafeAreaInsets();
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [pulling, setPulling] = useState(false);
+  const [programFilter, setProgramFilter] = useState<ProgramFilter>('All');
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 350);
@@ -66,20 +73,22 @@ function TrainingPanel({ searchQuery }: { searchQuery: string }) {
     isError,
     error,
     refetch,
-    total,
   } = useTrainingsList({
     search: debouncedSearch || undefined,
+    delivery_mode: deliveryModeQueryValue(programFilter),
     page: 1,
     page_size: 50,
   });
 
   const isSearching = Boolean(debouncedSearch);
+  const refreshing = pulling;
+  const isFiltered = programFilter !== 'All';
 
   const staticItems = useMemo(() => {
-    if (isSearching) return [];
+    if (isSearching || isFiltered) return [];
     const apiIds = new Set(apiItems.map((item) => item.id));
     return MARKET_TRAININGS.filter((item) => !apiIds.has(item.id));
-  }, [apiItems, isSearching]);
+  }, [apiItems, isFiltered, isSearching]);
 
   return (
     <ScrollView
@@ -90,15 +99,53 @@ function TrainingPanel({ searchQuery }: { searchQuery: string }) {
         { paddingBottom: insets.bottom + 24 },
       ]}
       keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setPulling(true);
+            void refetch().finally(() => setPulling(false));
+          }}
+          tintColor={TRAINING_GREEN}
+        />
+      }
     >
       <View style={styles.trainingBody}>
+        <View style={styles.filterBlock}>
+          <Text style={styles.filterLabel}>Filter programs</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chips}
+          >
+            {TRAINING_LIST_FILTERS.map((item) => {
+              const active = item === programFilter;
+              return (
+                <Pressable
+                  key={item}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => setProgramFilter(item)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {item}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
         <SectionHeader
           label={isSearching ? 'Search results' : 'Live trainings'}
-          count={apiItems.length || total}
+          count={apiItems.length}
           hint={
             isSearching
               ? `Results for “${debouncedSearch}”`
-              : 'Pulled from /api/v1/trainings/'
+              : programFilter === 'All'
+                ? 'All programs'
+                : `${programFilter} programs`
           }
         />
 
@@ -133,7 +180,9 @@ function TrainingPanel({ searchQuery }: { searchQuery: string }) {
             <Text style={styles.stateText}>
               {isSearching
                 ? `No trainings found for “${debouncedSearch}”.`
-                : 'No API trainings yet.'}
+                : programFilter === 'All'
+                  ? 'No API trainings yet.'
+                  : `No ${programFilter.toLowerCase()} trainings yet.`}
             </Text>
           </View>
         ) : null}
@@ -148,7 +197,7 @@ function TrainingPanel({ searchQuery }: { searchQuery: string }) {
           <ActivityIndicator color={TRAINING_GREEN} style={styles.fetching} />
         ) : null}
 
-        {!isSearching ? (
+        {!isSearching && !isFiltered ? (
           <>
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
@@ -204,6 +253,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: NU.hPad,
     paddingTop: NU.bodyPadTop,
     gap: NU.cardGap,
+  },
+  filterBlock: {
+    gap: c(10, 8),
+  },
+  filterLabel: {
+    fontSize: NU.body,
+    fontWeight: '700',
+    letterSpacing: 1.3,
+    textTransform: 'uppercase',
+    color: EVENTS_TRAINING_MUTED,
+  },
+  chips: {
+    gap: c(8, 6),
+    paddingRight: NU.hPad,
+  },
+  chip: {
+    paddingVertical: c(8, 6),
+    paddingHorizontal: NU.rowGap,
+    borderRadius: 99,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: EVENTS_TRAINING_BORDER,
+  },
+  chipActive: {
+    backgroundColor: EVENTS_TRAINING_TEAL,
+    borderColor: EVENTS_TRAINING_TEAL,
+  },
+  chipText: {
+    fontSize: NU.chipFont,
+    fontWeight: '600',
+    color: EVENTS_TRAINING_MUTED,
+  },
+  chipTextActive: {
+    color: '#FFFFFF',
   },
   sectionHead: {
     gap: c(4, 3),

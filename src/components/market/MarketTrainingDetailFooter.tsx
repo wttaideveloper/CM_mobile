@@ -10,9 +10,11 @@ import {
 } from '@/components/market/marketTrainingData';
 import { c, NU } from '@/utils/newUiCompact';
 
+export type TrainingDetailFooterCta = 'enroll' | 'continue' | 'pending';
+
 type Props = {
   wishlisted?: boolean;
-  enrolled?: boolean;
+  cta?: TrainingDetailFooterCta;
   busy?: boolean;
   onToggleWishlist?: () => void;
   onEnroll?: () => void;
@@ -21,13 +23,14 @@ type Props = {
 
 export function MarketTrainingDetailFooter({
   wishlisted,
-  enrolled,
+  cta = 'enroll',
   busy,
   onToggleWishlist,
   onEnroll,
   onContinue,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const showWishlist = cta === 'enroll';
 
   return (
     <View
@@ -36,52 +39,63 @@ export function MarketTrainingDetailFooter({
         { paddingBottom: Math.max(insets.bottom, c(22, 18)) },
       ]}
     >
-      <Pressable
-        style={[
-          styles.wishBtn,
-          wishlisted && styles.wishBtnActive,
-          busy && styles.wishBtnBusy,
-        ]}
-        onPress={onToggleWishlist}
-        disabled={busy}
-        accessibilityRole="button"
-        accessibilityLabel={
-          wishlisted ? 'In wishlist — view wishlist' : 'Add to wishlist'
-        }
-        accessibilityState={{ selected: Boolean(wishlisted), busy }}
-      >
-        <View
-          style={[styles.wishIconWrap, wishlisted && styles.wishIconWrapActive]}
-        >
-          <MarketHeartIcon
-            color={wishlisted ? '#FFFFFF' : TRAINING_TEAL}
-            size={18}
-            filled={Boolean(wishlisted)}
-          />
-        </View>
-        <View style={styles.wishCopy}>
-          <Text
-            style={[styles.wishLabel, wishlisted && styles.wishLabelActive]}
-            numberOfLines={1}
-          >
-            {wishlisted ? 'In wishlist' : 'Wishlist'}
-          </Text>
-          <Text style={styles.wishHint} numberOfLines={1}>
-            {wishlisted ? 'View saved' : 'Save for later'}
-          </Text>
-        </View>
-      </Pressable>
-
-      {enrolled ? (
+      {showWishlist ? (
         <Pressable
-          style={styles.enrolledBtn}
+          style={[
+            styles.wishBtn,
+            wishlisted && styles.wishBtnActive,
+            busy && styles.wishBtnBusy,
+          ]}
+          onPress={onToggleWishlist}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel={
+            wishlisted ? 'In wishlist — view wishlist' : 'Add to wishlist'
+          }
+          accessibilityState={{ selected: Boolean(wishlisted), busy }}
+        >
+          <View
+            style={[styles.wishIconWrap, wishlisted && styles.wishIconWrapActive]}
+          >
+            <MarketHeartIcon
+              color={wishlisted ? '#FFFFFF' : TRAINING_TEAL}
+              size={18}
+              filled={Boolean(wishlisted)}
+            />
+          </View>
+          <View style={styles.wishCopy}>
+            <Text
+              style={[styles.wishLabel, wishlisted && styles.wishLabelActive]}
+              numberOfLines={1}
+            >
+              {wishlisted ? 'In wishlist' : 'Wishlist'}
+            </Text>
+            <Text style={styles.wishHint} numberOfLines={1}>
+              {wishlisted ? 'View saved' : 'Save for later'}
+            </Text>
+          </View>
+        </Pressable>
+      ) : null}
+
+      {cta === 'continue' ? (
+        <Pressable
+          style={styles.continueBtn}
           onPress={onContinue}
           accessibilityRole="button"
-          accessibilityLabel="Already enrolled — continue learning"
+          accessibilityLabel="Already enrolled — go to learning"
         >
-          <Text style={styles.enrolledEyebrow}>Already enrolled</Text>
-          <Text style={styles.enrolledText}>Continue learning</Text>
+          <Text style={styles.continueEyebrow}>Already enrolled</Text>
+          <Text style={styles.continueText}>Go to learning</Text>
         </Pressable>
+      ) : cta === 'pending' ? (
+        <View
+          style={styles.pendingBtn}
+          accessibilityRole="text"
+          accessibilityLabel="Waiting for admin approval"
+        >
+          <Text style={styles.pendingEyebrow}>Enrolment submitted</Text>
+          <Text style={styles.pendingText}>Waiting for approval</Text>
+        </View>
       ) : (
         <Pressable
           style={styles.enrollBtn}
@@ -166,27 +180,48 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  enrolledBtn: {
+  continueBtn: {
     flex: 1,
-    height: c(52, 48),
+    height: c(56, 52),
     borderRadius: c(16, 14),
-    backgroundColor: '#e8f6ec',
-    borderWidth: 1,
-    borderColor: '#b7dfc2',
+    backgroundColor: TRAINING_TEAL,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 1,
   },
-  enrolledEyebrow: {
+  continueEyebrow: {
     fontSize: c(10.5, 10),
     fontWeight: '700',
     letterSpacing: 0.4,
     textTransform: 'uppercase',
-    color: TRAINING_GREEN,
+    color: 'rgba(255,255,255,0.78)',
   },
-  enrolledText: {
+  continueText: {
+    fontSize: c(16, 15),
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  pendingBtn: {
+    flex: 1,
+    height: c(56, 52),
+    borderRadius: c(16, 14),
+    backgroundColor: '#eef3f0',
+    borderWidth: 1,
+    borderColor: '#d5e6da',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1,
+  },
+  pendingEyebrow: {
+    fontSize: c(10.5, 10),
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    color: TRAINING_MUTED,
+  },
+  pendingText: {
     fontSize: c(14, 13),
     fontWeight: '800',
-    color: TRAINING_GREEN,
+    color: TRAINING_TEAL,
   },
 });

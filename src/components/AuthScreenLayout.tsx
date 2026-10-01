@@ -4,6 +4,7 @@ import { Image, type ImageSource } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
+import { ChevronLeftIcon } from '@/components/dashboard/DashboardIcons';
 import { AUTH_BG_ONBOARDING } from '../constants/images';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -12,6 +13,8 @@ type AuthScreenLayoutProps = {
   children: ReactNode;
   showSkip?: boolean;
   onSkip?: () => void;
+  showBack?: boolean;
+  onBack?: () => void;
   /** Content starts at this fraction of the area below the status bar. */
   contentTopRatio?: number;
   backgroundImage?: ImageSource;
@@ -21,6 +24,8 @@ export function AuthScreenLayout({
   children,
   showSkip = false,
   onSkip,
+  showBack = false,
+  onBack,
   contentTopRatio = 0.6,
   backgroundImage = AUTH_BG_ONBOARDING,
 }: AuthScreenLayoutProps) {
@@ -42,6 +47,19 @@ export function AuthScreenLayout({
           priority="high"
           transition={0}
         />
+
+        {showBack && onBack && (
+          <Pressable
+            style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+            onPress={onBack}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            accessibilityHint="Returns to sign in"
+          >
+            <ChevronLeftIcon size={20} color="#FFFFFF" />
+          </Pressable>
+        )}
 
         {showSkip && onSkip && (
           <Pressable
@@ -73,6 +91,21 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     width: '100%',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 12,
+    left: 24,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#1B3D35',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  backButtonPressed: {
+    backgroundColor: '#0F241C',
   },
   skipButton: {
     position: 'absolute',

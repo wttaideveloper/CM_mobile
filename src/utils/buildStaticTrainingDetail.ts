@@ -53,6 +53,8 @@ type StaticDetailSource = {
   trainerName: string;
   trainerBio: string;
   trainerRole: string;
+  trainerPhoto?: string;
+  trainerCredentials?: string;
   imageUrl: string;
   sessionConcepts: Record<string, string[]>;
 };
@@ -294,6 +296,7 @@ export function buildStaticTrainingDetail(id?: string): TrainingDetailView {
   return {
     id: listItem.id,
     title: listItem.title,
+    subtitle: '',
     description: source.description,
     category: source.category,
     subcategory: source.subcategory,
@@ -322,10 +325,14 @@ export function buildStaticTrainingDetail(id?: string): TrainingDetailView {
     accessInfo: source.accessInfo,
     meetingProvider: source.meetingProvider,
     meetingLink: source.meetingLink,
+    meetingId: '',
+    meetingPasscode: '',
     venue: source.venue,
     address: source.address,
     priceLabel: listItem.priceLabel,
     priceType: listItem.priceLabel === 'Free' ? 'Free' : 'Paid',
+    promoPriceLabel: '',
+    couponCode: '',
     discountLabel: source.discountLabel,
     capacityMax: source.capacityMax,
     enrolled: source.enrolled,
@@ -334,12 +341,15 @@ export function buildStaticTrainingDetail(id?: string): TrainingDetailView {
     registrationStatus: source.registrationStatus,
     requiresApproval: listItem.mode === 'Hybrid',
     prerequisites: source.prerequisites,
+    faqs: [],
     objectives: source.objectives,
     enterpriseName: source.enterpriseName,
     enterpriseId: '',
     trainerName: source.trainerName,
     trainerBio: source.trainerBio,
     trainerRole: source.trainerRole,
+    trainerPhoto: source.trainerPhoto ?? '',
+    trainerCredentials: source.trainerCredentials ?? '',
     sessions: sessionsFor(listItem, source),
     materials: TRAINING_MATERIALS.map((material) => ({
       id: material.id,
@@ -353,6 +363,8 @@ export function buildStaticTrainingDetail(id?: string): TrainingDetailView {
     targetAudience: source.targetAudience,
     difficulty: source.difficulty,
     language: source.language,
+    accessDuration: '',
+    accessExpiry: '',
     averageRating: source.averageRating,
     reviewCount: source.reviewCount,
     offlineEnabled: source.offlineEnabled,
@@ -365,6 +377,12 @@ export function buildStaticTrainingDetail(id?: string): TrainingDetailView {
       title: note.title,
       url: note.url,
     })),
+    hasViewerEnrolment: false,
+    isEnrolled: false,
+    canContinueLearning: false,
+    isPendingApproval: false,
+    enrolmentStatus: null,
+    rejectionReason: '',
   };
 }
 

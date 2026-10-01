@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -17,17 +18,30 @@ import {
 } from '@/components/market/marketTrainingData';
 import {
   useCreateTrainingDiscussion,
-  useReplyTrainingDiscussion,
   useTrainingDiscussions,
 } from '@/hooks/useTrainings';
 import { useAuthStore } from '@/stores/auth.store';
 import type { TrainingDiscussionApiItem } from '@/types/training.types';
+import { asPlainText, clampDisplayText } from '@/utils/trainingLessonMedia';
 import { c, NU } from '@/utils/newUiCompact';
 
+const DISCUSSION_INPUT_PROPS = {
+  multiline: true,
+  textAlignVertical: 'top' as const,
+  maxLength: 4000,
+  scrollEnabled: true,
+  blurOnSubmit: false,
+  autoCorrect: false,
+  spellCheck: false,
+  autoCapitalize: 'sentences' as const,
+  maxFontSizeMultiplier: 1.25,
+} as const;
+
 function formatDiscussionDate(value?: string | null): string {
-  if (!value?.trim()) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.trim();
+  const raw = asPlainText(value);
+  if (!raw) return '';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
   return date.toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
@@ -37,14 +51,11 @@ function formatDiscussionDate(value?: string | null): string {
 
 /** Reply text — API uses `answer`; some payloads may alias as `reply`. */
 function discussionReplyText(item: TrainingDiscussionApiItem): string {
-  const fromAnswer = item.answer?.trim() ?? '';
-  if (fromAnswer) return fromAnswer;
-  const replyAlias = (item as { reply?: string | null }).reply?.trim() ?? '';
-  return replyAlias;
+  return asPlainText(item.answer) || asPlainText(item.reply);
 }
 
 function authorLabel(author?: string | null): string {
-  const raw = author?.trim() || 'Learner';
+  const raw = asPlainText(author, 'Learner');
   if (raw.includes('@')) {
     return raw.split('@')[0] || raw;
   }
@@ -54,29 +65,15 @@ function authorLabel(author?: string | null): string {
 function DiscussionCard({
   item,
   isOwn,
-  canReply,
-  replyOpen,
-  replyText,
-  replyPending,
-  onToggleReply,
-  onChangeReply,
-  onSubmitReply,
 }: {
   item: TrainingDiscussionApiItem;
   isOwn: boolean;
-  canReply: boolean;
-  replyOpen: boolean;
-  replyText: string;
-  replyPending: boolean;
-  onToggleReply: () => void;
-  onChangeReply: (value: string) => void;
-  onSubmitReply: () => void;
 }) {
   const displayName = authorLabel(item.author);
-  const question = item.question?.trim() || '—';
-  const reply = discussionReplyText(item);
+  const question = clampDisplayText(asPlainText(item.question, '—'), 2_000);
+  const reply = clampDisplayText(discussionReplyText(item), 2_000);
   const dateLabel = formatDiscussionDate(item.created_at);
-  const initial = displayName.charAt(0).toUpperCase() || 'Q';
+  const initial = (displayName.trim().charAt(0) || 'Q').toUpperCase();
 
   return (
     <View style={[styles.card, isOwn && styles.cardOwn]}>
@@ -107,68 +104,21 @@ function DiscussionCard({
         </Text>
       </View>
 
-      <Text style={styles.questionText}>{question}</Text>
+      <Text style={styles.questionText} selectable numberOfLines={12}>
+        {question}
+      </Text>
 
       {reply ? (
         <View style={styles.replyBox}>
-          <Text style={styles.replyBoxLabel}>Reply</Text>
-          <Text style={styles.replyBoxText}>{reply}</Text>
+          <Text style={styles.replyBoxText} selectable numberOfLines={12}>
+            {reply}
+          </Text>
         </View>
-      ) : isOwn ? (
-        <Text style={styles.waitingOwn}>
-          Waiting for someone to reply
-        </Text>
       ) : (
-        <Text style={styles.waitingOther}>No reply yet</Text>
+        <Text style={styles.waitingOwn}>
+          Waiting for a reply from the admin
+        </Text>
       )}
-
-      {canReply ? (
-        <>
-          <Pressable
-            style={styles.replyToggle}
-            onPress={onToggleReply}
-            accessibilityRole="button"
-          >
-            <Text style={styles.replyToggleText}>
-              {replyOpen
-                ? 'Cancel'
-                : reply
-                  ? 'Update reply'
-                  : 'Write a reply'}
-            </Text>
-          </Pressable>
-
-          {replyOpen ? (
-            <View style={styles.replyForm}>
-              <TextInput
-                style={styles.replyInput}
-                value={replyText}
-                onChangeText={onChangeReply}
-                placeholder="Share a helpful reply…"
-                placeholderTextColor={TRAINING_MUTED}
-                multiline
-                textAlignVertical="top"
-                editable={!replyPending}
-              />
-              <Pressable
-                style={[
-                  styles.replyBtn,
-                  (!replyText.trim() || replyPending) && styles.btnDisabled,
-                ]}
-                onPress={onSubmitReply}
-                disabled={!replyText.trim() || replyPending}
-                accessibilityRole="button"
-              >
-                {replyPending ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.replyBtnText}>Post reply</Text>
-                )}
-              </Pressable>
-            </View>
-          ) : null}
-        </>
-      ) : null}
     </View>
   );
 }
@@ -176,32 +126,33 @@ function DiscussionCard({
 export function TrainingDiscussionsPanel({
   trainingId,
   enabled,
+  onEnsureInputVisible,
 }: {
   trainingId: string;
   enabled: boolean;
+  /** Parent scroll should pin this view above the keyboard (My Learning). */
+  onEnsureInputVisible?: (target: View | null) => void;
 }) {
   const authEmail = useAuthStore((s) => s.user?.email?.trim().toLowerCase() || '');
   const discussionsQuery = useTrainingDiscussions(enabled ? trainingId : undefined);
   const createDiscussion = useCreateTrainingDiscussion(
     enabled ? trainingId : undefined,
   );
-  const replyDiscussion = useReplyTrainingDiscussion(
-    enabled ? trainingId : undefined,
-  );
 
   const [questionDraft, setQuestionDraft] = useState('');
-  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
-  const [openReplyId, setOpenReplyId] = useState<string | null>(null);
+  const askFormRef = useRef<View>(null);
 
   const { mine, others } = useMemo(() => {
-    const all = discussionsQuery.discussions;
+    const all = discussionsQuery.discussions.filter(
+      (item) => item && asPlainText(item.id),
+    );
     if (!authEmail) {
       return { mine: [] as TrainingDiscussionApiItem[], others: all };
     }
     const mineList: TrainingDiscussionApiItem[] = [];
     const otherList: TrainingDiscussionApiItem[] = [];
     for (const item of all) {
-      const author = item.author?.trim().toLowerCase() ?? '';
+      const author = asPlainText(item.author).toLowerCase();
       if (author && author === authEmail) {
         mineList.push(item);
       } else {
@@ -224,7 +175,7 @@ export function TrainingDiscussionsPanel({
 
   const isOwnItem = (item: TrainingDiscussionApiItem) => {
     if (!authEmail) return false;
-    return (item.author?.trim().toLowerCase() ?? '') === authEmail;
+    return (asPlainText(item.author).toLowerCase()) === authEmail;
   };
 
   const onAsk = async () => {
@@ -241,51 +192,14 @@ export function TrainingDiscussionsPanel({
     }
   };
 
-  const onReply = async (discussionId: string) => {
-    const answer = (replyDrafts[discussionId] ?? '').trim();
-    if (!answer || replyDiscussion.isPending) return;
-    try {
-      await replyDiscussion.mutateAsync({ discussionId, answer });
-      setReplyDrafts((current) => {
-        const next = { ...current };
-        delete next[discussionId];
-        return next;
-      });
-      setOpenReplyId(null);
-    } catch {
-      Alert.alert(
-        'Could not reply',
-        'Something went wrong while posting the reply. Try again.',
-      );
-    }
-  };
-
   const renderCard = (item: TrainingDiscussionApiItem) => {
-    const own = isOwnItem(item);
+    const itemId = asPlainText(item.id);
+    if (!itemId) return null;
     return (
       <DiscussionCard
-        key={item.id}
+        key={itemId}
         item={item}
-        isOwn={own}
-        canReply={!own}
-        replyOpen={openReplyId === item.id}
-        replyText={replyDrafts[item.id] ?? ''}
-        replyPending={
-          replyDiscussion.isPending &&
-          replyDiscussion.variables?.discussionId === item.id
-        }
-        onToggleReply={() =>
-          setOpenReplyId((current) => (current === item.id ? null : item.id))
-        }
-        onChangeReply={(value) =>
-          setReplyDrafts((current) => ({
-            ...current,
-            [item.id]: value,
-          }))
-        }
-        onSubmitReply={() => {
-          void onReply(item.id);
-        }}
+        isOwn={isOwnItem(item)}
       />
     );
   };
@@ -296,7 +210,7 @@ export function TrainingDiscussionsPanel({
         <View style={styles.headerCopy}>
           <Text style={styles.label}>Discussions</Text>
           <Text style={styles.help}>
-            Ask questions and reply to other learners
+            Ask questions about this training
           </Text>
         </View>
         <View style={styles.countBadge}>
@@ -304,20 +218,26 @@ export function TrainingDiscussionsPanel({
         </View>
       </View>
 
-      <View style={styles.askCard}>
+      <View ref={askFormRef} style={styles.askCard}>
         <Text style={styles.askTitle}>Ask a question</Text>
         <Text style={styles.askHint}>
-          Your question is visible to the group. You can’t reply to your own
-          posts.
+          Your question is visible to the group.
         </Text>
         <TextInput
-          style={styles.askInput}
+          {...DISCUSSION_INPUT_PROPS}
+          style={[
+            styles.askInput,
+            Platform.OS === 'ios' && styles.askInputFixed,
+          ]}
           value={questionDraft}
-          onChangeText={setQuestionDraft}
+          onChangeText={(value) =>
+            setQuestionDraft(typeof value === 'string' ? value : '')
+          }
+          onFocus={() => {
+            onEnsureInputVisible?.(askFormRef.current);
+          }}
           placeholder="What would you like clarified?"
           placeholderTextColor={TRAINING_MUTED}
-          multiline
-          textAlignVertical="top"
           editable={!posting}
         />
         <Pressable
@@ -449,6 +369,7 @@ const styles = StyleSheet.create({
   },
   askInput: {
     minHeight: c(72, 64),
+    maxHeight: c(160, 140),
     borderWidth: 1,
     borderColor: TRAINING_BORDER,
     borderRadius: NU.cardRadiusSm,
@@ -457,6 +378,11 @@ const styles = StyleSheet.create({
     fontSize: c(13.5, 12.5),
     color: TRAINING_TEAL,
     backgroundColor: '#fafbfc',
+  },
+  askInputFixed: {
+    height: 96,
+    minHeight: 96,
+    maxHeight: 96,
   },
   askBtn: {
     alignSelf: 'flex-start',
@@ -604,6 +530,7 @@ const styles = StyleSheet.create({
     lineHeight: c(20, 18),
     fontWeight: '600',
     color: TRAINING_TEAL,
+    flexShrink: 1,
   },
   replyBox: {
     backgroundColor: '#FFFFFF',
@@ -615,13 +542,6 @@ const styles = StyleSheet.create({
     padding: c(10, 8),
     gap: c(4, 3),
   },
-  replyBoxLabel: {
-    fontSize: c(10.5, 9.5),
-    fontWeight: '800',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-    color: TRAINING_GREEN,
-  },
   replyBoxText: {
     fontSize: c(13, 12),
     lineHeight: c(18, 16),
@@ -632,47 +552,5 @@ const styles = StyleSheet.create({
     color: TRAINING_MUTED,
     fontWeight: '600',
     fontStyle: 'italic',
-  },
-  waitingOther: {
-    fontSize: c(12, 11),
-    color: TRAINING_MUTED,
-    fontWeight: '500',
-  },
-  replyToggle: {
-    alignSelf: 'flex-start',
-    paddingVertical: c(2, 1),
-  },
-  replyToggleText: {
-    fontSize: c(12.5, 11.5),
-    fontWeight: '800',
-    color: '#1f6f8b',
-  },
-  replyForm: {
-    gap: c(8, 6),
-  },
-  replyInput: {
-    minHeight: c(64, 56),
-    borderWidth: 1,
-    borderColor: TRAINING_BORDER,
-    borderRadius: NU.cardRadiusSm,
-    paddingHorizontal: c(10, 8),
-    paddingVertical: c(8, 7),
-    fontSize: c(13, 12),
-    color: TRAINING_TEAL,
-    backgroundColor: '#fafbfc',
-  },
-  replyBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: TRAINING_GREEN,
-    borderRadius: NU.cardRadiusSm,
-    paddingHorizontal: c(14, 12),
-    paddingVertical: c(9, 8),
-    minWidth: c(100, 90),
-    alignItems: 'center',
-  },
-  replyBtnText: {
-    fontSize: c(12.5, 11.5),
-    fontWeight: '800',
-    color: '#FFFFFF',
   },
 });

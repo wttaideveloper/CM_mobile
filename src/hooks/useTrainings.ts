@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { trainingService } from '@/services/training.service';
@@ -58,6 +59,12 @@ export function useMarketTrainingsPreview() {
     retry: 1,
   });
 
+  useFocusEffect(
+    useCallback(() => {
+      void query.refetch();
+    }, [query.refetch]),
+  );
+
   const items = useMemo(
     () => mapTrainingsApiToListItems(query.data?.items).slice(0, 2),
     [query.data?.items],
@@ -85,6 +92,12 @@ export function useTrainingsList(params: TrainingListQuery = {}) {
     gcTime: 5 * 60_000,
     retry: 1,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      void query.refetch();
+    }, [query.refetch]),
+  );
 
   const items = useMemo(
     () => mapTrainingsApiToListItems(query.data?.items),
@@ -131,10 +144,17 @@ export function useTrainingContent(id?: string) {
     retry: 1,
   });
 
-  const path = useMemo(
-    () => (query.data ? mapTrainingContentToProgressPath(query.data) : null),
-    [query.data],
-  );
+  const path = useMemo(() => {
+    if (!query.data) return null;
+    try {
+      return mapTrainingContentToProgressPath(query.data);
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[training-content] map failed', error);
+      }
+      return null;
+    }
+  }, [query.data]);
 
   return {
     ...query,
@@ -419,8 +439,14 @@ function isActiveEnrolmentStatus(status?: string | null): boolean {
     key === 'active' ||
     key === 'completed' ||
     key === 'pending_approval' ||
+    key === 'pending' ||
     key === 'approved'
   );
+}
+
+function isPendingApprovalStatus(status?: string | null): boolean {
+  const key = (status ?? '').trim().toLowerCase();
+  return key === 'pending_approval' || key === 'pending';
 }
 
 /** GET /api/v1/trainings/my/enrolments */
@@ -443,10 +469,24 @@ export function useMyTrainingEnrolments(status?: string) {
     return set;
   }, [query.data]);
 
+  const statusByTrainingId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of query.data ?? []) {
+      const id = enrolmentTrainingId(row);
+      if (!id) continue;
+      map.set(id, (row.status ?? '').trim().toLowerCase());
+    }
+    return map;
+  }, [query.data]);
+
   return {
     ...query,
     items: query.data ?? [],
     enrolledIds,
+    enrolmentStatus: (trainingId?: string | null) =>
+      trainingId ? statusByTrainingId.get(trainingId) ?? null : null,
+    isPendingApproval: (trainingId?: string | null) =>
+      Boolean(trainingId && isPendingApprovalStatus(statusByTrainingId.get(trainingId))),
     isEnrolled: (trainingId?: string | null) =>
       Boolean(trainingId && enrolledIds.has(trainingId)),
   };
@@ -553,9 +593,6 @@ export function useToggleTrainingWishlist() {
         );
       }
     },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: trainingKeys.wishlist() });
-    },
   });
 }
 
@@ -589,6 +626,7 @@ export function useSubmitTrainingReview(trainingId?: string) {
       rating: number;
       comment: string;
       participant_email: string;
+      participant_name?: string | null;
     }) => {
       if (!trainingId) {
         return Promise.reject(new Error('Missing training id'));

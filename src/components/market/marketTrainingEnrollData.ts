@@ -10,8 +10,13 @@ export const TRAINING_CHECKOUT_STATIC = {
   title: 'Confirm enrollment',
   paymentLabel: 'Visa ···· 4412',
   paymentMeta: 'Expires 04/29',
-  note: 'Calls POST /trainings/{id}/enroll (falls back to /enrol). Static confirm if API is unavailable.',
+  note: 'Your details stay private. You’ll get access as soon as enrollment is confirmed.',
   confirmLabel: 'Confirm & enroll',
+};
+
+export const TRAINING_CHECKOUT_FREE = {
+  title: 'Free enrollment',
+  note: 'This program is free. Confirm to enroll — no payment is required.',
 };
 
 export const TRAINING_ENROLLED_STATIC = {

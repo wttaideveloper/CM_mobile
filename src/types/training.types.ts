@@ -78,6 +78,7 @@ export type TrainingApiItem = {
   enterprise_name?: string | null;
   location_id?: string | null;
   title?: string | null;
+  subtitle?: string | null;
   description?: string | null;
   category?: string | null;
   subcategory?: string | null;
@@ -85,17 +86,24 @@ export type TrainingApiItem = {
   instructor_id?: string | null;
   instructor_name?: string | null;
   instructor_bio?: string | null;
+  instructor_photo?: string | null;
+  instructor_credentials?: string | null;
   instructor?: {
     id?: string | null;
     name?: string | null;
     bio?: string | null;
     role?: string | null;
+    photo?: string | null;
+    credentials?: string | null;
   } | null;
   delivery_mode?: string | null;
   delivery_instructions?: string | null;
   access_information?: string | null;
   meeting_link?: string | null;
   meeting_provider?: string | null;
+  meeting_platform?: string | null;
+  meeting_id?: string | null;
+  meeting_passcode?: string | null;
   venue?: string | null;
   address?: string | null;
   course_type?: string | null;
@@ -123,7 +131,13 @@ export type TrainingApiItem = {
   schedule_exceptions?: string | null;
   promo_price?: string | number | null;
   coupon_code?: string | null;
+  access_duration_days?: string | number | null;
+  access_expiry_days?: string | number | null;
   requirements?: string | null;
+  faqs?: {
+    question?: string | null;
+    answer?: string | null;
+  }[] | null;
   learning_objectives?: string[] | null;
   requires_approval?: boolean | null;
   target_audience?: string | null;
@@ -134,6 +148,10 @@ export type TrainingApiItem = {
   average_rating?: string | number | null;
   review_count?: string | number | null;
   reviews_count?: string | number | null;
+  /** Signed-in viewer enrolment on GET /trainings/{id} */
+  is_enrolled?: boolean | string | null;
+  enrolment_status?: string | null;
+  rejection_reason?: string | null;
   offline_enabled?: boolean | null;
   offline_access_enabled?: boolean | null;
   notes_pdf_url?: string | null;
@@ -143,6 +161,8 @@ export type TrainingApiItem = {
   reviews?: {
     id?: string;
     author?: string | null;
+    participant_name?: string | null;
+    participant_email?: string | null;
     rating?: string | number | null;
     comment?: string | null;
     created_at?: string | null;
@@ -243,6 +263,7 @@ export type TrainingReviewApiItem = {
   rating: number;
   comment?: string | null;
   participant_email?: string | null;
+  participant_name?: string | null;
   verified?: boolean | null;
   created_at?: string | null;
 };
@@ -257,6 +278,7 @@ export type TrainingReviewCreateBody = {
   rating: number;
   comment: string;
   participant_email: string;
+  participant_name?: string | null;
 };
 
 export type TrainingReviewView = {
@@ -331,8 +353,13 @@ export type TrainingListResult = {
 export type TrainingContentMediaFileApi =
   | string
   | {
+      id?: string | null;
       url?: string | null;
       name?: string | null;
+      title?: string | null;
+      type?: string | null;
+      size?: string | number | null;
+      file_size?: string | number | null;
       visibility?: string | null;
       downloadable?: boolean | null;
     };
@@ -367,6 +394,13 @@ export type TrainingContentLessonApi = {
   address?: string | null;
   pass_code?: string | null;
   check_in_window?: string | null;
+  /** Optional live/venue schedule fields */
+  schedule?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  scheduled_at?: string | null;
   /** Lesson-wise live/venue attendance from content API */
   is_attended?: boolean | null;
   attended_at?: string | null;
@@ -407,6 +441,11 @@ export type TrainingContentSectionApi = {
   title?: string | null;
   summary?: string | null;
   schedule?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  scheduled_at?: string | null;
   is_unlocked?: boolean | null;
   unlock_hint?: string | null;
   meeting_link?: string | null;
@@ -614,6 +653,8 @@ export type TrainingCertificateApi = {
 export type TrainingDetailView = {
   id: string;
   title: string;
+  /** Enterprise `subtitle` — shown under the title when present. */
+  subtitle: string;
   description: string;
   category: string;
   subcategory: string;
@@ -642,10 +683,14 @@ export type TrainingDetailView = {
   accessInfo: string;
   meetingProvider: string;
   meetingLink: string;
+  meetingId: string;
+  meetingPasscode: string;
   venue: string;
   address: string;
   priceLabel: string;
   priceType: string;
+  promoPriceLabel: string;
+  couponCode: string;
   discountLabel: string;
   capacityMax: string;
   enrolled: string;
@@ -654,12 +699,19 @@ export type TrainingDetailView = {
   registrationStatus: string;
   requiresApproval: boolean;
   prerequisites: string;
+  faqs: {
+    id: string;
+    question: string;
+    answer: string;
+  }[];
   objectives: string[];
   enterpriseName: string;
   enterpriseId: string;
   trainerName: string;
   trainerBio: string;
   trainerRole: string;
+  trainerPhoto: string;
+  trainerCredentials: string;
   sessions: {
     id: string;
     name: string;
@@ -694,6 +746,8 @@ export type TrainingDetailView = {
   targetAudience: string;
   difficulty: string;
   language: string;
+  accessDuration: string;
+  accessExpiry: string;
   averageRating: number | null;
   reviewCount: number;
   offlineEnabled: boolean;
@@ -722,5 +776,14 @@ export type TrainingDetailView = {
     id: string;
     title: string;
     url: string;
+    /** Human-readable size when API sends `size` / `file_size`. */
+    sizeLabel?: string;
   }[];
+  /** Viewer enrolment from GET /trainings/{id} (`is_enrolled`, `enrolment_status`). */
+  hasViewerEnrolment: boolean;
+  isEnrolled: boolean;
+  canContinueLearning: boolean;
+  isPendingApproval: boolean;
+  enrolmentStatus: string | null;
+  rejectionReason: string;
 };

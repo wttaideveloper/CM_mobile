@@ -1,9 +1,12 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { EmptyState } from '@/components/EmptyState';
 import { LeafyGradientButton } from '@/components/LeafyGradientButton';
+import { MessageSquareIcon } from '@/components/dashboard/DashboardIcons';
+import { useOpenServiceChat } from '@/hooks/useOpenServiceChat';
 import type { ServiceDetailSlot } from '@/types/service.types';
 import {
+  PRIMARY,
   TIME_SLOT_COLS,
   styles,
 } from '@/screens/shop/services/ServiceDetailScreen.styles';
@@ -185,18 +188,55 @@ export function ServiceDetailContent({
 }
 
 export function ServiceDetailFooter({
+  service,
   selectedBooking,
   price,
   paddingBottom,
   onBook,
 }: {
+  service: ServiceViewModel;
   selectedBooking: SelectedBooking | null;
   price: string;
   paddingBottom: number;
   onBook: () => void;
 }) {
+  const { openServiceChat, isOpeningChat } = useOpenServiceChat();
+  const providerUserId = service.providerUserId?.trim() || null;
+  const canChat = Boolean(providerUserId);
+
+  const openChat = () => {
+    if (!providerUserId) {
+      Alert.alert('Chat unavailable', 'This service has no provider to chat with.');
+      return;
+    }
+    void openServiceChat({
+      id: service.id,
+      name: service.name,
+      provider: service.provider,
+      providerUserId,
+      enterpriseName: service.enterprise,
+    });
+  };
+
   return (
     <View style={[styles.footer, { paddingBottom, paddingTop: 12 }]}>
+      <Pressable
+        onPress={openChat}
+        disabled={isOpeningChat || !canChat}
+        accessibilityRole="button"
+        accessibilityLabel="Chat"
+        accessibilityState={{ disabled: isOpeningChat || !canChat }}
+        style={[styles.footerChatBtn, (isOpeningChat || !canChat) && styles.footerChatBtnDisabled]}
+      >
+        {isOpeningChat ? (
+          <ActivityIndicator size="small" color={PRIMARY} />
+        ) : (
+          <>
+            <MessageSquareIcon size={16} color={PRIMARY} />
+            <Text style={styles.footerChatBtnText}>Chat</Text>
+          </>
+        )}
+      </Pressable>
       {selectedBooking ? (
         <LeafyGradientButton style={styles.footerBtn} borderRadius={14} onPress={onBook}>
           <Text style={styles.footerBtnText}>

@@ -24,7 +24,7 @@ export async function markChatConversationAndMessagesRead(
 
   const messageId = latestIncomingMessageId ?? activeLatestIncomingMessageId;
   if (messageId) {
-    await markMessageReadViaRest(messageId).catch((error) => {
+    await markMessageReadViaRest(messageId, conversationId).catch((error) => {
       if (__DEV__) {
         console.warn('[ChatRead] Message mark read failed:', error);
       }

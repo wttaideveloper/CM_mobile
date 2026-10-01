@@ -37,6 +37,7 @@ import {
   type ChatMessage,
 } from '@/constants/chat';
 import { API_CONFIG } from '@/config';
+import { formatISTTime } from '@/utils/dateTime';
 import { useChatPresence } from '@/hooks/useChatPresence';
 import { useAuthStore } from '@/stores/auth.store';
 import { useChatCamera } from '@/hooks/useChatCamera';
@@ -44,7 +45,6 @@ import { useChatScreenRealtime } from '@/hooks/useChatScreenRealtime';
 import { useConversationRoom } from '@/hooks/useConversationRoom';
 import { useConversationTyping } from '@/hooks/useConversationTyping';
 import { useRemoteTypingUsers } from '@/hooks/useRemoteTypingUsers';
-import { useSocketTyping } from '@/hooks/useSocketTyping';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import {
   markChatConversationAndMessagesRead,
@@ -57,7 +57,6 @@ import {
   reopenConversation,
 } from '@/services/conversation.service';
 import { editMessage, fetchConversationMessages, deleteMessage } from '@/services/message.service';
-import { markMessageReadViaSocket } from '@/services/socket/socket.typing.service';
 import {
   sendMessageViaSocket,
 } from '@/services/socket/socket.message.service';
@@ -349,10 +348,15 @@ export function ChatScreen() {
     useSocket: socketTypingEnabled,
   });
 
-  const { isAnyoneTyping: socketAnyoneTyping } = useSocketTyping({
+  const { isAnyoneTyping: socketAnyoneTyping } = useChatScreenRealtime({
     conversationId,
     currentUserId,
-    enabled: socketTypingEnabled && isLiveConversation,
+    isLiveConversation,
+    otherUserId,
+    setMessages,
+    setApiConversation,
+    setIsOtherUserOnline,
+    refreshOtherPresence,
   });
 
   const { isAnyoneTyping: restAnyoneTyping } = useRemoteTypingUsers({
@@ -531,18 +535,20 @@ export function ChatScreen() {
         setNextCursor(response.pagination.next_cursor);
         setHasOlder(response.pagination.has_more);
 
-        if (API_CONFIG.SOCKET_ENABLED && currentUserId) {
-          const unreadIncoming = response.items.filter(
-            (message) =>
-              message.sender_id !== currentUserId &&
-              !message.is_deleted &&
-              !message.read_by.includes(currentUserId),
-          );
-          const latestUnread = unreadIncoming.at(-1);
+        const incoming = currentUserId
+          ? response.items.filter(
+              (message) =>
+                message.sender_id !== currentUserId && !message.is_deleted,
+            )
+          : [];
+        const latestIncoming = incoming.at(-1);
+        const latestUnread = incoming
+          .filter((message) => !message.read_by.includes(currentUserId))
+          .at(-1);
 
-          if (latestUnread) {
-            void markMessageReadViaSocket(latestUnread.id);
-          }
+        const messageToMark = latestUnread?.id ?? latestIncoming?.id;
+        if (messageToMark) {
+          void markChatConversationAndMessagesRead(conversationId, messageToMark);
         }
       })
       .catch((error) => {
@@ -560,17 +566,6 @@ export function ChatScreen() {
       cancelled = true;
     };
   }, [conversationId, currentUserId, initialMessages, isLiveConversation, meta.hasOlderMessages]);
-
-  useChatScreenRealtime({
-    conversationId,
-    currentUserId,
-    isLiveConversation,
-    otherUserId,
-    setMessages,
-    setApiConversation,
-    setIsOtherUserOnline,
-    refreshOtherPresence,
-  });
 
   useEffect(() => {
     if (!isLiveConversation) return undefined;
@@ -943,6 +938,19 @@ export function ChatScreen() {
     setDraft('');
     setIsSending(true);
 
+    const pendingId = `socket-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: pendingId,
+        text,
+        sender: 'user',
+        timestamp: formatISTTime(new Date()),
+        status: 'sent',
+        messageType: 'text',
+      },
+    ]);
+
     try {
       const sentMessage = await sendMessageViaSocket({
         content: text,
@@ -952,10 +960,12 @@ export function ChatScreen() {
 
       const mapped = mapApiMessageToChatMessage(sentMessage, currentUserId);
       setMessages((prev) => {
-        if (prev.some((m) => m.id === mapped.id)) return prev;
-        return [...prev, mapped];
+        const withoutPending = prev.filter((m) => m.id !== pendingId);
+        if (withoutPending.some((m) => m.id === mapped.id)) return withoutPending;
+        return [...withoutPending, mapped];
       });
     } catch (error) {
+      setMessages((prev) => prev.filter((m) => m.id !== pendingId));
       setDraft(text);
 
       const message =

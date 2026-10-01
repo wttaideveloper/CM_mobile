@@ -14,8 +14,12 @@ export const SOCKET_CLIENT_EVENTS = {
 
 export const SOCKET_SERVER_EVENTS = {
   NEW_MESSAGE: 'new_message',
+  MESSAGE_UPDATED: 'message_updated',
+  MESSAGE_DELETED: 'message_deleted',
   MESSAGE_READ: 'message_read',
   TYPING: 'typing',
+  TYPING_START: 'typing_start',
+  TYPING_STOP: 'typing_stop',
   CONVERSATION_UPDATED: 'conversation_updated',
   USER_ONLINE: 'user_online',
   USER_OFFLINE: 'user_offline',

@@ -32,6 +32,8 @@ import type {
 } from '@/types/training.types';
 import { mapTrainingApiToDetailView } from '@/utils/marketTraining.mapper';
 import { mapTrainingReviewsResponse } from '@/utils/marketTrainingReviews.mapper';
+import { asPlainText } from '@/utils/trainingLessonMedia';
+import { normalizeTrainingDiscussion, normalizeTrainingDiscussions } from '@/utils/trainingDiscussions.mapper';
 
 function buildListParams(query: TrainingListQuery) {
   const params: Record<string, string | number> = {};
@@ -156,7 +158,14 @@ export const trainingService = {
     const response = await apiClient.get<TrainingApiItem>(
       ENDPOINTS.TRAININGS.GET_BY_ID(id),
     );
-    return mapTrainingApiToDetailView(response.data);
+    try {
+      return mapTrainingApiToDetailView(response.data);
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[training-detail] map failed', error);
+      }
+      throw error;
+    }
   },
 
   /**
@@ -171,8 +180,9 @@ export const trainingService = {
     try {
       return await postEnroll(ENDPOINTS.TRAININGS.ENROLL(id), id, body);
     } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response
-        ?.status;
+      const status =
+        (error as ApiError | undefined)?.statusCode ??
+        (error as { response?: { status?: number } })?.response?.status;
       if (status === 404) {
         return postEnroll(ENDPOINTS.TRAININGS.ENROL(id), id, body);
       }
@@ -216,18 +226,41 @@ export const trainingService = {
 
   /** GET /api/v1/trainings/{training_id}/content */
   getContent: async (trainingId: string): Promise<TrainingContentApiResponse> => {
-    const response = await apiClient.get<TrainingContentApiResponse>(
-      ENDPOINTS.TRAININGS.CONTENT(trainingId),
-    );
-    return response.data;
+    try {
+      const response = await apiClient.get<TrainingContentApiResponse>(
+        ENDPOINTS.TRAININGS.CONTENT(trainingId),
+      );
+      return response.data ?? { training_id: trainingId, sections: [] };
+    } catch (error) {
+      const status =
+        (error as ApiError | undefined)?.statusCode ??
+        (error as { response?: { status?: number } })?.response?.status;
+      // Let React Query surface a retryable error — do not throw raw Axios.
+      if (status === 0) {
+        throw {
+          message: 'Network error. Please check your connection.',
+          statusCode: 0,
+        };
+      }
+      throw error;
+    }
   },
 
   /** GET /api/v1/trainings/{training_id}/progress */
   getProgress: async (trainingId: string): Promise<TrainingProgressApiResponse> => {
-    const response = await apiClient.get<TrainingProgressApiResponse>(
-      ENDPOINTS.TRAININGS.PROGRESS(trainingId),
-    );
-    return response.data;
+    try {
+      const response = await apiClient.get<TrainingProgressApiResponse>(
+        ENDPOINTS.TRAININGS.PROGRESS(trainingId),
+      );
+      return response.data ?? {};
+    } catch (error) {
+      const status =
+        (error as ApiError | undefined)?.statusCode ??
+        (error as { response?: { status?: number } })?.response?.status;
+      // Soft-fail network/404 so My Learning still renders from content.
+      if (status === 0 || status === 404) return { training_id: trainingId };
+      throw error;
+    }
   },
 
   /**
@@ -358,6 +391,9 @@ export const trainingService = {
         rating: body.rating,
         comment: body.comment,
         participant_email: body.participant_email,
+        ...(body.participant_name?.trim()
+          ? { participant_name: body.participant_name.trim() }
+          : {}),
       },
     );
     return response.data;
@@ -379,7 +415,7 @@ export const trainingService = {
       const status =
         (error as ApiError | undefined)?.statusCode ??
         (error as { response?: { status?: number } })?.response?.status;
-      if (status === 404) return null;
+      if (status === 404 || status === 0) return null;
       throw error;
     }
   },
@@ -389,19 +425,15 @@ export const trainingService = {
     trainingId: string,
   ): Promise<TrainingDiscussionApiItem[]> => {
     try {
-      const response = await apiClient.get<
-        TrainingDiscussionApiItem[] | { items?: TrainingDiscussionApiItem[] }
-      >(ENDPOINTS.TRAININGS.DISCUSSIONS(trainingId));
-      const data = response.data;
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.items)) return data.items;
-      // 200 with null/odd body → treat as empty list, not an error
-      return [];
+      const response = await apiClient.get<unknown>(
+        ENDPOINTS.TRAININGS.DISCUSSIONS(trainingId),
+      );
+      return normalizeTrainingDiscussions(response.data);
     } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response
-        ?.status;
-      // Missing resource / no threads yet
-      if (status === 404) return [];
+      const status =
+        (error as ApiError | undefined)?.statusCode ??
+        (error as { response?: { status?: number } })?.response?.status;
+      if (status === 404 || status === 0) return [];
       throw error;
     }
   },
@@ -411,15 +443,21 @@ export const trainingService = {
     trainingId: string,
     body: TrainingDiscussionCreateBody,
   ): Promise<TrainingDiscussionApiItem> => {
-    const question = body.question.trim();
-    const response = await apiClient.post<TrainingDiscussionApiItem>(
+    const question = asPlainText(body.question);
+    const response = await apiClient.post<unknown>(
       ENDPOINTS.TRAININGS.DISCUSSIONS(trainingId),
       {
         question,
-        text: body.text?.trim() || question,
+        text: asPlainText(body.text) || question,
       },
     );
-    return response.data;
+    return (
+      normalizeTrainingDiscussion(response.data) ?? {
+        id: `discussion-${Date.now()}`,
+        question,
+        author: 'You',
+      }
+    );
   },
 
   /**
@@ -430,11 +468,24 @@ export const trainingService = {
     discussionId: string,
     body: TrainingDiscussionReplyBody,
   ): Promise<TrainingDiscussionApiItem> => {
-    const response = await apiClient.post<TrainingDiscussionApiItem>(
-      ENDPOINTS.TRAININGS.DISCUSSION_REPLY(trainingId, discussionId),
-      { answer: body.answer.trim() },
+    const id = asPlainText(discussionId);
+    if (!id) {
+      throw new Error('Missing discussion id');
+    }
+    const answer = asPlainText(body.answer);
+    if (!answer) {
+      throw new Error('Reply cannot be empty');
+    }
+    const response = await apiClient.post<unknown>(
+      ENDPOINTS.TRAININGS.DISCUSSION_REPLY(trainingId, id),
+      { answer },
     );
-    return response.data;
+    return (
+      normalizeTrainingDiscussion(response.data) ?? {
+        id,
+        answer,
+      }
+    );
   },
 
   /** GET /api/v1/trainings/{training_id}/announcements */
@@ -442,15 +493,40 @@ export const trainingService = {
     trainingId: string,
   ): Promise<TrainingAnnouncementApiItem[]> => {
     try {
-      const response = await apiClient.get<
-        | TrainingAnnouncementApiItem[]
-        | { items?: TrainingAnnouncementApiItem[]; announcements?: TrainingAnnouncementApiItem[] }
-      >(ENDPOINTS.TRAININGS.ANNOUNCEMENTS(trainingId));
+      const response = await apiClient.get<unknown>(
+        ENDPOINTS.TRAININGS.ANNOUNCEMENTS(trainingId),
+      );
       const data = response.data;
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.items)) return data.items;
-      if (data && Array.isArray(data.announcements)) return data.announcements;
-      return [];
+      const list = Array.isArray(data)
+        ? data
+        : data && typeof data === 'object'
+          ? ((data as { items?: unknown }).items ??
+            (data as { announcements?: unknown }).announcements)
+          : [];
+      if (!Array.isArray(list)) return [];
+      return list.flatMap((item, index) => {
+        if (!item || typeof item !== 'object') return [];
+        const row = item as Record<string, unknown>;
+        const id = asPlainText(row.id) || `announcement-${index}`;
+        return [
+          {
+            id,
+            title: asPlainText(row.title) || 'Announcement',
+            author: asPlainText(row.author) || 'Instructor',
+            channel: asPlainText(row.channel) || undefined,
+            message:
+              asPlainText(row.message) ||
+              asPlainText(row.description) ||
+              asPlainText(row.body) ||
+              undefined,
+            sent_at:
+              asPlainText(row.sent_at) ||
+              asPlainText(row.created_at) ||
+              undefined,
+            training_id: asPlainText(row.training_id) || undefined,
+          },
+        ];
+      });
     } catch (error) {
       const status = (error as { response?: { status?: number } })?.response
         ?.status;

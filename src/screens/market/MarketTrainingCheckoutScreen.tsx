@@ -13,6 +13,7 @@ import {
 import { MarketTrainingHeader } from '@/components/market/MarketTrainingHeader';
 import { MARKET_TRAININGS } from '@/components/market/marketTrainingData';
 import {
+  TRAINING_CHECKOUT_FREE,
   TRAINING_CHECKOUT_STATIC,
   TRAINING_ENROLL_BG,
   TRAINING_ENROLL_BORDER,
@@ -23,8 +24,7 @@ import {
 } from '@/components/market/marketTrainingEnrollData';
 import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 import { useEnrollTraining, useTraining } from '@/hooks/useTrainings';
-import type { ApiError } from '@/types/api.types';
-import { getApiErrorMessage } from '@/utils/apiError';
+import { resolveApiErrorMessage } from '@/utils/apiError';
 import { c, NU } from '@/utils/newUiCompact';
 
 function isUuid(id?: string) {
@@ -34,16 +34,36 @@ function isUuid(id?: string) {
   );
 }
 
+function isFreeCheckoutPrice(
+  priceLabel?: string | null,
+  priceType?: string | null,
+): boolean {
+  if ((priceType ?? '').trim().toLowerCase() === 'free') return true;
+  const raw = (priceLabel ?? '').trim().toLowerCase();
+  if (!raw || raw === 'free') return true;
+  const amount = Number(raw.replace(/[^0-9.]/g, ''));
+  return Number.isFinite(amount) && amount <= 0;
+}
+
 function enrollErrorMessage(error: unknown): string {
-  const axiosData = (
-    error as { response?: { data?: Parameters<typeof getApiErrorMessage>[0] } }
-  )?.response?.data;
-  if (axiosData) {
-    return getApiErrorMessage(axiosData, 'Could not enroll. Try again.');
+  const msg = resolveApiErrorMessage(error, 'Could not enroll. Try again.');
+  const openMatch = msg.match(
+    /opens\s+(\d{4}-\d{2}-\d{2}T[\d:.+-]+Z?)/i,
+  );
+  if (openMatch?.[1]) {
+    const opensAt = new Date(openMatch[1]);
+    if (!Number.isNaN(opensAt.getTime())) {
+      const label = opensAt.toLocaleString(undefined, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+      return `Enrolment is not open yet. It opens on ${label}.`;
+    }
   }
-  const api = error as ApiError;
-  if (api?.message?.trim()) return api.message.trim();
-  return 'Could not enroll. Try again.';
+  return msg;
 }
 
 export function MarketTrainingCheckoutScreen() {
@@ -69,9 +89,15 @@ export function MarketTrainingCheckoutScreen() {
     'Selected training';
   const trainingPrice =
     price?.trim() ||
+    training?.promoPriceLabel ||
     training?.priceLabel ||
     staticItem?.priceLabel ||
     'Free';
+  const isFree = isFreeCheckoutPrice(
+    trainingPrice,
+    training?.priceType ??
+      (staticItem?.priceLabel === 'Free' ? 'Free' : undefined),
+  );
   const imageUrl = training?.imageUrl || staticItem?.imageUrl || null;
 
   const goEnrolled = (code?: string, status?: string) => {
@@ -129,7 +155,11 @@ export function MarketTrainingCheckoutScreen() {
       >
         <MarketTrainingHeader
           eyebrow={TRAINING_CHECKOUT_STATIC.eyebrow}
-          title={TRAINING_CHECKOUT_STATIC.title}
+          title={
+            isFree
+              ? TRAINING_CHECKOUT_FREE.title
+              : TRAINING_CHECKOUT_STATIC.title
+          }
         />
 
         <View style={styles.body}>
@@ -148,9 +178,7 @@ export function MarketTrainingCheckoutScreen() {
             <View style={styles.cardCopy}>
               <Text style={styles.cardTitle}>{trainingTitle}</Text>
               <Text style={styles.cardMeta}>
-                {isApiTraining
-                  ? 'Confirm to enroll via API'
-                  : 'Demo training · local confirm only'}
+                Review and confirm to enroll
               </Text>
             </View>
             <Text style={styles.price}>{trainingPrice}</Text>
@@ -168,23 +196,27 @@ export function MarketTrainingCheckoutScreen() {
             <Text style={styles.link}>Edit</Text>
           </View>
 
-          <Text style={styles.sectionLabel}>Payment method</Text>
-          <View style={[styles.card, styles.cardSelected]}>
-            <View style={styles.visaBadge}>
-              <Text style={styles.visaText}>VISA</Text>
-            </View>
-            <View style={styles.cardCopy}>
-              <Text style={styles.cardTitle}>
-                {TRAINING_CHECKOUT_STATIC.paymentLabel}
-              </Text>
-              <Text style={styles.cardMeta}>
-                {TRAINING_CHECKOUT_STATIC.paymentMeta}
-              </Text>
-            </View>
-            <View style={styles.check}>
-              <MarketCheckoutCheckIcon />
-            </View>
-          </View>
+          {isFree ? null : (
+            <>
+              <Text style={styles.sectionLabel}>Payment method</Text>
+              <View style={[styles.card, styles.cardSelected]}>
+                <View style={styles.visaBadge}>
+                  <Text style={styles.visaText}>VISA</Text>
+                </View>
+                <View style={styles.cardCopy}>
+                  <Text style={styles.cardTitle}>
+                    {TRAINING_CHECKOUT_STATIC.paymentLabel}
+                  </Text>
+                  <Text style={styles.cardMeta}>
+                    {TRAINING_CHECKOUT_STATIC.paymentMeta}
+                  </Text>
+                </View>
+                <View style={styles.check}>
+                  <MarketCheckoutCheckIcon />
+                </View>
+              </View>
+            </>
+          )}
 
           <Text style={styles.sectionLabel}>Summary</Text>
           <View style={styles.summaryCard}>
@@ -192,22 +224,34 @@ export function MarketTrainingCheckoutScreen() {
               <Text style={styles.feeLabel}>Training fee</Text>
               <Text style={styles.feeValue}>{trainingPrice}</Text>
             </View>
-            <View style={styles.feeRow}>
-              <Text style={styles.feeLabel}>Tax</Text>
-              <Text style={styles.feeValue}>Included</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total due today</Text>
-              <Text style={styles.totalValue}>{trainingPrice}</Text>
-            </View>
+            {isFree ? (
+              <>
+                <View style={styles.divider} />
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>No payment required</Text>
+                  <Text style={styles.totalValue}>Free</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.feeRow}>
+                  <Text style={styles.feeLabel}>Tax</Text>
+                  <Text style={styles.feeValue}>Included</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Total due today</Text>
+                  <Text style={styles.totalValue}>{trainingPrice}</Text>
+                </View>
+              </>
+            )}
           </View>
 
           <View style={styles.note}>
             <MarketCheckoutShieldIcon />
             <Text style={styles.noteText}>
-              {isApiTraining
-                ? 'Confirm calls POST /api/v1/trainings/{id}/enroll with your auth token.'
+              {isFree
+                ? TRAINING_CHECKOUT_FREE.note
                 : TRAINING_CHECKOUT_STATIC.note}
             </Text>
           </View>

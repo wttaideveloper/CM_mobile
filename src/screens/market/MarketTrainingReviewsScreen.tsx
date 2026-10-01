@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -94,10 +93,7 @@ function reviewErrorMessage(error: unknown): string {
 
 export function MarketTrainingReviewsScreen() {
   const router = useRouter();
-  const commentRef = useRef<TextInput>(null);
-  const formCardRef = useRef<View>(null);
   const scrollRef = useRef<ScrollView>(null);
-  const formOffsetY = useRef(0);
   const { id, compose } = useLocalSearchParams<{
     id?: string;
     compose?: string;
@@ -107,8 +103,9 @@ export function MarketTrainingReviewsScreen() {
   const reviewsQuery = useTrainingReviews(isApiId ? id : undefined);
   const submitReview = useSubmitTrainingReview(isApiId ? id : undefined);
   const authEmail = useAuthStore((s) => s.user?.email?.trim() || '');
+  const authName = useAuthStore((s) => s.user?.fullName?.trim() || '');
 
-  const [rating, setRating] = useState(5);
+  const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [email, setEmail] = useState(authEmail);
 
@@ -117,23 +114,12 @@ export function MarketTrainingReviewsScreen() {
   }, [authEmail]);
 
   useEffect(() => {
-    if (compose === '1') {
-      const timer = setTimeout(() => {
-        scrollToForm();
-        commentRef.current?.focus();
-      }, 350);
-      return () => clearTimeout(timer);
-    }
+    if (compose !== '1') return;
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 350);
+    return () => clearTimeout(timer);
   }, [compose]);
-
-  const scrollToForm = () => {
-    // Form sits near the bottom — scroll it into view above the keyboard
-    scrollRef.current?.scrollToEnd({ animated: true });
-  };
-
-  const onFormFieldFocus = () => {
-    setTimeout(scrollToForm, Platform.OS === 'ios' ? 280 : 120);
-  };
 
   const canEditForm = isApiId && !submitReview.isPending;
 
@@ -172,11 +158,12 @@ export function MarketTrainingReviewsScreen() {
         rating,
         comment: trimmed,
         participant_email: emailTrimmed,
+        ...(authName ? { participant_name: authName } : {}),
       },
       {
         onSuccess: () => {
           setComment('');
-          setRating(5);
+          setRating(0);
           Alert.alert('Thanks', 'Your review was submitted.');
         },
         onError: (error) => {
@@ -222,7 +209,7 @@ export function MarketTrainingReviewsScreen() {
                 <View style={styles.reviewTop}>
                   <View style={styles.avatar}>
                     <Text style={styles.avatarText}>
-                      {review.author.charAt(0).toUpperCase()}
+                      {(review.author.trim().charAt(0) || 'L').toUpperCase()}
                     </Text>
                   </View>
                   <View style={styles.reviewCopy}>
@@ -249,14 +236,7 @@ export function MarketTrainingReviewsScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Add your review</Text>
-          <View
-            ref={formCardRef}
-            collapsable={false}
-            onLayout={(event) => {
-              formOffsetY.current = event.nativeEvent.layout.y;
-            }}
-            style={styles.formCard}
-          >
+          <View style={styles.formCard}>
             <Text style={styles.helper}>
               Tap stars, write a comment, then submit.
             </Text>
@@ -267,7 +247,9 @@ export function MarketTrainingReviewsScreen() {
               onSelect={canEditForm ? setRating : undefined}
               size="lg"
             />
-            <Text style={styles.ratingHint}>{rating} / 5 selected</Text>
+            <Text style={styles.ratingHint}>
+              {rating > 0 ? `${rating} / 5 selected` : 'Tap a star to rate'}
+            </Text>
 
             {!authEmail ? (
               <>
@@ -282,14 +264,13 @@ export function MarketTrainingReviewsScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={canEditForm}
-                  onFocus={onFormFieldFocus}
+                  contextMenuHidden={false}
                 />
               </>
             ) : null}
 
             <Text style={styles.formLabel}>Comment</Text>
             <TextInput
-              ref={commentRef}
               style={styles.input}
               value={comment}
               onChangeText={setComment}
@@ -299,7 +280,10 @@ export function MarketTrainingReviewsScreen() {
               textAlignVertical="top"
               editable={canEditForm}
               blurOnSubmit={false}
-              onFocus={onFormFieldFocus}
+              contextMenuHidden={false}
+              selectTextOnFocus={false}
+              autoCorrect
+              spellCheck
             />
 
             <Pressable

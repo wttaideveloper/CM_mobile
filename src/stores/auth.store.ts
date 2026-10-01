@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { create } from 'zustand';
 
 import { markActiveChatReadOnLogout } from '@/services/chatRead.service';
@@ -66,6 +67,8 @@ type AuthState = {
   selectedTenant: AuthTenant | null;
   isTenantPickerVisible: boolean;
   isTenantPickerLoading: boolean;
+  /** After Sign out, auth entry should open Sign In (not splash → onboarding). */
+  preferLoginOnAuthEntry: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
   /** Google / Facebook mobile OAuth → complete-login → same session as password login. */
   loginWithSocial: (provider: SocialAuthProvider, rememberMe?: boolean) => Promise<void>;
@@ -79,6 +82,7 @@ type AuthState = {
   initializeSession: () => Promise<void>;
   clearSession: () => void;
   logout: () => void;
+  consumePreferLoginOnAuthEntry: () => boolean;
   /** Returns marketplace JWT (dev-token) for apiClient interceptors. */
   ensureAccessToken: (force?: boolean) => Promise<string>;
   /** @deprecated Use ensureAccessToken */
@@ -256,6 +260,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   selectedTenant: null,
   isTenantPickerVisible: false,
   isTenantPickerLoading: false,
+  preferLoginOnAuthEntry: false,
 
   login: async (credentials) => {
     set({ isLoading: true });
@@ -556,14 +561,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
   },
 
+  consumePreferLoginOnAuthEntry: () => {
+    const preferLogin = get().preferLoginOnAuthEntry;
+    if (preferLogin) {
+      set({ preferLoginOnAuthEntry: false });
+    }
+    return preferLogin;
+  },
+
   logout: () => {
     if (get().isLoggingOut) return;
 
-    set({ isLoggingOut: true });
+    set({ isLoggingOut: true, preferLoginOnAuthEntry: true });
     const hadSession = Boolean(get().accessToken);
     const refreshToken = get().refreshToken;
 
     get().clearSession();
+    router.replace('/(auth)/login');
 
     void (async () => {
       try {
@@ -688,6 +702,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         return nextAccess;
       } catch (error) {
+        const statusCode =
+          (error as { statusCode?: number } | undefined)?.statusCode ??
+          (error as { response?: { status?: number } } | undefined)?.response
+            ?.status;
+        const message =
+          error instanceof Error
+            ? error.message
+            : typeof (error as { message?: unknown })?.message === 'string'
+              ? (error as { message: string }).message
+              : '';
+        const isNetwork =
+          statusCode === 0 ||
+          /network/i.test(message) ||
+          (error as { code?: string } | undefined)?.code === 'ERR_NETWORK';
+
+        // Transient network failure must NOT clear the session — that logs the
+        // user out mid My Learning and feels like an app crash.
+        if (isNetwork) {
+          if (__DEV__) {
+            console.warn(
+              '[Auth] Refresh network error — keeping session for retry',
+              message || statusCode,
+            );
+          }
+          throw new Error('Network error. Please check your connection.');
+        }
+
         get().clearSession();
         throw error;
       } finally {

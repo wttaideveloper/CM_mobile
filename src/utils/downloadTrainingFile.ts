@@ -12,6 +12,7 @@ import {
   useTrainingDownloadsStore,
   type TrainingDownloadKind,
 } from '@/stores/trainingDownloads.store';
+import { resolveAbsoluteApiUrl } from '@/utils/trainingLessonMedia';
 
 const ANDROID_DOWNLOADS_DIR_KEY = 'training.file.downloadsDirUri';
 
@@ -80,13 +81,14 @@ async function downloadToCache(
   url: string,
   dest: string,
 ): Promise<FileSystem.FileSystemDownloadResult> {
+  const safeUrl = resolveAbsoluteApiUrl(url) || url.trim();
   const token = await useAuthStore.getState().ensureAccessToken(false);
-  let result = await FileSystem.downloadAsync(url, dest, {
+  let result = await FileSystem.downloadAsync(safeUrl, dest, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   if (result.status === 401 || result.status === 403) {
     const refreshed = await useAuthStore.getState().ensureAccessToken(true);
-    result = await FileSystem.downloadAsync(url, dest, {
+    result = await FileSystem.downloadAsync(safeUrl, dest, {
       headers: { Authorization: `Bearer ${refreshed}` },
     });
   }
@@ -163,7 +165,7 @@ export async function openTrainingFile(args: {
   url: string;
   suggestedName?: string;
 }): Promise<boolean> {
-  const url = args.url.trim();
+  const url = resolveAbsoluteApiUrl(args.url.trim()) || args.url.trim();
   if (!url) {
     Alert.alert('File', 'File link is not available yet.');
     return false;
@@ -171,7 +173,7 @@ export async function openTrainingFile(args: {
 
   const fileName = fileNameFromUrl(
     url,
-    args.suggestedName?.trim() || 'training-file.pdf',
+    ensurePdfExtension(args.suggestedName?.trim() || 'training-file.pdf'),
   );
   const mimeType = mimeFromFileName(fileName);
   const dest = `${FileSystem.cacheDirectory}training-${Date.now()}-${fileName}`;
@@ -188,6 +190,43 @@ export async function openTrainingFile(args: {
       error instanceof Error ? error.message : 'Could not open this file.';
     Alert.alert('Unable to open', message);
     return false;
+  }
+}
+
+function ensurePdfExtension(name: string): string {
+  const trimmed = name.trim() || 'training-file.pdf';
+  if (/\.[a-z0-9]{2,5}$/i.test(trimmed)) return trimmed;
+  return `${trimmed}.pdf`;
+}
+
+/**
+ * Best-effort Content-Length probe for Notes size labels when API omits size.
+ */
+export async function probeTrainingFileSizeBytes(
+  url: string,
+): Promise<number | null> {
+  const trimmed = resolveAbsoluteApiUrl(url.trim()) || url.trim();
+  if (!trimmed) return null;
+  try {
+    const token = await useAuthStore.getState().ensureAccessToken(false);
+    const headers: Record<string, string> = token
+      ? { Authorization: `Bearer ${token}` }
+      : {};
+    let response = await fetch(trimmed, { method: 'HEAD', headers });
+    if (response.status === 401 || response.status === 403) {
+      const refreshed = await useAuthStore.getState().ensureAccessToken(true);
+      response = await fetch(trimmed, {
+        method: 'HEAD',
+        headers: { Authorization: `Bearer ${refreshed}` },
+      });
+    }
+    if (!response.ok) return null;
+    const raw = response.headers.get('content-length');
+    if (!raw) return null;
+    const bytes = Number(raw);
+    return Number.isFinite(bytes) && bytes >= 0 ? bytes : null;
+  } catch {
+    return null;
   }
 }
 
@@ -230,7 +269,7 @@ export async function downloadTrainingToLibrary(args: {
   url: string;
   suggestedName?: string;
 }): Promise<boolean> {
-  const url = args.url.trim();
+  const url = resolveAbsoluteApiUrl(args.url.trim()) || args.url.trim();
   if (!url) {
     Alert.alert('Download', 'File link is not available yet.');
     return false;
@@ -297,7 +336,7 @@ export async function saveTrainingFileToDevice(args: {
   url: string;
   suggestedName?: string;
 }): Promise<boolean> {
-  const url = args.url.trim();
+  const url = resolveAbsoluteApiUrl(args.url.trim()) || args.url.trim();
   if (!url) {
     Alert.alert('Download', 'File link is not available yet.');
     return false;

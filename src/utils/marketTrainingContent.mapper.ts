@@ -13,17 +13,54 @@ import type {
   TrainingContentSectionApi,
 } from '@/types/training.types';
 import {
+  asPlainText,
+  clampDisplayText,
+  isPlayableVideoUrl,
+  isYoutubeUrl,
   resolveCourseNoteMaterials,
   resolveLessonBodyText,
   resolveLessonDocuments,
   resolveLessonVideoUrl,
 } from '@/utils/trainingLessonMedia';
+import { parseSessionStart } from '@/utils/dateTime';
 
 const FALLBACK_BANNER =
   'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=1200&q=80';
 
-function text(value: string | null | undefined, fallback = ''): string {
-  return typeof value === 'string' ? value.trim() : fallback;
+const TITLE_MAX = 400;
+const DETAIL_MAX = 800;
+const QR_URI_MAX = 350_000;
+
+function text(value: unknown, fallback = ''): string {
+  return asPlainText(value, fallback);
+}
+
+function pickSessionStartRaw(
+  ...rows: Array<Record<string, unknown> | null | undefined>
+): string {
+  for (const row of rows) {
+    if (!row) continue;
+    for (const key of [
+      'starts_at',
+      'scheduled_at',
+      'start_time',
+      'schedule',
+    ]) {
+      const value = text(row[key]);
+      if (value && parseSessionStart(value)) return value;
+    }
+    const schedule = text(row.schedule);
+    if (schedule) return schedule;
+  }
+  return '';
+}
+
+function safeTitle(value: unknown, fallback = 'Lesson'): string {
+  return clampDisplayText(text(value, fallback), TITLE_MAX);
+}
+
+function safeDetail(value: unknown, fallback = ''): string {
+  return clampDisplayText(text(value, fallback), DETAIL_MAX);
 }
 
 function num(value: string | number | null | undefined): number | undefined {
@@ -38,15 +75,16 @@ function num(value: string | number | null | undefined): number | undefined {
 /** Normalize content API `qr_image_base64` to an Image-ready URI. */
 function resolveQrImageUri(raw?: string | null): string | undefined {
   const value = text(raw);
-  if (!value) return undefined;
+  if (!value || value.length > QR_URI_MAX) return undefined;
   if (
     value.startsWith('data:image/') ||
     value.startsWith('http://') ||
     value.startsWith('https://')
   ) {
-    return value;
+    return value.length > QR_URI_MAX ? undefined : value;
   }
-  return `data:image/png;base64,${value}`;
+  const uri = `data:image/png;base64,${value}`;
+  return uri.length > QR_URI_MAX ? undefined : uri;
 }
 
 function resolveDeliveryMode(raw?: string | null): TrainingDeliveryMode {
@@ -100,11 +138,25 @@ function resolveLessonKind(
     return 'document';
   }
   if (type === 'notes') return 'document';
-  if (type === 'text' || type === 'topic') return 'text';
-  // Assignments open as readable items so complete-lesson can advance the path.
+  if (
+    type === 'text' ||
+    type === 'topic' ||
+    type === 'html' ||
+    type === 'article' ||
+    type === 'reading' ||
+    type === 'page'
+  ) {
+    return 'text';
+  }
+  // Assignments / ad-hoc tasks open as readable items, not the video player.
   if (type === 'assignment' || type === 'task') return 'text';
   if (type === 'youtube' || type === 'yt') return 'youtube';
-  if (type === 'video' || type === 'audio') return 'video';
+
+  const mediaUrl = resolveLessonVideoUrl(lesson);
+  if (isYoutubeUrl(mediaUrl)) return 'youtube';
+  if (type === 'video' || type === 'audio') {
+    return isPlayableVideoUrl(mediaUrl) ? 'video' : 'text';
+  }
 
   if (lesson.assessment || lesson.assessment_id) return 'exam';
   if (text(lesson.meeting_link) || text(lesson.join_meta)) return 'live';
@@ -127,24 +179,36 @@ function resolveLessonKind(
   if (title.includes('quiz') || title.includes('exam') || title.includes('assessment')) {
     return 'exam';
   }
-  return 'video';
+  if (isPlayableVideoUrl(mediaUrl)) return 'video';
+  return 'text';
 }
 
 function mapAssessmentToExam(
   assessment: TrainingContentAssessmentApi,
 ): TrainingExam {
-  const questions = (assessment.questions ?? []).map((q, index) => {
+  const questions = (Array.isArray(assessment.questions)
+    ? assessment.questions
+    : []
+  )
+    .filter((q): q is NonNullable<typeof q> => Boolean(q && typeof q === 'object'))
+    .map((q, index) => {
     const rawOptions = q.options;
     let options: { id: string; label: string }[] = [];
     if (Array.isArray(rawOptions)) {
       options = rawOptions.map((opt, optIndex) => {
         if (typeof opt === 'string') {
-          return { id: `opt-${optIndex}`, label: opt };
+          return {
+            id: `opt-${optIndex}`,
+            label: clampDisplayText(opt, TITLE_MAX),
+          };
         }
-        return {
-          id: text(opt.id, `opt-${optIndex}`),
-          label: text(opt.label, `Option ${optIndex + 1}`),
-        };
+        if (opt && typeof opt === 'object') {
+          return {
+            id: text(opt.id, `opt-${optIndex}`),
+            label: safeTitle(opt.label, `Option ${optIndex + 1}`),
+          };
+        }
+        return { id: `opt-${optIndex}`, label: `Option ${optIndex + 1}` };
       });
     }
 
@@ -173,7 +237,7 @@ function mapAssessmentToExam(
 
     return {
       id: text(q.id, `q-${index}`),
-      prompt: text(q.question_text, `Question ${index + 1}`),
+      prompt: safeTitle(q.question_text, `Question ${index + 1}`),
       options,
       correctOptionId: correct || undefined,
       questionType,
@@ -181,8 +245,8 @@ function mapAssessmentToExam(
   });
 
   return {
-    id: assessment.id,
-    title: text(assessment.title, 'Quiz'),
+    id: text(assessment.id, 'exam'),
+    title: safeTitle(assessment.title, 'Quiz'),
     subtitle: 'Session quiz',
     questionCount: questions.length,
     passPercent: assessment.pass_percent ?? 67,
@@ -193,7 +257,11 @@ function mapAssessmentToExam(
 function sectionItemsOf(
   section: TrainingContentSectionApi,
 ): TrainingContentLessonApi[] {
-  return (section.lessons?.length ? section.lessons : section.items) ?? [];
+  const raw = (section.lessons?.length ? section.lessons : section.items) ?? [];
+  return raw.filter(
+    (lesson): lesson is TrainingContentLessonApi =>
+      Boolean(lesson && typeof lesson === 'object'),
+  );
 }
 
 function isQuizLikeLesson(lesson: TrainingContentLessonApi): boolean {
@@ -230,10 +298,10 @@ function previousSessionQuizGateCleared(
   }
   const nested = [
     ...(previous.assessment ? [previous.assessment] : []),
-    ...(previous.assessments ?? []),
+    ...(Array.isArray(previous.assessments) ? previous.assessments : []),
   ];
   if (nested.length > 0) {
-    return nested.every((a) => Boolean(a.is_submitted));
+    return nested.every((a) => Boolean(a && a.is_submitted));
   }
   return false;
 }
@@ -252,16 +320,22 @@ function mapLesson(
   const kind = resolveLessonKind(lesson, deliveryMode);
   const assessment = lesson.assessment;
   if (assessment?.id) {
-    exams[assessment.id] = mapAssessmentToExam(assessment);
+    try {
+      exams[assessment.id] = mapAssessmentToExam(assessment);
+    } catch {
+      // Keep the lesson even if the nested quiz payload is malformed.
+    }
   }
 
-  const duration =
+  const duration = clampDisplayText(
     text(lesson.duration) ||
-    (kind === 'exam'
-      ? `${(assessment?.questions ?? []).length || '—'} questions`
-      : '—');
+      (kind === 'exam'
+        ? `${(assessment?.questions ?? []).length || '—'} questions`
+        : '—'),
+    80,
+  );
   const detail =
-    text(lesson.detail) ||
+    safeDetail(lesson.detail) ||
     (kind === 'live'
       ? 'Online live · join below'
       : kind === 'venue'
@@ -277,7 +351,11 @@ function mapLesson(
                 : 'Watch this lesson');
 
   const documents = resolveLessonDocuments(lesson);
-  const videoUrl = resolveLessonVideoUrl(lesson);
+  const resolvedVideoUrl = resolveLessonVideoUrl(lesson);
+  const videoUrl =
+    kind === 'youtube' || isPlayableVideoUrl(resolvedVideoUrl)
+      ? resolvedVideoUrl
+      : undefined;
   const quizSubmitted =
     Boolean(lesson.is_completed) || Boolean(assessment?.is_submitted);
   const lessonQrCode = text(lesson.qr_code) || text(lesson.pass_code);
@@ -286,12 +364,15 @@ function mapLesson(
   const durationSeconds = num(lesson.duration_seconds);
 
   return {
-    id: lesson.id,
+    id: text(lesson.id),
     kind,
-    title: text(lesson.title, 'Lesson'),
+    title: safeTitle(lesson.title, 'Lesson'),
     duration,
     detail,
-    imageUrl: text(lesson.thumbnail_url) || undefined,
+    imageUrl: (() => {
+      const thumb = text(lesson.thumbnail_url);
+      return thumb && thumb.length < 8_000 ? thumb : undefined;
+    })(),
     videoUrl: kind === 'document' ? undefined : videoUrl,
     bodyText: resolveLessonBodyText(lesson),
     documentUrls: documents.length
@@ -300,19 +381,20 @@ function mapLesson(
     documentFileName: documents[0]?.name,
     isDownloadable: lesson.is_downloadable ?? undefined,
     sectionId: sectionId || undefined,
-    joinUrl: text(lesson.meeting_link),
-    joinMeta: text(lesson.join_meta),
-    venue: text(lesson.venue) || undefined,
-    address: text(lesson.address) || undefined,
+    joinUrl: clampDisplayText(text(lesson.meeting_link), 2_000),
+    joinMeta: safeDetail(lesson.join_meta),
+    venue: safeDetail(lesson.venue) || undefined,
+    address: safeDetail(lesson.address) || undefined,
     passCode:
-      lessonQrCode ||
-      (kind === 'venue' ? trainingQrCode : '') ||
-      undefined,
+      clampDisplayText(
+        lessonQrCode || (kind === 'venue' ? trainingQrCode : ''),
+        80,
+      ) || undefined,
     qrImageBase64:
       resolveQrImageUri(lesson.qr_image_base64) ||
       (kind === 'venue' ? sectionQrImage : undefined) ||
       undefined,
-    checkInWindow: text(lesson.check_in_window) || undefined,
+    checkInWindow: safeDetail(lesson.check_in_window) || undefined,
     examId: assessment?.id || text(lesson.assessment_id) || undefined,
     locked: sectionLocked || (Boolean(lesson.is_locked) && !forceUnlock),
     apiCompleted:
@@ -325,6 +407,9 @@ function mapLesson(
     durationSeconds,
     isAttended: Boolean(lesson.is_attended),
     attendedAt: text(lesson.attended_at) || undefined,
+    startsAt:
+      pickSessionStartRaw(lesson as unknown as Record<string, unknown>) ||
+      undefined,
   };
 }
 
@@ -350,7 +435,7 @@ function mapSection(
   /** Shared QR image when a venue section omits `qr_image_base64`. */
   trainingQrImage?: string,
 ): TrainingDay {
-  const title = text(section.title, `Session ${index + 1}`);
+  const title = safeTitle(section.title, `Session ${index + 1}`);
   const { dayLabel, name } = splitSectionTitle(title);
   const apiSectionLocked = section.is_unlocked === false;
   // Self-paced: submitting the previous session quiz unlocks the next session
@@ -368,22 +453,48 @@ function mapSection(
   const sectionQrImage = isVenueSection
     ? resolveQrImageUri(section.qr_image_base64) || trainingQrImage
     : undefined;
-  const lessons = sectionItems.map((lesson) =>
-    mapLesson(
-      lesson,
-      sectionLocked,
-      exams,
-      deliveryMode,
-      sectionQrCode,
-      section.id,
-      forceUnlock,
-      sectionQrImage,
-    ),
+  const sectionKey = text(section.id, `section-${index}`);
+  const sectionStartsAt = pickSessionStartRaw(
+    section as unknown as Record<string, unknown>,
   );
+  const lessons = sectionItems.map((lesson, lessonIndex) => {
+    try {
+      const mapped = mapLesson(
+        lesson,
+        sectionLocked,
+        exams,
+        deliveryMode,
+        sectionQrCode,
+        sectionKey,
+        forceUnlock,
+        sectionQrImage,
+      );
+      const kind = mapped.kind;
+      const inheritStart =
+        (kind === 'live' || kind === 'venue') &&
+        !mapped.startsAt &&
+        sectionStartsAt
+          ? sectionStartsAt
+          : mapped.startsAt;
+      return {
+        ...mapped,
+        id: mapped.id || `${sectionKey}-lesson-${lessonIndex}`,
+        startsAt: inheritStart || undefined,
+      };
+    } catch {
+      return {
+        id: `${sectionKey}-lesson-${lessonIndex}`,
+        kind: 'text' as const,
+        title: 'Lesson',
+        duration: '—',
+        detail: 'This item could not be loaded.',
+      };
+    }
+  });
 
   const nestedAssessments = [
     ...(section.assessment ? [section.assessment] : []),
-    ...(section.assessments ?? []),
+    ...(Array.isArray(section.assessments) ? section.assessments : []),
   ];
   for (const assessment of nestedAssessments) {
     if (!assessment?.id) continue;
@@ -393,7 +504,7 @@ function mapSection(
       lessons.push({
         id: `exam-${assessment.id}`,
         kind: 'exam',
-        title: text(assessment.title, 'Session quiz'),
+        title: safeTitle(assessment.title, 'Session quiz'),
         duration: `${(assessment.questions ?? []).length || '—'} questions`,
         detail: 'Complete after session lessons',
         examId: assessment.id,
@@ -405,20 +516,20 @@ function mapSection(
   }
 
   const lessonCountLabel = `${lessons.length} lesson${lessons.length === 1 ? '' : 's'}`;
-  const rawSummary = text(section.summary);
+  const rawSummary = safeDetail(section.summary);
   const summary =
     !rawSummary || /^0\s+lessons?$/i.test(rawSummary)
       ? lessonCountLabel
       : rawSummary;
 
   return {
-    id: section.id || `section-${index}`,
-    dayLabel: dayLabel || `Session ${index + 1}`,
-    title: name,
+    id: sectionKey,
+    dayLabel: clampDisplayText(dayLabel || `Session ${index + 1}`, TITLE_MAX),
+    title: clampDisplayText(name, TITLE_MAX),
     summary,
     unlockHint: forceUnlock
       ? 'Continue with this session'
-      : text(
+      : safeDetail(
           section.unlock_hint,
           'Finish this session’s content to continue',
         ),
@@ -426,7 +537,7 @@ function mapSection(
     meetingLink: isVenueSection
       ? undefined
       : text(section.meeting_link) || undefined,
-    schedule: text(section.schedule) || undefined,
+    schedule: text(section.schedule) || sectionStartsAt || undefined,
     venue: text(section.venue) || undefined,
     address: text(section.address) || undefined,
     passCode: isVenueSection ? sectionQrCode || undefined : undefined,
@@ -441,8 +552,13 @@ export function mapTrainingContentToProgressPath(
   data: TrainingContentApiResponse,
 ): TrainingProgressPath {
   const exams: Record<string, TrainingExam> = {};
-  const sections = Array.isArray(data.sections) ? [...data.sections] : [];
-  sections.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const sections = Array.isArray(data?.sections)
+    ? data.sections.filter(
+        (section): section is NonNullable<typeof section> =>
+          Boolean(section && typeof section === 'object'),
+      )
+    : [];
+  sections.sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
   const deliveryMode = resolveDeliveryMode(data.delivery_mode);
   const trainingQrCode = text(data.qr_code);
   const trainingQrImage =
@@ -451,33 +567,57 @@ export function mapTrainingContentToProgressPath(
       .map((section) => resolveQrImageUri(section.qr_image_base64))
       .find(Boolean);
 
-  const days = sections.map((section, index) =>
-    mapSection(
-      section,
-      index,
-      exams,
-      deliveryMode,
-      trainingQrCode,
-      index > 0 ? sections[index - 1] : null,
-      trainingQrImage,
-    ),
-  );
+  const days = sections.map((section, index) => {
+    try {
+      return mapSection(
+        section,
+        index,
+        exams,
+        deliveryMode,
+        trainingQrCode,
+        index > 0 ? sections[index - 1] : null,
+        trainingQrImage,
+      );
+    } catch {
+      return {
+        id: `section-${index}`,
+        dayLabel: `Session ${index + 1}`,
+        title: 'Session',
+        summary: '0 lessons',
+        unlockHint: 'Finish this session’s content to continue',
+        lessons: [],
+      };
+    }
+  });
 
-  for (const assessment of data.assessments ?? []) {
+  for (const assessment of Array.isArray(data.assessments)
+    ? data.assessments
+    : []) {
     if (!assessment?.id) continue;
-    exams[assessment.id] = mapAssessmentToExam(assessment);
+    try {
+      exams[assessment.id] = mapAssessmentToExam(assessment);
+    } catch {
+      // Skip a malformed quiz instead of crashing the course.
+    }
   }
 
+  const bannerUrl = text(data.primary_image);
   return {
-    trainingId: String(data.training_id),
-    title: text(data.title, 'Training'),
-    vendor: text(data.enterprise_name, 'Training'),
-    instructor: text(data.instructor_name, 'Instructor'),
-    bannerUrl: text(data.primary_image) || FALLBACK_BANNER,
+    trainingId: text(data.training_id) || 'training',
+    title: safeTitle(data.title, 'Training'),
+    vendor: safeTitle(data.enterprise_name, 'Training'),
+    instructor: safeTitle(data.instructor_name, 'Instructor'),
+    bannerUrl: bannerUrl && bannerUrl.length < 8_000 ? bannerUrl : FALLBACK_BANNER,
     deliveryMode,
     days,
     exams,
-    courseNotes: resolveCourseNoteMaterials(data),
+    courseNotes: (() => {
+      try {
+        return resolveCourseNoteMaterials(data);
+      } catch {
+        return [];
+      }
+    })(),
     resumeSectionId:
       text(data.resume_section_id) || undefined,
     resumeLessonId:

@@ -1,12 +1,12 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useEffect } from 'react';
 
 import { API_CONFIG } from '@/config';
 import {
   joinConversationRoom,
   leaveConversationRoom,
 } from '@/services/socket/socket.room.service';
-import { getSocket } from '@/services/socket/socket.client';
+import { getSocket, watchSocket } from '@/services/socket/socket.client';
+import type { Socket } from 'socket.io-client';
 
 type UseConversationRoomOptions = {
   conversationId: string;
@@ -14,25 +14,33 @@ type UseConversationRoomOptions = {
 };
 
 export function useConversationRoom({ conversationId, enabled }: UseConversationRoomOptions) {
-  useFocusEffect(
-    useCallback(() => {
-      if (!enabled || !API_CONFIG.SOCKET_ENABLED) {
-        return undefined;
+  useEffect(() => {
+    if (!enabled || !API_CONFIG.SOCKET_ENABLED) {
+      return undefined;
+    }
+
+    const join = () => {
+      void joinConversationRoom(conversationId);
+    };
+
+    let attached: Socket | null = null;
+
+    join();
+
+    const unwatch = watchSocket((socket) => {
+      if (attached === socket) return;
+      attached?.off('connect', join);
+      attached = socket;
+      socket.on('connect', join);
+      if (socket.connected) {
+        join();
       }
+    });
 
-      const join = () => {
-        void joinConversationRoom(conversationId);
-      };
-
-      join();
-
-      const socket = getSocket();
-      socket?.on('connect', join);
-
-      return () => {
-        socket?.off('connect', join);
-        void leaveConversationRoom(conversationId);
-      };
-    }, [conversationId, enabled]),
-  );
+    return () => {
+      unwatch();
+      attached?.off('connect', join);
+      void leaveConversationRoom(conversationId);
+    };
+  }, [conversationId, enabled]);
 }

@@ -93,7 +93,11 @@ export function useVoiceRecorder() {
     previewUriRef.current = previewUri;
   }, [previewUri]);
 
-  const recordingSeconds = Math.max(0, Math.floor((recorderState.durationMillis ?? 0) / 1000));
+  const durationMs = Number.isFinite(recorderState.durationMillis)
+    ? Math.floor(recorderState.durationMillis)
+    : 0;
+  const metering = Number.isFinite(recorderState.metering) ? recorderState.metering : null;
+  const recordingSeconds = Math.max(0, Math.floor(durationMs / 1000));
   const seconds =
     phase === 'recording' ? (isPaused ? pausedSeconds : recordingSeconds) : 0;
 
@@ -102,10 +106,11 @@ export function useVoiceRecorder() {
       return;
     }
 
-    const nextLevel = normalizeMetering(recorderState.metering);
-    levelsRef.current = [...levelsRef.current.slice(1), nextLevel];
-    setWaveformLevels(levelsRef.current);
-  }, [isPaused, phase, recorderState.metering, recorderState.durationMillis]);
+    const nextLevel = normalizeMetering(metering ?? undefined);
+    const nextLevels = [...levelsRef.current.slice(1), nextLevel];
+    levelsRef.current = nextLevels;
+    setWaveformLevels(nextLevels);
+  }, [isPaused, metering, phase, durationMs]);
 
   const resetWaveform = useCallback(() => {
     levelsRef.current = DEFAULT_LEVELS;
