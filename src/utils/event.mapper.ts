@@ -45,6 +45,7 @@ import { formatMoney } from '@/utils/currency';
 import {
   formatISTShortDate,
   formatISTTime,
+  HAS_TIMEZONE,
   parseApiDate,
 } from '@/utils/dateTime';
 
@@ -102,24 +103,52 @@ function normalizeEventModules(modules?: EventModules | null): EventModules {
 }
 
 /**
- * Phase 2.8 — an already-active option's current selectability, computed
- * once at mapping time from the backend's own sold_out/purchase window
- * fields. Never derive this from a local capacity count: the backend is
- * authoritative, and reserved_count/capacity are informational-only here.
+ * Phase 2.8 — a meal/accommodation option's current selectability, computed
+ * once at mapping time from the backend's own active/sold_out/purchase
+ * window fields. Never derive this from a local capacity count: the backend
+ * is authoritative, and reserved_count/capacity are informational-only here.
  */
 function computeOptionAvailability(
+  active: boolean,
   soldOut: boolean,
   purchaseStartAt: Date | null,
   purchaseEndAt: Date | null,
 ): EventOptionAvailability {
+  if (!active) return 'unavailable';
   if (soldOut) return 'sold_out';
   const now = Date.now();
   if (purchaseStartAt && purchaseStartAt.getTime() > now) return 'unavailable';
-  if (purchaseEndAt && purchaseEndAt.getTime() <= now) return 'unavailable';
+  if (purchaseEndAt && purchaseEndAt.getTime() < now) return 'unavailable';
   return 'available';
 }
 
+/**
+ * IST has a fixed, unchanging UTC offset (no DST) — safe to hardcode.
+ * purchase_start_at/purchase_end_at/service_start_at/service_end_at are set
+ * by an organizer entering a wall-clock time (e.g. a datetime-local picker),
+ * not server-generated like most other API timestamps. The backend stores
+ * whatever it's given verbatim, tz-aware or naive (app/utils/event_meals.py
+ * _normalize_window_value: "never guesses a timezone that isn't there") — so
+ * a naive value here is the organizer's own local (IST) wall-clock time, not
+ * UTC. parseApiDate()'s "naive = UTC" default is correct for server-
+ * generated timestamps elsewhere in the app (chat, notifications, ...) but
+ * would misread a naive "12:00" meant as 12:00 IST as 12:00 UTC (17:30 IST)
+ * instead — a ~5.5h shift large enough to make an option built around
+ * "right now" look unavailable when it's actually open. A tz-aware value
+ * (already carrying Z/±HH:MM) is never affected — this only changes the
+ * fallback applied when no timezone is present at all.
+ */
+function parseEventOptionWindowDate(value?: string | null): Date | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = HAS_TIMEZONE.test(trimmed) ? trimmed : `${trimmed}+05:30`;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 type PricedOptionSource = {
+  active: boolean;
   price?: number | null;
   currency?: string | null;
   capacity?: number | null;
@@ -153,10 +182,36 @@ function normalizePricedOptionFields(
   const remainingCapacity = Number.isFinite(option.remaining_capacity)
     ? Number(option.remaining_capacity)
     : null;
-  const purchaseStartAt = safeParseDate(option.purchase_start_at);
-  const purchaseEndAt = safeParseDate(option.purchase_end_at);
-  const serviceStartAt = safeParseDate(option.service_start_at);
-  const serviceEndAt = safeParseDate(option.service_end_at);
+  const purchaseStartAt = parseEventOptionWindowDate(option.purchase_start_at);
+  const purchaseEndAt = parseEventOptionWindowDate(option.purchase_end_at);
+  const serviceStartAt = parseEventOptionWindowDate(option.service_start_at);
+  const serviceEndAt = parseEventOptionWindowDate(option.service_end_at);
+  const availability = computeOptionAvailability(
+    Boolean(option.active),
+    Boolean(option.sold_out),
+    purchaseStartAt,
+    purchaseEndAt,
+  );
+
+  if (__DEV__) {
+    // TEMP DIAGNOSTIC (Phase 2.8 availability bug) — remove once the
+    // IST-naive-timestamp fix above is confirmed against a real device/event.
+    console.log('[event.mapper] option availability', {
+      active: option.active,
+      sold_out: option.sold_out,
+      purchase_start_at: option.purchase_start_at,
+      purchase_end_at: option.purchase_end_at,
+      service_start_at: option.service_start_at,
+      service_end_at: option.service_end_at,
+      price: option.price,
+      currency: option.currency,
+      remaining_capacity: option.remaining_capacity,
+      parsed_purchase_start_at: purchaseStartAt?.toISOString() ?? null,
+      parsed_purchase_end_at: purchaseEndAt?.toISOString() ?? null,
+      now: new Date().toISOString(),
+      availability,
+    });
+  }
 
   return {
     price,
@@ -164,7 +219,7 @@ function normalizePricedOptionFields(
     currency,
     capacity,
     remainingCapacity,
-    availability: computeOptionAvailability(Boolean(option.sold_out), purchaseStartAt, purchaseEndAt),
+    availability,
     serviceStartAtLabel: serviceStartAt ? formatEventDateTime(serviceStartAt) : null,
     serviceEndAtLabel: serviceEndAt ? formatEventDateTime(serviceEndAt) : null,
   };
