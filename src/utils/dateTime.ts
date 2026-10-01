@@ -1,6 +1,7 @@
 export const IST_TIMEZONE = 'Asia/Kolkata';
 
-const HAS_TIMEZONE = /[zZ]|[+-]\d{2}:\d{2}$/;
+/** Exported for event.mapper.ts's meal/accommodation purchase/service-window parsing — see its own doc comment for why those fields need a different naive-timestamp fallback than parseApiDate's UTC default. */
+export const HAS_TIMEZONE = /[zZ]|[+-]\d{2}:\d{2}$/;
 
 /** Backend timestamps without timezone are treated as UTC. */
 export function parseApiDate(iso: string): Date {

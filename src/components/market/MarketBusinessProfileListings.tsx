@@ -121,7 +121,7 @@ export function MarketBusinessProfileListings({
                 router.push(
                   item.id === 'batch'
                     ? '/(main)/market/course-learning'
-                    : '/(main)/market/event-detail',
+                    : '/(main)/events',
                 )
               }
               accessibilityRole="button"

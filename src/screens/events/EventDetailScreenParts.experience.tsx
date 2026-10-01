@@ -1,0 +1,534 @@
+import { ActivityIndicator, Alert, Linking, Pressable, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+
+import { CalendarIcon, LockIcon, MapPinIcon } from '@/components/dashboard/DashboardIcons';
+import { EmptyState } from '@/components/EmptyState';
+import { useEventMeetingLink, useJoinSessionMeeting } from '@/hooks/useEvents';
+import type { Event, EventOptionAvailability } from '@/constants/events';
+import type { EventSessionSummary } from '@/types/event.types';
+import type { EventAvailability } from '@/utils/event.mapper';
+import { isModuleEnabled } from '@/utils/eventModules';
+import {
+  addEventToDeviceCalendar,
+  hasValidEventTiming,
+  resolveCalendarEnd,
+} from '@/utils/eventCalendar';
+import { PRIMARY, TEXT_MUTED, styles } from '@/screens/events/EventDetailScreen.styles';
+
+/** Same open-in-browser pattern already used for training documents (MarketTrainingDetailBody.tsx) — no new dependency. */
+async function openExternalUrl(url: string): Promise<void> {
+  const target = url.startsWith('http') ? url : `https://${url}`;
+  try {
+    await Linking.openURL(target);
+  } catch {
+    Alert.alert('Unable to open link', 'Please try again.');
+  }
+}
+
+function EventSessionRow({
+  event,
+  session,
+  isLast,
+  isOnline,
+  isOver,
+  isRegistered,
+}: {
+  event: Event;
+  session: EventSessionSummary;
+  isLast: boolean;
+  isOnline: boolean;
+  isOver: boolean;
+  isRegistered: boolean;
+}) {
+  const router = useRouter();
+  const joinMutation = useJoinSessionMeeting();
+  
+  const handleRegisterToJoin = () => {
+    router.push({ pathname: '/(main)/event/register', params: { id: event.id } });
+  };
+
+  const handleJoin = async () => {
+    try {
+      const access = await joinMutation.mutateAsync({ eventId: event.id, sessionId: session.id });
+      if (access.meetingLink) {
+        openExternalUrl(access.meetingLink);
+      } else {
+        Alert.alert('Not available', "This session doesn't have a meeting link yet.");
+      }
+    } catch (error: any) {
+      if (error.statusCode === 403) {
+        Alert.alert('Access Denied', 'Please register for this event to join the session.');
+      } else if (error.statusCode === 401) {
+        Alert.alert('Session Expired', 'Please sign in again to view meeting details.');
+      } else if (error.statusCode === 404) {
+        Alert.alert('Not available', 'Meeting details are not available for this session.');
+      } else {
+        Alert.alert('Error', error.message || 'Something went wrong. Please try again.');
+      }
+    }
+  };
+
+  return (
+    <View style={[styles.experienceRow, !isLast && styles.experienceRowBorder]}>
+      <View style={styles.experienceRowHeader}>
+        <Text style={styles.experienceRowTitle}>{session.title}</Text>
+      </View>
+      <Text style={styles.experienceRowMeta}>{session.dateTimeLabel}</Text>
+      {session.speaker ? (
+        <Text style={styles.experienceRowMeta}>Speaker: {session.speaker}</Text>
+      ) : null}
+      {session.location ? (
+        <Text style={styles.experienceRowMeta}>📍 {session.location}</Text>
+      ) : null}
+
+      {isOnline && session.hasMeetingInfo && !isOver && (
+        isRegistered ? (
+          <Pressable
+            onPress={handleJoin}
+            disabled={joinMutation.isPending}
+            accessibilityRole="button"
+            accessibilityLabel="Join Session"
+            style={({ pressed }) => [
+              styles.joinMeetingBtn,
+              { marginTop: 12 },
+              (pressed || joinMutation.isPending) && styles.pressed,
+            ]}
+          >
+            {joinMutation.isPending ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.joinMeetingBtnText}>Join Session</Text>
+            )}
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={handleRegisterToJoin}
+            accessibilityRole="button"
+            accessibilityLabel="Register to join session"
+            style={({ pressed }) => [
+              styles.joinMeetingBtn,
+              { marginTop: 12, backgroundColor: '#f3f4f6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+              pressed && styles.pressed,
+            ]}
+          >
+            <LockIcon size={14} color={TEXT_MUTED} />
+            <Text style={[styles.joinMeetingBtnText, { color: TEXT_MUTED }]}>Register to join</Text>
+          </Pressable>
+        )
+      )}
+    </View>
+  );
+}
+
+export function EventSessionsSection({
+  event,
+  availability,
+  isRegistered,
+}: {
+  event: Event;
+  availability: EventAvailability;
+  isRegistered: boolean;
+}) {
+  if (!isModuleEnabled(event, 'sessions')) return null;
+
+  const sessions = event.sessions ?? [];
+  const isOnline = isModuleEnabled(event, 'online_meeting');
+  const isOver = availability.kind === 'cancelled' || availability.kind === 'completed';
+
+  return (
+    <View style={styles.experienceSection}>
+      <Text style={styles.sectionTitle}>Agenda</Text>
+      <View style={[styles.experienceCard, { marginTop: 10 }]}>
+        {sessions.length === 0 ? (
+          <View style={styles.experienceRow}>
+            <Text style={styles.experienceBodyText}>No sessions scheduled yet.</Text>
+          </View>
+        ) : (
+          sessions.map((session, index) => (
+            <EventSessionRow
+              key={session.id}
+              event={event}
+              session={session}
+              isLast={index === sessions.length - 1}
+              isOnline={isOnline}
+              isOver={isOver}
+              isRegistered={isRegistered}
+            />
+          ))
+        )}
+      </View>
+    </View>
+  );
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
+  zoom: 'Zoom',
+  google_meet: 'Google Meet',
+  teams: 'Microsoft Teams',
+  other: 'Online meeting',
+};
+
+function meetingProviderLabel(provider: string | null): string {
+  if (!provider) return 'Online meeting';
+  return PROVIDER_LABELS[provider.trim().toLowerCase()] ?? provider;
+}
+
+export function EventMeetingSection({
+  event,
+  availability,
+  isRegistered,
+}: {
+  event: Event;
+  availability: EventAvailability;
+  isRegistered: boolean;
+}) {
+  const isOnline = isModuleEnabled(event, 'online_meeting');
+  const isOver = availability.kind === 'cancelled' || availability.kind === 'completed';
+  const hasSessionMeetings = event.sessions?.some((s) => s.hasMeetingInfo) ?? false;
+  const router = useRouter();
+
+  const handleRegisterToJoin = () => {
+    router.push({ pathname: '/(main)/event/register', params: { id: event.id } });
+  };
+
+  const { data, isLoading, isError, error, refetch } = useEventMeetingLink(event.id, {
+    enabled: isOnline && !isOver && isRegistered,
+  });
+
+  if (!isOnline) return null;
+
+  return (
+    <View style={styles.experienceSection}>
+      <Text style={styles.sectionTitle}>
+        {hasSessionMeetings ? 'Main Event Meeting' : 'Meeting Information'}
+      </Text>
+      <View style={[styles.experienceCard, styles.experienceCardPad, { marginTop: 10 }]}>
+        {isOver ? (
+          <Text style={styles.experienceBodyText}>
+            {availability.kind === 'cancelled'
+              ? 'This event has been cancelled — meeting details are no longer available.'
+              : 'This event has ended — meeting details are no longer available.'}
+          </Text>
+        ) : !isRegistered ? (
+          <View>
+            <View style={styles.experienceStateRow}>
+              <LockIcon size={14} color={TEXT_MUTED} />
+              <Text style={[styles.experienceBodyText, { flex: 1 }]}>
+                Register to access the meeting link.
+              </Text>
+            </View>
+            <Pressable
+              onPress={handleRegisterToJoin}
+              style={({ pressed }) => [
+                { marginTop: 12, backgroundColor: '#f3f4f6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 8 },
+                pressed && styles.pressed,
+              ]}
+            >
+              <LockIcon size={14} color={TEXT_MUTED} />
+              <Text style={[{ color: TEXT_MUTED, fontWeight: '600' }]}>Register to join</Text>
+            </Pressable>
+          </View>
+        ) : isLoading ? (
+          <View style={styles.experienceStateRow}>
+            <ActivityIndicator color={PRIMARY} size="small" />
+            <Text style={styles.experienceBodyText}>Checking meeting access…</Text>
+          </View>
+        ) : isError ? (
+          error.statusCode === 403 ? (
+            <View style={styles.experienceStateRow}>
+              <LockIcon size={14} color={TEXT_MUTED} />
+              <Text style={styles.experienceBodyText}>
+                Register for this event to unlock the meeting link.
+              </Text>
+            </View>
+          ) : error.statusCode === 401 ? (
+            <Text style={styles.experienceBodyText}>
+              Please sign in again to view meeting details.
+            </Text>
+          ) : error.statusCode === 404 ? (
+            <Text style={styles.experienceBodyText}>
+              Meeting details are not available for this event.
+            </Text>
+          ) : (
+            <EmptyState
+              variant="error"
+              compact
+              title="Couldn't load meeting details"
+              description={error.message || 'Something went wrong. Please try again.'}
+              onAction={() => refetch()}
+              actionLabel="Retry"
+            />
+          )
+        ) : data?.meetingLink ? (
+          <>
+            <Text style={styles.experienceBodyText}>{meetingProviderLabel(data.meetingProvider)}</Text>
+            <Pressable
+              onPress={() => openExternalUrl(data.meetingLink!)}
+              accessibilityRole="button"
+              accessibilityLabel={hasSessionMeetings ? 'Join main event' : 'Join meeting'}
+              style={({ pressed }) => [styles.joinMeetingBtn, pressed && styles.pressed]}
+            >
+              <Text style={styles.joinMeetingBtnText}>
+                {hasSessionMeetings ? 'Join Main Event' : 'Join Meeting'}
+              </Text>
+            </Pressable>
+          </>
+        ) : (
+          <Text style={styles.experienceBodyText}>
+            You&rsquo;re eligible to join — the meeting link will be shared closer to the event.
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+export function EventResourcesSection({ resources }: { resources: Event['resources'] }) {
+  if (!resources || resources.length === 0) return null;
+
+  return (
+    <View style={styles.experienceSection}>
+      <Text style={styles.sectionTitle}>Resources</Text>
+      <View style={[styles.experienceCard, { marginTop: 10 }]}>
+        {resources.map((resource, index) => (
+          <Pressable
+            key={resource.id}
+            onPress={() => openExternalUrl(resource.url)}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${resource.title}`}
+            style={({ pressed }) => [
+              styles.experienceRow,
+              index > 0 && styles.experienceRowBorder,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={styles.experienceRowHeader}>
+              <Text style={styles.experienceRowTitle} numberOfLines={2}>
+                {resource.title}
+              </Text>
+              <Text style={styles.experienceActionText}>Open</Text>
+            </View>
+            {resource.type ? <Text style={styles.experienceRowMeta}>{resource.type}</Text> : null}
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Informational only (Phase 7) — matches Sessions/Resources' read-only
+ * pattern. Selection happens at free registration time
+ * (EventRegisterScreen.tsx); there is no participant-facing endpoint to
+ * read back an existing registration's current selections, so this
+ * section never attempts to show or edit "your" selections, only what's
+ * on offer. Retired (active:false) options are never listed here — they
+ * only matter for an attendee who already holds one, which this section
+ * doesn't know about.
+ */
+/** Phase 2.8 — "Sold out" / "Currently unavailable" (outside purchase window), straight from the backend's own sold_out/purchase-window fields; never computed locally. 'available' renders nothing here (the price badge covers that case). */
+function OptionAvailabilityBadge({ availability }: { availability: EventOptionAvailability }) {
+  if (availability === 'available') return null;
+  return (
+    <View style={styles.experienceBadgeMuted}>
+      <Text style={styles.experienceBadgeTextMuted}>
+        {availability === 'sold_out' ? 'Sold out' : 'Currently unavailable'}
+      </Text>
+    </View>
+  );
+}
+
+export function EventMealsSection({ event }: { event: Event }) {
+  if (!isModuleEnabled(event, 'meals')) return null;
+
+  const options = event.meals.options.filter((option) => option.active);
+
+  return (
+    <View style={styles.experienceSection}>
+      <Text style={styles.sectionTitle}>Meals</Text>
+      <View style={[styles.experienceCard, { marginTop: 10 }]}>
+        {options.length === 0 ? (
+          <View style={styles.experienceRow}>
+            <Text style={styles.experienceBodyText}>No meal options configured yet.</Text>
+          </View>
+        ) : (
+          options.map((option, index) => (
+            <View
+              key={option.id}
+              style={[
+                styles.experienceRow,
+                index > 0 && styles.experienceRowBorder,
+                option.availability !== 'available' && styles.experienceRowDisabled,
+              ]}
+            >
+              <View style={styles.experienceRowHeader}>
+                <Text style={styles.experienceRowTitle}>{option.name}</Text>
+                {option.availability === 'available' ? (
+                  <View style={styles.experienceBadge}>
+                    <Text style={styles.experienceBadgeText}>{option.priceLabel}</Text>
+                  </View>
+                ) : (
+                  <OptionAvailabilityBadge availability={option.availability} />
+                )}
+              </View>
+              {option.date ? (
+                <Text style={styles.experienceRowMeta}>{option.date}</Text>
+              ) : null}
+              {option.description ? (
+                <Text style={styles.experienceRowMeta}>{option.description}</Text>
+              ) : null}
+            </View>
+          ))
+        )}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Informational only (Phase 8) — same pattern and same constraint as
+ * EventMealsSection: no participant-facing endpoint exists to read back an
+ * existing registration's current selections, so this never shows/edits
+ * "your" selections, only what's on offer. Retired options are excluded
+ * for the same reason as meals.
+ */
+export function EventAccommodationSection({ event }: { event: Event }) {
+  if (!isModuleEnabled(event, 'accommodation')) return null;
+
+  const options = event.accommodation.options.filter((option) => option.active);
+
+  return (
+    <View style={styles.experienceSection}>
+      <Text style={styles.sectionTitle}>Accommodation</Text>
+      <View style={[styles.experienceCard, { marginTop: 10 }]}>
+        {options.length === 0 ? (
+          <View style={styles.experienceRow}>
+            <Text style={styles.experienceBodyText}>No accommodation options configured yet.</Text>
+          </View>
+        ) : (
+          options.map((option, index) => (
+            <View
+              key={option.id}
+              style={[
+                styles.experienceRow,
+                index > 0 && styles.experienceRowBorder,
+                option.availability !== 'available' && styles.experienceRowDisabled,
+              ]}
+            >
+              <View style={styles.experienceRowHeader}>
+                <Text style={styles.experienceRowTitle}>{option.name}</Text>
+                {option.availability === 'available' ? (
+                  <View style={styles.experienceBadge}>
+                    <Text style={styles.experienceBadgeText}>{option.priceLabel}</Text>
+                  </View>
+                ) : (
+                  <OptionAvailabilityBadge availability={option.availability} />
+                )}
+              </View>
+              {option.description ? (
+                <Text style={styles.experienceRowMeta}>{option.description}</Text>
+              ) : null}
+            </View>
+          ))
+        )}
+      </View>
+    </View>
+  );
+}
+
+export function EventLocationSection({ event }: { event: Event }) {
+  const isVenueRelevant = event.deliveryMode === 'in_person' || event.deliveryMode === 'hybrid';
+  if (!isVenueRelevant || !event.venueAddress) return null;
+
+  return (
+    <View style={styles.experienceSection}>
+      <Text style={styles.sectionTitle}>Location Details</Text>
+      <View style={[styles.experienceCard, styles.experienceCardPad, { marginTop: 10 }]}>
+        <View style={styles.experienceRowHeader}>
+          <MapPinIcon size={14} color={TEXT_MUTED} />
+          <Text style={[styles.experienceRowTitle, { fontWeight: '600' }]}>
+            {event.venueAddress}
+          </Text>
+        </View>
+        {event.venueMapUrl ? (
+          <Pressable
+            onPress={() => openExternalUrl(event.venueMapUrl!)}
+            accessibilityRole="button"
+            accessibilityLabel="View on map"
+          >
+            <Text style={[styles.experienceActionText, { marginTop: 8 }]}>View on map</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+export function EventInstructionsSection({ event }: { event: Event }) {
+  if (!event.venueInstructions) return null;
+
+  return (
+    <View style={styles.experienceSection}>
+      <Text style={styles.sectionTitle}>Instructions</Text>
+      <View style={[styles.experienceCard, styles.experienceCardPad, { marginTop: 10 }]}>
+        <Text style={styles.experienceBodyText}>{event.venueInstructions}</Text>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * "Add to Calendar" (Phase 5D-1). Only rendered when the event has a valid
+ * start date. The meeting link is included only when this event is online/
+ * hybrid, not cancelled/completed, and the protected GET /{id}/meeting-link
+ * fetch (same query the Meeting Information section already makes — React
+ * Query dedupes the shared cache key, so this never issues a second request
+ * on its own) has actually resolved a link for this user; otherwise the
+ * calendar entry is built without it rather than falling back to the raw,
+ * unauthenticated event.meeting_link.
+ */
+export function EventAddToCalendarAction({
+  event,
+  availability,
+}: {
+  event: Event;
+  availability: EventAvailability;
+}) {
+  const isOnline = isModuleEnabled(event, 'online_meeting');
+  const isOver = availability.kind === 'cancelled' || availability.kind === 'completed';
+
+  const { data: meetingAccess } = useEventMeetingLink(event.id, {
+    enabled: isOnline && !isOver,
+  });
+
+  if (!hasValidEventTiming(event.startDate)) return null;
+
+  const handlePress = () => {
+    const start = event.startDate!;
+    const end = resolveCalendarEnd(start, event.endDate ?? null);
+    const location = event.location && event.location !== 'NA' ? event.location : '';
+    const meetingUrl = isOnline && !isOver ? (meetingAccess?.meetingLink ?? null) : null;
+
+    void addEventToDeviceCalendar({
+      id: event.id,
+      title: event.detailTitle,
+      description: event.description,
+      start,
+      end,
+      location,
+      meetingUrl,
+    });
+  };
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel="Add to calendar"
+      style={({ pressed }) => [styles.addToCalendarBtn, pressed && styles.pressed]}
+    >
+      <CalendarIcon size={16} color={PRIMARY} />
+      <Text style={styles.addToCalendarBtnText}>Add to Calendar</Text>
+    </Pressable>
+  );
+}

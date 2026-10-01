@@ -156,22 +156,12 @@ export type MarketEventItem = {
   sideBottomColor: string;
 };
 
-/** Home section cards (same UI as former Events & courses). */
+// The fabricated "event" entry (id 'sunrise') was removed (2026-09-30) — the
+// Home dashboard's Events & courses teaser now sources its event row from
+// the real Events API (see MarketBody.tsx's toMarketEventItem). The
+// remaining "course" entry is a separate, unrelated Market Trainings
+// feature with no real API backing this list yet.
 export const MARKET_EVENTS: MarketEventItem[] = [
-  {
-    id: 'sunrise',
-    badge: 'FREE EVENT',
-    badgeColor: '#257d3f',
-    badgeBg: '#e6f4e8',
-    when: 'Sat · 9:00 AM',
-    title: 'Sunrise walk & breathwork',
-    detail: 'Restwell Studio · Laurelhurst Park · 32 going',
-    sideTop: 'SEP',
-    sideBottom: '14',
-    sideBg: '#e6f4e8',
-    sideTopColor: '#4d8a5c',
-    sideBottomColor: '#257d3f',
-  },
   {
     id: 'metabolic',
     badge: 'COURSE',

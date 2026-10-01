@@ -23,22 +23,12 @@ export type EventListItem = {
   sideBottomColor: string;
 };
 
+// "event"-kind entries were removed (2026-09-30) — the Events panel that
+// used to source them from here now uses the real Events API
+// (see MarketEventListBody.tsx's toEventListItem). Only "course" entries
+// remain; they're a separate, unrelated Market Trainings feature with no
+// real API backing this list yet.
 export const MARKET_EVENTS_ALL: EventListItem[] = [
-  {
-    id: 'sunrise',
-    kind: 'event',
-    badge: 'FREE EVENT',
-    badgeColor: '#257d3f',
-    badgeBg: '#e6f4e8',
-    when: 'Sat · 9:00 AM',
-    title: 'Sunrise walk & breathwork',
-    detail: 'Restwell Studio · Laurelhurst Park · 32 going',
-    sideTop: 'SEP',
-    sideBottom: '14',
-    sideBg: '#e6f4e8',
-    sideTopColor: '#4d8a5c',
-    sideBottomColor: '#257d3f',
-  },
   {
     id: 'metabolic',
     kind: 'course',
@@ -55,21 +45,6 @@ export const MARKET_EVENTS_ALL: EventListItem[] = [
     sideBottomColor: '#8352c0',
   },
   {
-    id: 'farmers',
-    kind: 'event',
-    badge: 'FREE EVENT',
-    badgeColor: '#257d3f',
-    badgeBg: '#e6f4e8',
-    when: 'Sun · 10:00 AM',
-    title: 'Farmers market tour',
-    detail: 'Verdant Roots · Suite plaza · 24 going',
-    sideTop: 'SEP',
-    sideBottom: '21',
-    sideBg: '#e6f4e8',
-    sideTopColor: '#4d8a5c',
-    sideBottomColor: '#257d3f',
-  },
-  {
     id: 'batch',
     kind: 'course',
     badge: 'COURSE',
@@ -83,21 +58,6 @@ export const MARKET_EVENTS_ALL: EventListItem[] = [
     sideBg: '#f2e9fb',
     sideTopColor: '#8352c0',
     sideBottomColor: '#8352c0',
-  },
-  {
-    id: 'mobility',
-    kind: 'event',
-    badge: 'EVENT',
-    badgeColor: '#3c63c8',
-    badgeBg: '#eaf1ff',
-    when: 'Wed · 6:30 PM',
-    title: 'Evening mobility circle',
-    detail: 'Motion Studio East · Studio B · 18 going',
-    sideTop: 'SEP',
-    sideBottom: '17',
-    sideBg: '#eaf1ff',
-    sideTopColor: '#3c63c8',
-    sideBottomColor: '#3c63c8',
   },
   {
     id: 'sleep-lab',

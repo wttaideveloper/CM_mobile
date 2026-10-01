@@ -162,7 +162,7 @@ export function MarketPillarListings({
                 router.push(
                   event.route === 'course'
                     ? '/(main)/market/course-learning'
-                    : '/(main)/market/event-detail',
+                    : '/(main)/events',
                 )
               }
             >

@@ -36,10 +36,7 @@ export function EventsScreen() {
     const byFilter = filterEventsByTag(events ?? [], activeFilter);
     return byFilter.filter((event) => matchesEventSearch(event, routeSearch));
   }, [events, activeFilter, routeSearch]);
-  const listEvents = useMemo(
-    () => filteredEvents.filter((event) => event.id !== featuredEvent?.id),
-    [filteredEvents, featuredEvent],
-  );
+  const listEvents = filteredEvents;
   const showFeatured =
     featuredEvent &&
     (activeFilter === 'All' || filteredEvents.some((event) => event.id === featuredEvent.id));
@@ -60,6 +57,15 @@ export function EventsScreen() {
             </Pressable>
           ) : null}
           <Text style={styles.title}>Events</Text>
+          <Pressable
+            onPress={() => router.push('/(main)/event/my-events')}
+            accessibilityRole="button"
+            accessibilityLabel="My Events"
+            accessibilityHint="Shows the events you've registered for"
+            style={({ pressed }) => [styles.myEventsBtn, pressed && styles.cardPressed]}
+          >
+            <Text style={styles.myEventsBtnText}>My Events</Text>
+          </Pressable>
         </View>
 
         <ScrollView

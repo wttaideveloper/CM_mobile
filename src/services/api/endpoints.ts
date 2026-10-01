@@ -93,6 +93,29 @@ export const ENDPOINTS = {
   EVENTS: {
     GET_ALL: '/api/v1/events/',
     GET_BY_ID: (id: string) => `/api/v1/events/${id}`,
+    REGISTRATION_FORM: (id: string) => `/api/v1/events/${id}/registration-form`,
+    REGISTER: (id: string) => `/api/v1/events/${id}/registrations`,
+    MY_REGISTRATIONS: '/api/v1/events/my/registrations',
+    MY_WAITLIST: '/api/v1/events/my/waitlist',
+    REGISTRATION: (id: string, registrationId: string) =>
+      `/api/v1/events/${id}/registrations/${registrationId}`,
+    REGISTRATION_QR: (id: string, registrationId: string) =>
+      `/api/v1/events/${id}/registrations/${registrationId}/qr`,
+    CHECKOUT: (id: string) => `/api/v1/events/${id}/checkout`,
+    CHECKOUT_QUOTE: (id: string) => `/api/v1/events/${id}/checkout/quote`,
+    WAITLIST: (id: string) => `/api/v1/events/${id}/waitlist`,
+    WAITLIST_ENTRY: (id: string, entryId: string) =>
+      `/api/v1/events/${id}/waitlist/${entryId}`,
+    MEETING_LINK: (id: string) => `/api/v1/events/${id}/meeting-link`,
+    SESSION_MEETING_LINK: (id: string, sessionId: string) =>
+      `/api/v1/events/${id}/sessions/${sessionId}/meeting-link`,
+    CONTACT: (id: string) => `/api/v1/events/${id}/contact`,
+    FEEDBACK: (id: string) => `/api/v1/events/${id}/feedback`,
+    REVIEWS: (id: string) => `/api/v1/events/${id}/reviews`,
+  },
+
+  EVENT_TYPES: {
+    GET_ALL: '/api/v1/event-types/',
   },
 
   SEARCH: {

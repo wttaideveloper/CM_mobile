@@ -9,8 +9,10 @@ import {
   MessageSquareIcon,
 } from '@/components/dashboard/DashboardIcons';
 import type { Event } from '@/constants/events';
+import type { EventAvailability } from '@/utils/event.mapper';
 import {
   HERO_HEIGHT,
+  PRIMARY,
   SCREEN_WIDTH,
   SPEAKER_COLORS,
   SPEAKER_OVERLAP,
@@ -24,6 +26,16 @@ import {
   InfoCard,
   OrganizerAvatar,
 } from '@/screens/events/EventDetailScreenParts.shared';
+import {
+  EventAccommodationSection,
+  EventAddToCalendarAction,
+  EventInstructionsSection,
+  EventLocationSection,
+  EventMealsSection,
+  EventMeetingSection,
+  EventResourcesSection,
+  EventSessionsSection,
+} from '@/screens/events/EventDetailScreenParts.experience';
 
 export function EventDetailHero({
   event,
@@ -84,13 +96,23 @@ export function EventDetailContent({
   event,
   fillPercent,
   spotsRemaining,
+  availability,
+  isRegistered,
+  eventTypeName,
 }: {
   event: Event;
   fillPercent: number;
   spotsRemaining: number;
+  availability: EventAvailability;
+  isRegistered: boolean;
+  /** Resolved dynamically via the Event Type API — null while resolving/unavailable, never a hardcoded label. */
+  eventTypeName?: string | null;
 }) {
   return (
     <View style={styles.contentSheet}>
+      {eventTypeName ? (
+        <Text style={styles.registrationMeta}>{eventTypeName}</Text>
+      ) : null}
       <View style={styles.infoGrid}>
         <View style={styles.infoRow}>
           <InfoCard emoji="📅" label="Date & Time" value={event.schedule} />
@@ -105,6 +127,8 @@ export function EventDetailContent({
           <InfoCard emoji="🎟" label="Ticket Price" value={event.priceDetail} />
         </View>
       </View>
+
+      <EventAddToCalendarAction event={event} availability={availability} />
 
       <View style={styles.organizerCard}>
         <OrganizerAvatar initial={event.organizerInitial} />
@@ -175,43 +199,58 @@ export function EventDetailContent({
           </View>
         </View>
       ) : null}
+
+      <EventLocationSection event={event} />
+      <EventSessionsSection event={event} availability={availability} isRegistered={isRegistered} />
+      <EventMeetingSection event={event} availability={availability} isRegistered={isRegistered} />
+      <EventMealsSection event={event} />
+      <EventAccommodationSection event={event} />
+      <EventResourcesSection resources={event.resources} />
+      <EventInstructionsSection event={event} />
     </View>
   );
 }
 
 export function EventDetailFooter({
-  registerLabel,
+  ctaLabel,
   paddingBottom,
-  onRegister,
+  onPress,
+  onContactPress,
 }: {
-  registerLabel: string;
+  ctaLabel: string;
   paddingBottom: number;
-  onRegister: () => void;
+  /** Undefined when the event's current availability offers no action (closed/cancelled/completed). */
+  onPress?: () => void;
+  /** Contact Organizer (Phase 5D-2) — undefined only when the event id isn't known yet. */
+  onContactPress?: () => void;
 }) {
   return (
     <View style={[styles.footer, { paddingBottom, paddingTop: 10 }]}>
       <Pressable
-        disabled
+        onPress={onContactPress}
+        disabled={!onContactPress}
         accessibilityRole="button"
-        accessibilityLabel="Chat"
-        accessibilityState={{ disabled: true }}
-        accessibilityHint="Not available yet"
+        accessibilityLabel="Contact organizer"
+        accessibilityState={{ disabled: !onContactPress }}
         style={({ pressed }) => [
           styles.chatBtn,
-          styles.chatBtnDisabled,
+          !onContactPress && styles.chatBtnDisabled,
           pressed && styles.pressed,
         ]}
         hitSlop={6}
       >
-        <MessageSquareIcon size={20} color={TEXT_MUTED} />
+        <MessageSquareIcon size={20} color={onContactPress ? PRIMARY : TEXT_MUTED} />
       </Pressable>
 
       <LeafyGradientButton
-        onPress={onRegister}
+        onPress={onPress}
+        disabled={!onPress}
         style={styles.registerBtn}
         borderRadius={14}
       >
-        <Text style={styles.registerBtnText}>{registerLabel}</Text>
+        <Text style={styles.registerBtnText} numberOfLines={1} adjustsFontSizeToFit>
+          {ctaLabel}
+        </Text>
       </LeafyGradientButton>
     </View>
   );
