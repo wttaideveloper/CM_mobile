@@ -20,7 +20,6 @@ import { LeafyGradientButton } from '@/components/LeafyGradientButton';
 import {
   useCheckoutQuote,
   useEvent,
-  useEventRegistrationForm,
   useRegisterForEvent,
 } from '@/hooks/useEvents';
 import { useAuthStore } from '@/stores/auth.store';
@@ -177,14 +176,6 @@ export function EventRegisterScreen() {
   // Dynamic questions only apply to the free-registration flow — the paid
   // checkout endpoint (EventCheckoutRequest, backend event_schema.py) has no
   // field to carry them, confirmed against current backend source.
-  const {
-    form,
-    isLoading: isFormLoading,
-    isError: isFormError,
-    refetch: refetchForm,
-  } = useEventRegistrationForm(id, {
-    enabled: Boolean(event?.isFree),
-  });
   const registerMutation = useRegisterForEvent();
 
   const [name, setName] = useState(user?.fullName?.trim() ?? '');
@@ -280,12 +271,12 @@ export function EventRegisterScreen() {
   // custom questions — the basic Full Name / Email fields always work
   // regardless (Phase 3: restored, see EventRegisterFormField.tsx and
   // buildCustomFieldsPayload below, both already built for this).
-  const formSections = !isPaid ? (form?.sections ?? []) : [];
-  const isFormLoadingVisible = !isPaid && isFormLoading;
-  // A failed form fetch must not silently look like "no custom questions" —
-  // that could skip enforcement of a required question. Block submission
-  // and require a successful retry instead of guessing.
-  const isFormErrorVisible = !isPaid && isFormError;
+  const hasCustomQuestions = Boolean(event && isModuleEnabled(event, 'custom_questions'));
+  const customFields = event?.customQuestions ?? [];
+  
+  const formSections: EventFormSection[] = (hasCustomQuestions && customFields.length > 0)
+    ? [{ id: 'custom_questions', label: 'Registration Questions', fields: customFields }]
+    : [];
   // mealsEnabled/accommodationEnabled are computed earlier (needed for useCheckoutQuote,
   // which must run unconditionally before this screen's loading/not-found guards).
   // Retired options can't be newly selected — only ever offer active ones.
@@ -343,9 +334,18 @@ export function EventRegisterScreen() {
     }
 
     if (isPaid) {
+      const customFieldsPayload = formSections.length > 0 
+        ? JSON.stringify(buildCustomFieldsPayload(formSections, answers)) 
+        : undefined;
       router.push({
         pathname: '/(main)/event/checkout',
-        params: { id, participantName: name.trim(), participantEmail: email.trim(), waitlist_id },
+        params: { 
+          id, 
+          participantName: name.trim(), 
+          participantEmail: email.trim(), 
+          waitlist_id,
+          ...(customFieldsPayload ? { customFields: customFieldsPayload } : {})
+        },
       });
       return;
     }
@@ -581,56 +581,30 @@ export function EventRegisterScreen() {
               )}
             </View>
 
-            {isFormLoadingVisible ? (
-              <View style={styles.formLoadingRow}>
-                <ActivityIndicator color={PRIMARY} size="small" />
-                <Text style={styles.formLoadingText}>Loading registration questions…</Text>
+            {formSections.map((section) => (
+              <View key={section.id}>
+                {section.label ? (
+                  <Text style={styles.formSectionTitle}>{section.label}</Text>
+                ) : null}
+                {section.fields.map((field) => (
+                  <EventRegisterFormField
+                    key={field.id}
+                    field={field}
+                    value={answers[field.id]}
+                    error={fieldErrors[field.id]}
+                    onChange={(value) => {
+                      setAnswers((current) => ({ ...current, [field.id]: value }));
+                      setFieldErrors((current) => {
+                        if (!current[field.id]) return current;
+                        const next = { ...current };
+                        delete next[field.id];
+                        return next;
+                      });
+                    }}
+                  />
+                ))}
               </View>
-            ) : isFormErrorVisible ? (
-              <View style={styles.submitBanner}>
-                <Text style={styles.submitBannerText}>
-                  Couldn&rsquo;t load this event&rsquo;s registration questions. Please try
-                  again before continuing.
-                </Text>
-                <Pressable
-                  onPress={() => refetchForm()}
-                  accessibilityRole="button"
-                  accessibilityLabel="Retry loading registration questions"
-                  style={({ pressed }) => [
-                    styles.secondaryBtn,
-                    { marginTop: 10 },
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Text style={styles.secondaryBtnText}>Retry</Text>
-                </Pressable>
-              </View>
-            ) : (
-              formSections.map((section) => (
-                <View key={section.id}>
-                  {section.label ? (
-                    <Text style={styles.formSectionTitle}>{section.label}</Text>
-                  ) : null}
-                  {section.fields.map((field) => (
-                    <EventRegisterFormField
-                      key={field.id}
-                      field={field}
-                      value={answers[field.id]}
-                      error={fieldErrors[field.id]}
-                      onChange={(value) => {
-                        setAnswers((current) => ({ ...current, [field.id]: value }));
-                        setFieldErrors((current) => {
-                          if (!current[field.id]) return current;
-                          const next = { ...current };
-                          delete next[field.id];
-                          return next;
-                        });
-                      }}
-                    />
-                  ))}
-                </View>
-              ))
-            )}
+            ))}
 
             {mealsEnabled && availableMealOptions.length > 0 ? (
               <View style={styles.fieldGroup}>
@@ -688,8 +662,6 @@ export function EventRegisterScreen() {
               onPress={handleSubmit}
               disabled={
                 registerMutation.isPending ||
-                isFormLoadingVisible ||
-                isFormErrorVisible ||
                 (hasPaidSelectionIntent && (isQuoteFetching || isQuoteError || !quote))
               }
               style={styles.submitBtn}

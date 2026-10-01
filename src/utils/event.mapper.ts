@@ -545,6 +545,43 @@ export function mapCheckoutQuoteApiResponse(api: EventCheckoutQuoteApiResponse):
   };
 }
 
+function mapCustomQuestions(customFields: unknown[] | null | undefined): EventFormField[] {
+  if (!Array.isArray(customFields)) {
+    return [];
+  }
+
+  return customFields.map((field: any, index: number) => {
+    // The backend uses a free-form list of dicts. If there's no label, fallback.
+    const label = typeof field?.label === 'string' && field.label.trim() ? field.label : `Question ${index + 1}`;
+    
+    // The key MUST be the exact original label string (including trailing spaces if any)
+    // to ensure answers match the requested question identity correctly.
+    const id = typeof field?.label === 'string' ? field.label : label;
+    
+    const renderer = (typeof field?.type === 'string' ? field.type : 'text') as EventFormFieldRenderer;
+    const required = field?.required === true;
+
+    let options: EventFormFieldOption[] = [];
+    if (Array.isArray(field?.options)) {
+      options = field.options.map((opt: unknown) => {
+        const strVal = String(opt);
+        return { label: strVal, value: strVal };
+      });
+    }
+
+    return {
+      id,
+      label,
+      renderer,
+      required,
+      placeholder: null,
+      helpText: null,
+      options,
+      validation: {},
+    };
+  });
+}
+
 export function mapEventApiToItem(api: EventApiResponse): Event {
   const start = safeParseDate(api.start_date);
   const end = safeParseDate(api.end_date);
@@ -612,6 +649,7 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
     modules: normalizeEventModules(api.modules),
     meals: normalizeEventMeals(api.meals, api.currency),
     accommodation: normalizeEventAccommodation(api.accommodation, api.currency),
+    customQuestions: mapCustomQuestions(api.custom_fields),
   };
 }
 

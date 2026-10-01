@@ -525,6 +525,7 @@ export type EventCheckoutRequest = {
    */
   meal_selections?: string[];
   accommodation_selections?: string[];
+  custom_fields?: Record<string, string | boolean | string[]>;
 };
 
 /**

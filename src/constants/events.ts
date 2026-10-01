@@ -98,6 +98,8 @@ export type Event = {
   sessions?: EventSessionSummary[];
   /** Documents/resources attached to the event (Phase 5C) — empty when none. */
   resources?: EventResource[];
+  /** Dynamic registration questions embedded directly in the Event API response. */
+  customQuestions?: import('@/types/event.types').EventFormField[];
   /** Raw backend delivery_mode ("in_person"|"online"|"hybrid") — decides which detail sections apply. */
   deliveryMode?: string;
   /** Human-readable delivery mode label ("In Person"|"Online"|"Hybrid"). */
