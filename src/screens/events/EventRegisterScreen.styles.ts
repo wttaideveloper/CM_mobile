@@ -164,6 +164,10 @@ export const styles = StyleSheet.create({
     marginBottom: isSmallDevice ? 10 : 12,
     marginTop: isSmallDevice ? 2 : 4,
   },
+  // NOTE: these 5 keys are also used by EventRegisterFormField.tsx for its
+  // generic multi_select custom-question renderer, unrelated to meals/
+  // accommodation (Phase 2.8's own chip styling lives in the shared
+  // EventOptionChips.styles.ts instead) — do not remove without checking there.
   optionList: {
     flexDirection: 'row',
     flexWrap: 'wrap',

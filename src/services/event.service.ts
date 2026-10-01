@@ -3,6 +3,9 @@ import * as FileSystem from 'expo-file-system/legacy';
 import type {
   EventApiResponse,
   EventCancelRegistrationResponse,
+  EventCheckoutQuote,
+  EventCheckoutQuoteApiResponse,
+  EventCheckoutQuoteRequest,
   EventCheckoutRequest,
   EventContactOrganizerApiResponse,
   EventContactOrganizerRequest,
@@ -29,6 +32,7 @@ import type {
   MyWaitlistEntry,
 } from '@/types/event.types';
 import {
+  mapCheckoutQuoteApiResponse,
   mapEventApiToItem,
   mapEventMeetingLink,
   mapEventRegistrationForm,
@@ -241,6 +245,29 @@ export const eventService = {
     );
 
     return response.data;
+  },
+
+  /**
+   * POST /api/v1/events/{id}/checkout/quote (Phase 2.8) — a pure price
+   * preview: nothing is written or reserved server-side. Real response_model
+   * on the backend (EventCheckoutQuoteResponse), trusted directly. Option
+   * ids only in the request — never a price; the backend re-resolves every
+   * price from its own stored configuration.
+   */
+  getCheckoutQuote: async (
+    id: string,
+    payload: EventCheckoutQuoteRequest,
+  ): Promise<EventCheckoutQuote> => {
+    if (__DEV__) {
+      console.log('[Events API] POST checkout/quote:', id, payload);
+    }
+
+    const response = await apiClient.post<EventCheckoutQuoteApiResponse>(
+      ENDPOINTS.EVENTS.CHECKOUT_QUOTE(id),
+      payload,
+    );
+
+    return mapCheckoutQuoteApiResponse(response.data);
   },
 
   /**

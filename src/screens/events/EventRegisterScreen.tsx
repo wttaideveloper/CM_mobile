@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,7 +17,12 @@ import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar'
 import { CircleCheckIcon, ChevronLeftIcon } from '@/components/dashboard/DashboardIcons';
 import { EmptyState } from '@/components/EmptyState';
 import { LeafyGradientButton } from '@/components/LeafyGradientButton';
-import { useEvent, useEventRegistrationForm, useRegisterForEvent } from '@/hooks/useEvents';
+import {
+  useCheckoutQuote,
+  useEvent,
+  useEventRegistrationForm,
+  useRegisterForEvent,
+} from '@/hooks/useEvents';
 import { useAuthStore } from '@/stores/auth.store';
 import type { ApiError } from '@/types/api.types';
 import type {
@@ -29,6 +35,8 @@ import { getEventAvailability } from '@/utils/event.mapper';
 import { isModuleEnabled } from '@/utils/eventModules';
 import { EventRegisterFormField } from '@/screens/events/EventRegisterFormField';
 import { InfoCard } from '@/screens/events/EventDetailScreenParts.shared';
+import { EventOptionChips } from '@/screens/events/EventOptionChips';
+import { EventQuoteSummary } from '@/screens/events/EventQuoteSummary';
 import { PRIMARY, styles } from '@/screens/events/EventRegisterScreen.styles';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -190,6 +198,38 @@ export function EventRegisterScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<EventRegistrationResult | null>(null);
 
+  // Meal/accommodation selection — and therefore a live quote — only applies to the
+  // free-registration flow (EventRegistrationCreate.meal_selections/accommodation_selections;
+  // the paid checkout schema carries its own, handled on EventCheckoutScreen instead).
+  // Computed from `event?.` here (before the loading/not-found guards below) because
+  // useCheckoutQuote, like every other hook on this screen, must run unconditionally.
+  const isPaid = !event?.isFree;
+  const mealsEnabled = Boolean(event) && !isPaid && isModuleEnabled(event!, 'meals');
+  const accommodationEnabled = Boolean(event) && !isPaid && isModuleEnabled(event!, 'accommodation');
+  const hasPaidSelectionIntent =
+    (mealsEnabled && mealSelections.length > 0) ||
+    (accommodationEnabled && accommodationSelections.length > 0);
+
+  // '' ticket_type_id: free registration never selects a ticket type — the backend
+  // treats an empty id as "use the event's flat price" (same convention documented
+  // on EventTicketOption.id). Only fetched once there's something that might cost
+  // something to preview — a free event with nothing selected has nothing to quote.
+  const {
+    quote,
+    isLoading: isQuoteLoading,
+    isFetching: isQuoteFetching,
+    isError: isQuoteError,
+    error: quoteError,
+    refetch: refetchQuote,
+  } = useCheckoutQuote({
+    eventId: id,
+    ticketTypeId: '',
+    quantity: 1,
+    mealSelections: mealsEnabled ? mealSelections : [],
+    accommodationSelections: accommodationEnabled ? accommodationSelections : [],
+    enabled: hasPaidSelectionIntent,
+  });
+
   const goBack = () => router.back();
 
   if (isLoading) {
@@ -217,7 +257,6 @@ export function EventRegisterScreen() {
     );
   }
 
-  const isPaid = !event.isFree;
   const availability = getEventAvailability(event);
   // Paid events aren't gated on "full": checkout enforces capacity per ticket
   // type server-side, which this event-wide figure doesn't reliably reflect.
@@ -247,15 +286,10 @@ export function EventRegisterScreen() {
   // that could skip enforcement of a required question. Block submission
   // and require a successful retry instead of guessing.
   const isFormErrorVisible = !isPaid && isFormError;
-  // Meal selection only exists on the free-registration payload today
-  // (EventRegistrationCreate.meal_selections) — the paid checkout schema
-  // has no equivalent field, same constraint Phase 3 found for custom_fields.
-  const mealsEnabled = !isPaid && isModuleEnabled(event, 'meals');
+  // mealsEnabled/accommodationEnabled are computed earlier (needed for useCheckoutQuote,
+  // which must run unconditionally before this screen's loading/not-found guards).
   // Retired options can't be newly selected — only ever offer active ones.
   const availableMealOptions = mealsEnabled ? event.meals.options.filter((o) => o.active) : [];
-  // Same constraint as meals: only the free-registration payload accepts
-  // accommodation_selections (EventRegistrationCreate), checkout does not.
-  const accommodationEnabled = !isPaid && isModuleEnabled(event, 'accommodation');
   const availableAccommodationOptions = accommodationEnabled
     ? event.accommodation.options.filter((o) => o.active)
     : [];
@@ -316,6 +350,26 @@ export function EventRegisterScreen() {
       return;
     }
 
+    // A free ticket with a priced meal/accommodation selection still turns this into a
+    // real payable registration server-side ("free ≠ zero payable") — confirm with the
+    // same demo-payment pattern EventCheckoutScreen already uses before submitting,
+    // rather than silently charging the backend's companion order without telling the user.
+    if (hasPaidSelectionIntent && quote && quote.grandTotal > 0) {
+      Alert.alert(
+        'Confirm Payment',
+        `Your selections total ${quote.grandTotalLabel}. This is a demo checkout — no real payment will be processed.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Confirm & Register', onPress: submitRegistration },
+        ],
+      );
+      return;
+    }
+
+    submitRegistration();
+  }
+
+  function submitRegistration() {
     registerMutation.mutate(
       {
         id,
@@ -581,81 +635,63 @@ export function EventRegisterScreen() {
             {mealsEnabled && availableMealOptions.length > 0 ? (
               <View style={styles.fieldGroup}>
                 <Text style={styles.formSectionTitle}>Meals</Text>
-                <View style={styles.optionList}>
-                  {availableMealOptions.map((option) => {
-                    const isSelected = mealSelections.includes(option.id);
-                    return (
-                      <Pressable
-                        key={option.id}
-                        onPress={() =>
-                          setMealSelections((current) =>
-                            isSelected
-                              ? current.filter((id) => id !== option.id)
-                              : [...current, option.id],
-                          )
-                        }
-                        accessibilityRole="button"
-                        accessibilityLabel={
-                          option.date ? `${option.name}, ${option.date}` : option.name
-                        }
-                        accessibilityState={{ selected: isSelected }}
-                        style={[styles.optionChip, isSelected && styles.optionChipSelected]}
-                      >
-                        <Text
-                          style={[
-                            styles.optionChipText,
-                            isSelected && styles.optionChipTextSelected,
-                          ]}
-                        >
-                          {option.name}
-                          {option.date ? ` · ${option.date}` : ''}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <EventOptionChips
+                  options={availableMealOptions}
+                  selectedIds={mealSelections}
+                  onToggle={(optionId) =>
+                    setMealSelections((current) =>
+                      current.includes(optionId)
+                        ? current.filter((id) => id !== optionId)
+                        : [...current, optionId],
+                    )
+                  }
+                />
               </View>
             ) : null}
 
             {accommodationEnabled && availableAccommodationOptions.length > 0 ? (
               <View style={styles.fieldGroup}>
                 <Text style={styles.formSectionTitle}>Accommodation</Text>
-                <View style={styles.optionList}>
-                  {availableAccommodationOptions.map((option) => {
-                    const isSelected = accommodationSelections.includes(option.id);
-                    return (
-                      <Pressable
-                        key={option.id}
-                        onPress={() =>
-                          setAccommodationSelections((current) =>
-                            isSelected
-                              ? current.filter((id) => id !== option.id)
-                              : [...current, option.id],
-                          )
-                        }
-                        accessibilityRole="button"
-                        accessibilityLabel={option.name}
-                        accessibilityState={{ selected: isSelected }}
-                        style={[styles.optionChip, isSelected && styles.optionChipSelected]}
-                      >
-                        <Text
-                          style={[
-                            styles.optionChipText,
-                            isSelected && styles.optionChipTextSelected,
-                          ]}
-                        >
-                          {option.name}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <EventOptionChips
+                  options={availableAccommodationOptions}
+                  selectedIds={accommodationSelections}
+                  onToggle={(optionId) =>
+                    setAccommodationSelections((current) =>
+                      current.includes(optionId)
+                        ? current.filter((id) => id !== optionId)
+                        : [...current, optionId],
+                    )
+                  }
+                />
               </View>
+            ) : null}
+
+            {hasPaidSelectionIntent ? (
+              <EventQuoteSummary
+                rows={[
+                  ...(mealsEnabled && mealSelections.length > 0 && quote
+                    ? [{ label: 'Meals', valueLabel: quote.mealSubtotalLabel }]
+                    : []),
+                  ...(accommodationEnabled && accommodationSelections.length > 0 && quote
+                    ? [{ label: 'Accommodation', valueLabel: quote.accommodationSubtotalLabel }]
+                    : []),
+                ]}
+                totalLabel={quote?.grandTotalLabel ?? null}
+                isLoading={isQuoteLoading}
+                isError={isQuoteError}
+                errorMessage={quoteError?.message}
+                onRetry={() => void refetchQuote()}
+              />
             ) : null}
 
             <LeafyGradientButton
               onPress={handleSubmit}
-              disabled={registerMutation.isPending || isFormLoadingVisible || isFormErrorVisible}
+              disabled={
+                registerMutation.isPending ||
+                isFormLoadingVisible ||
+                isFormErrorVisible ||
+                (hasPaidSelectionIntent && (isQuoteFetching || isQuoteError || !quote))
+              }
               style={styles.submitBtn}
               borderRadius={14}
             >
@@ -668,7 +704,9 @@ export function EventRegisterScreen() {
                     ? 'Registering…'
                     : isPaid
                       ? 'Continue to Checkout'
-                      : 'Confirm Registration'}
+                      : hasPaidSelectionIntent && quote && quote.grandTotal > 0
+                        ? `Pay ${quote.grandTotalLabel} & Register`
+                        : 'Confirm Registration'}
                 </Text>
               </View>
             </LeafyGradientButton>

@@ -7,10 +7,13 @@ import { AppStatusBar, useStatusBarBackground } from '@/components/AppStatusBar'
 import { CircleCheckIcon, ChevronLeftIcon } from '@/components/dashboard/DashboardIcons';
 import { EmptyState } from '@/components/EmptyState';
 import { LeafyGradientButton } from '@/components/LeafyGradientButton';
-import { useCheckoutEvent, useEvent, useMyRegistrations } from '@/hooks/useEvents';
+import { useCheckoutEvent, useCheckoutQuote, useEvent, useMyRegistrations } from '@/hooks/useEvents';
 import type { ApiError } from '@/types/api.types';
 import type { EventOrderApiResponse } from '@/types/event.types';
+import { isModuleEnabled } from '@/utils/eventModules';
 import { InfoCard } from '@/screens/events/EventDetailScreenParts.shared';
+import { EventOptionChips } from '@/screens/events/EventOptionChips';
+import { EventQuoteSummary } from '@/screens/events/EventQuoteSummary';
 import { PRIMARY, styles } from '@/screens/events/EventCheckoutScreen.styles';
 
 const DEMO_FAILURE_MESSAGE =
@@ -59,9 +62,42 @@ export function EventCheckoutScreen() {
   const { registrations, refetch: refetchMyRegistrations } = useMyRegistrations();
 
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [mealSelections, setMealSelections] = useState<string[]>([]);
+  const [accommodationSelections, setAccommodationSelections] = useState<string[]>([]);
   const [phase, setPhase] = useState<'summary' | 'success' | 'failure'>('summary');
   const [order, setOrder] = useState<EventOrderApiResponse | null>(null);
   const [failureReason, setFailureReason] = useState<string | null>(null);
+
+  // Ticket/module resolution needs to happen before useCheckoutQuote — every hook on
+  // this screen must run unconditionally, before the loading/not-found guards below —
+  // so these read from `event?.` directly rather than the narrowed `event` the JSX
+  // further down uses once it's known to be loaded.
+  const ticketOptions = event?.ticketOptions ?? [];
+  const hasTicketOptions = ticketOptions.length > 0;
+  const selectedTicket = hasTicketOptions
+    ? ticketOptions.find((t) => t.id === selectedTicketId) ?? ticketOptions[0]
+    : null;
+  const mealsEnabled = Boolean(event) && isModuleEnabled(event!, 'meals');
+  const accommodationEnabled = Boolean(event) && isModuleEnabled(event!, 'accommodation');
+
+  // Phase 2.8 — the authoritative price preview. Always fetched once the event (and so
+  // a ticket, even the '' "flat price" fallback) is known, since checkout must never
+  // calculate or override the total locally — grand_total is always the backend's own.
+  const {
+    quote,
+    isLoading: isQuoteLoading,
+    isFetching: isQuoteFetching,
+    isError: isQuoteError,
+    error: quoteError,
+    refetch: refetchQuote,
+  } = useCheckoutQuote({
+    eventId: id,
+    ticketTypeId: selectedTicket ? selectedTicket.id : '',
+    quantity: 1,
+    mealSelections: mealsEnabled ? mealSelections : [],
+    accommodationSelections: accommodationEnabled ? accommodationSelections : [],
+    enabled: Boolean(event) && !event?.isFree,
+  });
 
   const goBack = () => router.back();
 
@@ -131,12 +167,12 @@ export function EventCheckoutScreen() {
     );
   }
 
-  const ticketOptions = event.ticketOptions ?? [];
-  const hasTicketOptions = ticketOptions.length > 0;
-  const selectedTicket = hasTicketOptions
-    ? ticketOptions.find((t) => t.id === selectedTicketId) ?? ticketOptions[0]
-    : null;
-  const priceLabel = selectedTicket ? selectedTicket.effectivePriceLabel : event.priceLabel;
+  // ticketOptions/hasTicketOptions/selectedTicket are computed earlier (needed for
+  // useCheckoutQuote, which must run unconditionally before this screen's guards).
+  const availableMealOptions = mealsEnabled ? event.meals.options.filter((o) => o.active) : [];
+  const availableAccommodationOptions = accommodationEnabled
+    ? event.accommodation.options.filter((o) => o.active)
+    : [];
 
   function runCheckout() {
     checkoutMutation.mutate(
@@ -148,6 +184,10 @@ export function EventCheckoutScreen() {
           ticket_type_id: selectedTicket ? selectedTicket.id : '',
           quantity: 1,
           ...(waitlist_id ? { waitlist_id } : {}),
+          ...(mealsEnabled && mealSelections.length > 0 ? { meal_selections: mealSelections } : {}),
+          ...(accommodationEnabled && accommodationSelections.length > 0
+            ? { accommodation_selections: accommodationSelections }
+            : {}),
         },
       },
       {
@@ -165,11 +205,11 @@ export function EventCheckoutScreen() {
   }
 
   function handlePayPress() {
-    if (checkoutMutation.isPending) return;
+    if (checkoutMutation.isPending || !quote) return;
 
     Alert.alert(
       'Demo Payment',
-      `This is a demo checkout for ${priceLabel}. No real payment will be processed.`,
+      `This is a demo checkout for ${quote.grandTotalLabel}. No real payment will be processed.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -403,19 +443,68 @@ export function EventCheckoutScreen() {
             </Text>
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Price</Text>
-            <Text style={styles.priceValue}>{priceLabel}</Text>
-          </View>
-          <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Quantity</Text>
             <Text style={styles.priceValue}>1</Text>
           </View>
-          <View style={styles.totalDivider} />
-          <View style={styles.priceRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>{priceLabel}</Text>
-          </View>
         </View>
+
+        {mealsEnabled && availableMealOptions.length > 0 ? (
+          <View style={styles.optionSection}>
+            <Text style={styles.sectionTitle}>Meals</Text>
+            <EventOptionChips
+              options={availableMealOptions}
+              selectedIds={mealSelections}
+              onToggle={(optionId) =>
+                setMealSelections((current) =>
+                  current.includes(optionId)
+                    ? current.filter((id) => id !== optionId)
+                    : [...current, optionId],
+                )
+              }
+            />
+          </View>
+        ) : null}
+
+        {accommodationEnabled && availableAccommodationOptions.length > 0 ? (
+          <View style={styles.optionSection}>
+            <Text style={styles.sectionTitle}>Accommodation</Text>
+            <EventOptionChips
+              options={availableAccommodationOptions}
+              selectedIds={accommodationSelections}
+              onToggle={(optionId) =>
+                setAccommodationSelections((current) =>
+                  current.includes(optionId)
+                    ? current.filter((id) => id !== optionId)
+                    : [...current, optionId],
+                )
+              }
+            />
+          </View>
+        ) : null}
+
+        <Text style={styles.sectionTitle}>Price Summary</Text>
+        <EventQuoteSummary
+          rows={
+            quote
+              ? [
+                  { label: hasTicketOptions ? 'Ticket' : 'Registration', valueLabel: quote.ticketSubtotalLabel },
+                  ...(mealsEnabled && mealSelections.length > 0
+                    ? [{ label: 'Meals', valueLabel: quote.mealSubtotalLabel }]
+                    : []),
+                  ...(accommodationEnabled && accommodationSelections.length > 0
+                    ? [{ label: 'Accommodation', valueLabel: quote.accommodationSubtotalLabel }]
+                    : []),
+                  { label: 'Discount', valueLabel: quote.discountLabel },
+                  { label: 'Tax', valueLabel: quote.taxLabel },
+                ]
+              : []
+          }
+          totalLabel={quote?.grandTotalLabel ?? null}
+          isLoading={isQuoteLoading}
+          isError={isQuoteError}
+          errorMessage={quoteError?.message}
+          onRetry={() => void refetchQuote()}
+        />
 
         <View style={styles.demoBanner}>
           <Text style={{ fontSize: 18 }}>⚠️</Text>
@@ -429,7 +518,7 @@ export function EventCheckoutScreen() {
 
         <LeafyGradientButton
           onPress={handlePayPress}
-          disabled={checkoutMutation.isPending}
+          disabled={checkoutMutation.isPending || isQuoteFetching || isQuoteError || !quote}
           style={styles.payBtn}
           borderRadius={14}
         >
@@ -438,7 +527,11 @@ export function EventCheckoutScreen() {
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : null}
             <Text style={styles.payBtnText}>
-              {checkoutMutation.isPending ? 'Processing…' : `Pay ${priceLabel} · Demo`}
+              {checkoutMutation.isPending
+                ? 'Processing…'
+                : quote
+                  ? `Pay ${quote.grandTotalLabel} · Demo`
+                  : 'Calculating total…'}
             </Text>
           </View>
         </LeafyGradientButton>

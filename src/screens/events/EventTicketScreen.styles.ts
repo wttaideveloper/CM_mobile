@@ -81,6 +81,35 @@ export const styles = StyleSheet.create({
     gap: isSmallDevice ? 8 : 10,
     marginBottom: isSmallDevice ? 12 : 14,
   },
+  /** Phase 2.8 — purchased/selected Meals or Accommodation, between the info row and the QR. */
+  purchasedSection: {
+    marginBottom: isSmallDevice ? 12 : 14,
+  },
+  purchasedSectionTitle: {
+    fontSize: isSmallDevice ? 12 : 13,
+    fontWeight: '700',
+    color: TEXT_MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: isSmallDevice ? 6 : 8,
+  },
+  purchasedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  purchasedName: {
+    flex: 1,
+    fontSize: isSmallDevice ? 13 : 14,
+    fontWeight: '600',
+    color: TEXT_BLACK,
+  },
+  purchasedPrice: {
+    fontSize: isSmallDevice ? 12.5 : 13.5,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
   qrWrap: {
     alignItems: 'center',
     justifyContent: 'center',

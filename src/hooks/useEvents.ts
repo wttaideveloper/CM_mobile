@@ -4,12 +4,14 @@ import {
   useQueryClient,
   type UseQueryOptions,
 } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 
 import { eventService, EVENT_PAGE_SIZE } from '@/services/event.service';
 import type { ApiError } from '@/types/api.types';
 import type { Event } from '@/constants/events';
 import type {
   EventCancelRegistrationResponse,
+  EventCheckoutQuote,
   EventCheckoutRequest,
   EventContactOrganizerRequest,
   EventContactOrganizerResult,
@@ -39,6 +41,13 @@ export const eventKeys = {
   registrationQr: (eventId: string, registrationId: string) =>
     [...eventKeys.all, 'qr', eventId, registrationId] as const,
   meetingLink: (eventId: string) => [...eventKeys.all, 'meeting-link', eventId] as const,
+  checkoutQuote: (
+    eventId: string,
+    ticketTypeId: string,
+    quantity: number,
+    mealKey: string,
+    accommodationKey: string,
+  ) => [...eventKeys.all, 'checkout-quote', eventId, ticketTypeId, quantity, mealKey, accommodationKey] as const,
 };
 
 type UseEventsOptions = Omit<UseQueryOptions<Event[], ApiError>, 'queryKey' | 'queryFn'>;
@@ -243,6 +252,78 @@ export function useCheckoutEvent() {
       void queryClient.invalidateQueries({ queryKey: eventKeys.myRegistrations() });
     },
   });
+}
+
+export type CheckoutQuoteParams = {
+  eventId: string;
+  /** '' = no ticket type on this event — the backend falls back to its flat price (same convention as EventTicketOption.id). */
+  ticketTypeId: string;
+  quantity: number;
+  mealSelections: string[];
+  accommodationSelections: string[];
+  /** Pass false to skip fetching entirely — e.g. nothing to price yet (no ticket type resolved). */
+  enabled?: boolean;
+};
+
+/**
+ * POST /api/v1/events/{id}/checkout/quote (Phase 2.8) — the authoritative
+ * price preview shown before checkout/registration, debounced 350ms after
+ * the last param change (same debounce window this app already uses
+ * elsewhere for search-as-you-type, e.g. MarketTrainingListScreen) so
+ * toggling a few selections in a row fires one request, not one per tap.
+ * A pure preview — the backend re-validates everything, authoritatively,
+ * at the actual checkout/registration call.
+ */
+export function useCheckoutQuote(params: CheckoutQuoteParams) {
+  const { eventId, ticketTypeId, quantity, mealSelections, accommodationSelections } = params;
+  const enabled = params.enabled ?? true;
+
+  // Sorted + joined so the debounce/query key is stable across re-renders
+  // that pass a new array instance with the same ids in a different order.
+  const mealKey = [...mealSelections].sort().join(',');
+  const accommodationKey = [...accommodationSelections].sort().join(',');
+
+  const [debounced, setDebounced] = useState({ ticketTypeId, quantity, mealKey, accommodationKey });
+
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setDebounced({ ticketTypeId, quantity, mealKey, accommodationKey }),
+      350,
+    );
+    return () => clearTimeout(timer);
+  }, [ticketTypeId, quantity, mealKey, accommodationKey]);
+
+  const query = useQuery<EventCheckoutQuote, ApiError>({
+    queryKey: eventKeys.checkoutQuote(
+      eventId,
+      debounced.ticketTypeId,
+      debounced.quantity,
+      debounced.mealKey,
+      debounced.accommodationKey,
+    ),
+    queryFn: () =>
+      eventService.getCheckoutQuote(eventId, {
+        ticket_type_id: debounced.ticketTypeId,
+        quantity: debounced.quantity,
+        ...(debounced.mealKey ? { meal_selections: debounced.mealKey.split(',') } : {}),
+        ...(debounced.accommodationKey
+          ? { accommodation_selections: debounced.accommodationKey.split(',') }
+          : {}),
+      }),
+    enabled: Boolean(eventId) && enabled,
+    // A fresh preview every time — selections/capacity can change between fetches, and the
+    // debounce above already keeps request volume in check.
+    staleTime: 0,
+    gcTime: 60_000,
+    // A 400/422 (sold out, invalid selection, ...) means "try different selections", not
+    // "try the same request again" — only a network failure is worth one retry.
+    retry: (failureCount, error) => error.statusCode === 0 && failureCount < 1,
+  });
+
+  return {
+    ...query,
+    quote: query.data ?? null,
+  };
 }
 
 /** POST /api/v1/events/{id}/waitlist — join (Phase 4). */

@@ -140,9 +140,13 @@ export type EventModules = {
 };
 
 /**
- * One meal option (backend app/schemas/event_meal_schema.py MealOption).
- * `active: false` = retired by the organizer — kept for history/existing
- * selections, never offered as a new choice.
+ * One meal option (backend app/schemas/event_meal_schema.py MealOption,
+ * Phase 2.8). `active: false` = retired by the organizer — kept for
+ * history/existing selections, never offered as a new choice. Pricing/
+ * capacity/window fields are all optional-with-safe-defaults server-side
+ * (an option created before Phase 2.8 prices as free/unlimited/always-open)
+ * — never guess a value here when a field is absent; use the mapper's
+ * defaults (0 price, null capacity, no window) instead.
  */
 export type EventMealOptionApiResponse = {
   id: string;
@@ -150,6 +154,24 @@ export type EventMealOptionApiResponse = {
   description?: string | null;
   date?: string | null;
   active: boolean;
+  /** Price per selection; 0 for a free option. Never compute this client-side. */
+  price?: number | null;
+  currency?: string | null;
+  /** Maximum selections allowed across all attendees. null = unlimited. */
+  capacity?: number | null;
+  /** Confirmed/attended registrations currently holding this option. null when capacity is unlimited (not computed). */
+  reserved_count?: number | null;
+  /** null = unlimited. The backend is authoritative — never derive this from reserved_count/capacity client-side. */
+  remaining_capacity?: number | null;
+  /** Authoritative sold-out flag from the backend — never infer this from remaining_capacity being 0 vs reading it directly, and never compute it locally. */
+  sold_out?: boolean | null;
+  /** When attendees may start selecting this option. null = always open. */
+  purchase_start_at?: string | null;
+  /** When attendees may no longer newly select this option. null = always open. An option already held stays visible past this. */
+  purchase_end_at?: string | null;
+  /** Informational/fulfilment only — when the meal is actually served. */
+  service_start_at?: string | null;
+  service_end_at?: string | null;
 };
 
 /**
@@ -163,14 +185,26 @@ export type EventMealsApiResponse = {
 
 /**
  * One accommodation option (backend app/schemas/event_accommodation_schema.py
- * AccommodationOption) — identical shape to a meal option minus `date`.
- * `active: false` = retired by the organizer.
+ * AccommodationOption, Phase 2.8) — identical shape to a meal option minus
+ * `date`. `active: false` = retired by the organizer. See
+ * EventMealOptionApiResponse's doc comment for the pricing/window fields —
+ * identical semantics and defaults here.
  */
 export type EventAccommodationOptionApiResponse = {
   id: string;
   name: string;
   description?: string | null;
   active: boolean;
+  price?: number | null;
+  currency?: string | null;
+  capacity?: number | null;
+  reserved_count?: number | null;
+  remaining_capacity?: number | null;
+  sold_out?: boolean | null;
+  purchase_start_at?: string | null;
+  purchase_end_at?: string | null;
+  service_start_at?: string | null;
+  service_end_at?: string | null;
 };
 
 /**
@@ -358,11 +392,47 @@ export type EventRegistrationResult = {
 };
 
 /**
+ * One registration's meal selection as returned by GET /my/registrations
+ * (backend AttendeeMealSelection, Phase 2.8). `price`/`currency` are the
+ * PURCHASE-TIME snapshot (from the EventRegistrationOption line item, not
+ * the option's current live price) — null only when this selection predates
+ * Phase 2.8 or was never a paid line item. `status: "confirmed"` means a
+ * real purchase-time snapshot backs it; `"selected"` means it doesn't (a
+ * pre-2.8 selection, or a legacy/free one) — never treat "selected" as a
+ * confirmed purchase.
+ */
+export type AttendeeMealSelectionApiResponse = {
+  meal_id: string;
+  name: string | null;
+  active: boolean;
+  price: number | null;
+  currency: string | null;
+  service_start_at: string | null;
+  service_end_at: string | null;
+  status: 'confirmed' | 'selected';
+};
+
+/** Same shape as AttendeeMealSelectionApiResponse, keyed by accommodation_id instead of meal_id. */
+export type AttendeeAccommodationSelectionApiResponse = {
+  accommodation_id: string;
+  name: string | null;
+  active: boolean;
+  price: number | null;
+  currency: string | null;
+  service_start_at: string | null;
+  service_end_at: string | null;
+  status: 'confirmed' | 'selected';
+};
+
+/**
  * Shape of one item returned by GET /api/v1/events/my/registrations.
  * This endpoint has no response_model either, but (unlike the raw ORM
  * object POST /registrations returns) the service already builds plain
  * dicts with these exact keys — see app/services/event_service.py,
- * my_registrations_service.
+ * my_registrations_service. meal_selections/accommodation_selections were
+ * added in Phase 2.8 — this endpoint still returns no ticket price/order
+ * total (that only ever existed transiently in the checkout response), so
+ * do not invent one.
  */
 export type EventMyRegistrationApiResponse = {
   registration_id: string;
@@ -373,10 +443,28 @@ export type EventMyRegistrationApiResponse = {
   registration_status: string;
   qr_code: string | null;
   checked_in_at: string | null;
+  meal_selections?: AttendeeMealSelectionApiResponse[];
+  accommodation_selections?: AttendeeAccommodationSelectionApiResponse[];
 };
 
 /** Bucket derived client-side — the backend has no single "upcoming/completed/cancelled" field. */
 export type MyEventBucket = 'upcoming' | 'completed' | 'cancelled';
+
+/**
+ * One purchased/selected meal or accommodation option, normalized for
+ * display on the Ticket screen (Phase 2.8). `priceLabel` is null when
+ * `isConfirmedPurchase` is false — only a confirmed purchase has a real
+ * purchase-time price snapshot to show; never fall back to a live option
+ * price here (this list has no access to the event's current config, by
+ * design — it is a record of what was actually purchased, not a preview).
+ */
+export type PurchasedOption = {
+  id: string;
+  name: string;
+  /** False for a pre-Phase-2.8/legacy selection with no purchase-time snapshot — see AttendeeMealSelectionApiResponse's doc comment. */
+  isConfirmedPurchase: boolean;
+  priceLabel: string | null;
+};
 
 /** Normalized shape the app renders for "My Events". */
 export type MyEventRegistration = {
@@ -391,6 +479,9 @@ export type MyEventRegistration = {
   hasQr: boolean;
   checkedInAt: Date | null;
   bucket: MyEventBucket;
+  /** Phase 2.8 — empty when meals aren't configured for this event or none were selected. */
+  mealSelections: PurchasedOption[];
+  accommodationSelections: PurchasedOption[];
 };
 
 export type EventCancelRegistrationResponse = {
@@ -425,6 +516,74 @@ export type EventCheckoutRequest = {
   quantity: number;
   payment_provider?: string;
   waitlist_id?: string;
+  /**
+   * Meal option ids to purchase alongside the ticket (backend
+   * EventCheckoutRequest.meal_selections, Phase 2.8) — option ids only,
+   * never a price or quantity; the backend re-resolves every price from
+   * its own stored configuration. Omit rather than send an empty array
+   * when nothing was selected, same convention as EventRegistrationRequest.
+   */
+  meal_selections?: string[];
+  accommodation_selections?: string[];
+};
+
+/**
+ * Body for POST /api/v1/events/{id}/checkout/quote (Phase 2.8) — a pure
+ * price preview, nothing is written or reserved. Same shape as
+ * EventCheckoutRequest minus buyer identity/payment provider/waitlist,
+ * since a quote creates nothing. Option ids only — never send a price.
+ */
+export type EventCheckoutQuoteRequest = {
+  ticket_type_id: string;
+  quantity: number;
+  meal_selections?: string[];
+  accommodation_selections?: string[];
+};
+
+/** One priced line of a checkout quote (backend EventCheckoutQuoteLine). */
+export type EventCheckoutQuoteLineApiResponse = {
+  option_type: string;
+  option_id: string;
+  name: string;
+  unit_price: number;
+  quantity: number;
+  line_total: number;
+  currency: string;
+};
+
+/**
+ * Response of POST /api/v1/events/{id}/checkout/quote — the authoritative
+ * price breakdown checkout would charge. discount/tax are always 0 today
+ * (no such concept exists on the backend yet) — display them as given,
+ * never assume they'll stay 0. grand_total is the ONLY value the app may
+ * show as "the total due" — never sum the subtotals client-side instead.
+ */
+export type EventCheckoutQuoteApiResponse = {
+  ticket_subtotal: number;
+  meal_subtotal: number;
+  accommodation_subtotal: number;
+  discount: number;
+  tax: number;
+  grand_total: number;
+  currency: string;
+  items: EventCheckoutQuoteLineApiResponse[];
+};
+
+/**
+ * Normalized checkout quote — every *_label field is the already-formatted
+ * (formatMoney) string, matching EventTicketOption's effectivePriceLabel
+ * convention. grandTotal/grandTotalLabel are the ONLY values the app may
+ * display as "the total due" — never derive a total from the subtotals.
+ */
+export type EventCheckoutQuote = {
+  ticketSubtotalLabel: string;
+  mealSubtotalLabel: string;
+  accommodationSubtotalLabel: string;
+  discountLabel: string;
+  taxLabel: string;
+  grandTotal: number;
+  grandTotalLabel: string;
+  currency: string;
 };
 
 /**

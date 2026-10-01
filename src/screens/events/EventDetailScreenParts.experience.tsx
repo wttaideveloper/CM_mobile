@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { CalendarIcon, LockIcon, MapPinIcon } from '@/components/dashboard/DashboardIcons';
 import { EmptyState } from '@/components/EmptyState';
 import { useEventMeetingLink, useJoinSessionMeeting } from '@/hooks/useEvents';
-import type { Event } from '@/constants/events';
+import type { Event, EventOptionAvailability } from '@/constants/events';
 import type { EventSessionSummary } from '@/types/event.types';
 import type { EventAvailability } from '@/utils/event.mapper';
 import { isModuleEnabled } from '@/utils/eventModules';
@@ -326,6 +326,18 @@ export function EventResourcesSection({ resources }: { resources: Event['resourc
  * only matter for an attendee who already holds one, which this section
  * doesn't know about.
  */
+/** Phase 2.8 — "Sold out" / "Currently unavailable" (outside purchase window), straight from the backend's own sold_out/purchase-window fields; never computed locally. 'available' renders nothing here (the price badge covers that case). */
+function OptionAvailabilityBadge({ availability }: { availability: EventOptionAvailability }) {
+  if (availability === 'available') return null;
+  return (
+    <View style={styles.experienceBadgeMuted}>
+      <Text style={styles.experienceBadgeTextMuted}>
+        {availability === 'sold_out' ? 'Sold out' : 'Currently unavailable'}
+      </Text>
+    </View>
+  );
+}
+
 export function EventMealsSection({ event }: { event: Event }) {
   if (!isModuleEnabled(event, 'meals')) return null;
 
@@ -343,10 +355,21 @@ export function EventMealsSection({ event }: { event: Event }) {
           options.map((option, index) => (
             <View
               key={option.id}
-              style={[styles.experienceRow, index > 0 && styles.experienceRowBorder]}
+              style={[
+                styles.experienceRow,
+                index > 0 && styles.experienceRowBorder,
+                option.availability !== 'available' && styles.experienceRowDisabled,
+              ]}
             >
               <View style={styles.experienceRowHeader}>
                 <Text style={styles.experienceRowTitle}>{option.name}</Text>
+                {option.availability === 'available' ? (
+                  <View style={styles.experienceBadge}>
+                    <Text style={styles.experienceBadgeText}>{option.priceLabel}</Text>
+                  </View>
+                ) : (
+                  <OptionAvailabilityBadge availability={option.availability} />
+                )}
               </View>
               {option.date ? (
                 <Text style={styles.experienceRowMeta}>{option.date}</Text>
@@ -386,10 +409,21 @@ export function EventAccommodationSection({ event }: { event: Event }) {
           options.map((option, index) => (
             <View
               key={option.id}
-              style={[styles.experienceRow, index > 0 && styles.experienceRowBorder]}
+              style={[
+                styles.experienceRow,
+                index > 0 && styles.experienceRowBorder,
+                option.availability !== 'available' && styles.experienceRowDisabled,
+              ]}
             >
               <View style={styles.experienceRowHeader}>
                 <Text style={styles.experienceRowTitle}>{option.name}</Text>
+                {option.availability === 'available' ? (
+                  <View style={styles.experienceBadge}>
+                    <Text style={styles.experienceBadgeText}>{option.priceLabel}</Text>
+                  </View>
+                ) : (
+                  <OptionAvailabilityBadge availability={option.availability} />
+                )}
               </View>
               {option.description ? (
                 <Text style={styles.experienceRowMeta}>{option.description}</Text>

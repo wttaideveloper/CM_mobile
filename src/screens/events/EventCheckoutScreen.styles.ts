@@ -147,20 +147,9 @@ export const styles = StyleSheet.create({
     color: TEXT_BLACK,
     fontWeight: '600',
   },
-  totalDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: BORDER,
-    marginVertical: 2,
-  },
-  totalLabel: {
-    fontSize: isSmallDevice ? 14.5 : 15.5,
-    color: TEXT_BLACK,
-    fontWeight: '800',
-  },
-  totalValue: {
-    fontSize: isSmallDevice ? 16 : 18,
-    color: PRIMARY,
-    fontWeight: '900',
+  /** Phase 2.8 — wraps a Meals/Accommodation EventOptionChips block. */
+  optionSection: {
+    marginBottom: isSmallDevice ? 16 : 18,
   },
   demoBanner: {
     flexDirection: 'row',

@@ -372,6 +372,23 @@ export const styles = StyleSheet.create({
     color: PRIMARY,
     letterSpacing: 0.2,
   },
+  /** Sold out / outside purchase window (Phase 2.8) — a neutral muted badge, matching the app's existing opacity-based "disabled" convention rather than an error color (this isn't a failure state). */
+  experienceBadgeMuted: {
+    alignSelf: 'flex-start',
+    backgroundColor: CARD_BG,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  experienceBadgeTextMuted: {
+    fontSize: isSmallDevice ? 9.5 : 10.5,
+    fontWeight: '800',
+    color: TEXT_MUTED,
+    letterSpacing: 0.2,
+  },
+  experienceRowDisabled: {
+    opacity: 0.5,
+  },
   experienceActionText: {
     fontSize: isSmallDevice ? 12 : 13,
     fontWeight: '800',

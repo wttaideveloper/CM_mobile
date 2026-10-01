@@ -5,13 +5,33 @@ import type {
   EventTicketOption,
 } from '@/types/event.types';
 
-/** Normalized meal option — id/active passthrough from the API; description/date default to null; date is pre-formatted for display (mirrors dateTime/schedule elsewhere on Event), matching option.active semantics (false = retired, kept for history). */
+/**
+ * Whether an (already active) option can be newly selected right now —
+ * computed once at mapping time from the backend's own sold_out/
+ * purchase_start_at/purchase_end_at fields, never from a local capacity
+ * count (see event.mapper.ts normalizeEventMealOption). A snapshot, not
+ * live — re-fetch the event for a fresh value.
+ */
+export type EventOptionAvailability = 'available' | 'sold_out' | 'unavailable';
+
+/** Normalized meal option — id/active passthrough from the API; description/date default to null; date is pre-formatted for display (mirrors dateTime/schedule elsewhere on Event), matching option.active semantics (false = retired, kept for history). Pricing/capacity/window fields added Phase 2.8. */
 export type EventMealOption = {
   id: string;
   name: string;
   description: string | null;
   date: string | null;
   active: boolean;
+  price: number;
+  priceLabel: string;
+  currency: string;
+  /** Maximum selections allowed. null = unlimited. */
+  capacity: number | null;
+  /** null = unlimited (not computed). */
+  remainingCapacity: number | null;
+  availability: EventOptionAvailability;
+  /** Informational/fulfilment only — when the meal is actually served. */
+  serviceStartAtLabel: string | null;
+  serviceEndAtLabel: string | null;
 };
 
 export type EventMeals = {
@@ -25,6 +45,14 @@ export type EventAccommodationOption = {
   name: string;
   description: string | null;
   active: boolean;
+  price: number;
+  priceLabel: string;
+  currency: string;
+  capacity: number | null;
+  remainingCapacity: number | null;
+  availability: EventOptionAvailability;
+  serviceStartAtLabel: string | null;
+  serviceEndAtLabel: string | null;
 };
 
 export type EventAccommodation = {

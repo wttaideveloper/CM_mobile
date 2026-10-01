@@ -5,9 +5,14 @@ import type {
   EventFilterTag,
   EventMealOption,
   EventMeals,
+  EventOptionAvailability,
 } from '@/constants/events';
 import type {
+  AttendeeAccommodationSelectionApiResponse,
+  AttendeeMealSelectionApiResponse,
   EventApiResponse,
+  EventCheckoutQuote,
+  EventCheckoutQuoteApiResponse,
   EventFormField,
   EventFormFieldApiResponse,
   EventFormFieldOption,
@@ -34,6 +39,7 @@ import type {
   MyWaitlistApiResponse,
   MyWaitlistEntry,
   MyWaitlistStatus,
+  PurchasedOption,
 } from '@/types/event.types';
 import { formatMoney } from '@/utils/currency';
 import {
@@ -95,7 +101,79 @@ function normalizeEventModules(modules?: EventModules | null): EventModules {
   };
 }
 
-function normalizeEventMealOption(option: EventMealOptionApiResponse): EventMealOption | null {
+/**
+ * Phase 2.8 — an already-active option's current selectability, computed
+ * once at mapping time from the backend's own sold_out/purchase window
+ * fields. Never derive this from a local capacity count: the backend is
+ * authoritative, and reserved_count/capacity are informational-only here.
+ */
+function computeOptionAvailability(
+  soldOut: boolean,
+  purchaseStartAt: Date | null,
+  purchaseEndAt: Date | null,
+): EventOptionAvailability {
+  if (soldOut) return 'sold_out';
+  const now = Date.now();
+  if (purchaseStartAt && purchaseStartAt.getTime() > now) return 'unavailable';
+  if (purchaseEndAt && purchaseEndAt.getTime() <= now) return 'unavailable';
+  return 'available';
+}
+
+type PricedOptionSource = {
+  price?: number | null;
+  currency?: string | null;
+  capacity?: number | null;
+  remaining_capacity?: number | null;
+  sold_out?: boolean | null;
+  purchase_start_at?: string | null;
+  purchase_end_at?: string | null;
+  service_start_at?: string | null;
+  service_end_at?: string | null;
+};
+
+type PricedOptionFields = {
+  price: number;
+  priceLabel: string;
+  currency: string;
+  capacity: number | null;
+  remainingCapacity: number | null;
+  availability: EventOptionAvailability;
+  serviceStartAtLabel: string | null;
+  serviceEndAtLabel: string | null;
+};
+
+/** Shared by meal and accommodation options — the only difference between the two option kinds is the `date` field meals carry, handled by each caller separately. */
+function normalizePricedOptionFields(
+  option: PricedOptionSource,
+  eventCurrency?: string | null,
+): PricedOptionFields {
+  const price = Number.isFinite(option.price) ? Number(option.price) : 0;
+  const currency = option.currency?.trim() || eventCurrency?.trim() || 'INR';
+  const capacity = Number.isFinite(option.capacity) ? Number(option.capacity) : null;
+  const remainingCapacity = Number.isFinite(option.remaining_capacity)
+    ? Number(option.remaining_capacity)
+    : null;
+  const purchaseStartAt = safeParseDate(option.purchase_start_at);
+  const purchaseEndAt = safeParseDate(option.purchase_end_at);
+  const serviceStartAt = safeParseDate(option.service_start_at);
+  const serviceEndAt = safeParseDate(option.service_end_at);
+
+  return {
+    price,
+    priceLabel: formatMoney(price, currency),
+    currency,
+    capacity,
+    remainingCapacity,
+    availability: computeOptionAvailability(Boolean(option.sold_out), purchaseStartAt, purchaseEndAt),
+    serviceStartAtLabel: serviceStartAt ? formatEventDateTime(serviceStartAt) : null,
+    serviceEndAtLabel: serviceEndAt ? formatEventDateTime(serviceEndAt) : null,
+  };
+}
+
+function normalizeEventMealOption(
+  option: EventMealOptionApiResponse,
+  eventCurrency?: string | null,
+): EventMealOption | null {
   const id = option?.id != null ? String(option.id).trim() : '';
   const name = option?.name?.trim();
   if (!id || !name) return null;
@@ -112,6 +190,7 @@ function normalizeEventMealOption(option: EventMealOptionApiResponse): EventMeal
     description: option.description?.trim() || null,
     date: parsedDate ? formatISTShortDate(parsedDate) : null,
     active: Boolean(option.active),
+    ...normalizePricedOptionFields(option, eventCurrency),
   };
 }
 
@@ -122,10 +201,13 @@ function normalizeEventMealOption(option: EventMealOptionApiResponse): EventMeal
  * configured events resolve to {enabled:false, options:[]} server-side;
  * this only guards a genuinely missing/malformed response.
  */
-function normalizeEventMeals(meals?: EventMealsApiResponse | null): EventMeals {
+function normalizeEventMeals(
+  meals?: EventMealsApiResponse | null,
+  eventCurrency?: string | null,
+): EventMeals {
   const options = Array.isArray(meals?.options)
     ? meals!.options
-        .map(normalizeEventMealOption)
+        .map((option) => normalizeEventMealOption(option, eventCurrency))
         .filter((option): option is EventMealOption => option !== null)
     : [];
   return { enabled: Boolean(meals?.enabled), options };
@@ -133,6 +215,7 @@ function normalizeEventMeals(meals?: EventMealsApiResponse | null): EventMeals {
 
 function normalizeEventAccommodationOption(
   option: EventAccommodationOptionApiResponse,
+  eventCurrency?: string | null,
 ): EventAccommodationOption | null {
   const id = option?.id != null ? String(option.id).trim() : '';
   const name = option?.name?.trim();
@@ -143,6 +226,7 @@ function normalizeEventAccommodationOption(
     name,
     description: option.description?.trim() || null,
     active: Boolean(option.active),
+    ...normalizePricedOptionFields(option, eventCurrency),
   };
 }
 
@@ -154,10 +238,11 @@ function normalizeEventAccommodationOption(
  */
 function normalizeEventAccommodation(
   accommodation?: EventAccommodationApiResponse | null,
+  eventCurrency?: string | null,
 ): EventAccommodation {
   const options = Array.isArray(accommodation?.options)
     ? accommodation!.options
-        .map(normalizeEventAccommodationOption)
+        .map((option) => normalizeEventAccommodationOption(option, eventCurrency))
         .filter((option): option is EventAccommodationOption => option !== null)
     : [];
   return { enabled: Boolean(accommodation?.enabled), options };
@@ -385,6 +470,26 @@ function buildTicketOptions(
     });
 }
 
+/**
+ * Maps POST /checkout/quote's response (Phase 2.8). Every subtotal/discount/
+ * tax is pre-formatted for display only — grandTotal/grandTotalLabel are the
+ * sole values the app may present as "the total due"; never sum the other
+ * fields to recompute it client-side.
+ */
+export function mapCheckoutQuoteApiResponse(api: EventCheckoutQuoteApiResponse): EventCheckoutQuote {
+  const currency = api.currency || 'INR';
+  return {
+    ticketSubtotalLabel: formatMoney(api.ticket_subtotal, currency),
+    mealSubtotalLabel: formatMoney(api.meal_subtotal, currency),
+    accommodationSubtotalLabel: formatMoney(api.accommodation_subtotal, currency),
+    discountLabel: formatMoney(api.discount, currency),
+    taxLabel: formatMoney(api.tax, currency),
+    grandTotal: api.grand_total,
+    grandTotalLabel: formatMoney(api.grand_total, currency),
+    currency,
+  };
+}
+
 export function mapEventApiToItem(api: EventApiResponse): Event {
   const start = safeParseDate(api.start_date);
   const end = safeParseDate(api.end_date);
@@ -450,8 +555,8 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
     venueMapUrl: api.venue?.map_url?.trim() || null,
     eventType: resolveEventType(api.event_type),
     modules: normalizeEventModules(api.modules),
-    meals: normalizeEventMeals(api.meals),
-    accommodation: normalizeEventAccommodation(api.accommodation),
+    meals: normalizeEventMeals(api.meals, api.currency),
+    accommodation: normalizeEventAccommodation(api.accommodation, api.currency),
   };
 }
 
@@ -550,6 +655,49 @@ function classifyMyEventBucket(
   return 'upcoming';
 }
 
+/**
+ * One purchased/selected option (meal or accommodation) from GET
+ * /my/registrations. `priceLabel` is intentionally null unless the backend
+ * marked this a confirmed purchase (a real EventRegistrationOption snapshot
+ * backs it) — the backend still sends a `price` for an unconfirmed/legacy
+ * "selected" entry (its current LIVE price), but showing that here would
+ * misrepresent a live price as a historical purchase price, so it's
+ * deliberately discarded for anything not `status: "confirmed"`.
+ */
+function mapPurchasedOption(
+  selection: { name: string | null; price: number | null; currency: string | null; status: 'confirmed' | 'selected' },
+  fallbackId: string,
+): PurchasedOption {
+  const isConfirmedPurchase = selection.status === 'confirmed';
+  return {
+    id: fallbackId,
+    name: selection.name?.trim() || 'Option',
+    isConfirmedPurchase,
+    priceLabel:
+      isConfirmedPurchase && selection.price != null
+        ? formatMoney(selection.price, selection.currency || 'INR')
+        : null,
+  };
+}
+
+function mapPurchasedMealSelections(
+  selections?: AttendeeMealSelectionApiResponse[],
+): PurchasedOption[] {
+  if (!Array.isArray(selections)) return [];
+  return selections
+    .filter((selection) => selection?.meal_id)
+    .map((selection) => mapPurchasedOption(selection, String(selection.meal_id)));
+}
+
+function mapPurchasedAccommodationSelections(
+  selections?: AttendeeAccommodationSelectionApiResponse[],
+): PurchasedOption[] {
+  if (!Array.isArray(selections)) return [];
+  return selections
+    .filter((selection) => selection?.accommodation_id)
+    .map((selection) => mapPurchasedOption(selection, String(selection.accommodation_id)));
+}
+
 export function mapMyRegistrationApiToItem(
   api: EventMyRegistrationApiResponse,
 ): MyEventRegistration {
@@ -567,6 +715,8 @@ export function mapMyRegistrationApiToItem(
     hasQr: Boolean(api.qr_code),
     checkedInAt: safeParseDate(api.checked_in_at),
     bucket: classifyMyEventBucket(api.registration_status, api.event_status ?? null, eventStart),
+    mealSelections: mapPurchasedMealSelections(api.meal_selections),
+    accommodationSelections: mapPurchasedAccommodationSelections(api.accommodation_selections),
   };
 }
 

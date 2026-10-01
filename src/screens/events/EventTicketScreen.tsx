@@ -192,6 +192,34 @@ export function EventTicketScreen() {
             </Text>
           ) : null}
 
+          {registration.mealSelections.length > 0 ? (
+            <View style={styles.purchasedSection}>
+              <Text style={styles.purchasedSectionTitle}>Meals</Text>
+              {registration.mealSelections.map((option) => (
+                <View key={option.id} style={styles.purchasedRow}>
+                  <Text style={styles.purchasedName}>✓ {option.name}</Text>
+                  {option.priceLabel ? (
+                    <Text style={styles.purchasedPrice}>{option.priceLabel}</Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {registration.accommodationSelections.length > 0 ? (
+            <View style={styles.purchasedSection}>
+              <Text style={styles.purchasedSectionTitle}>Accommodation</Text>
+              {registration.accommodationSelections.map((option) => (
+                <View key={option.id} style={styles.purchasedRow}>
+                  <Text style={styles.purchasedName}>✓ {option.name}</Text>
+                  {option.priceLabel ? (
+                    <Text style={styles.purchasedPrice}>{option.priceLabel}</Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           <View style={styles.qrWrap}>
             {!registration.hasQr ? (
               <View style={styles.qrState}>
