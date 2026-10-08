@@ -3,7 +3,7 @@ import { SearchSectionHeading } from '@/components/search/SearchSectionHeading';
 import { SearchResultsSkeleton } from '@/components/ui/Skeleton.screens';
 import type { Course } from '@/constants/courses';
 import type { Event } from '@/constants/events';
-import { CourseCard } from '@/screens/events/courses/CoursesScreen';
+import { CourseCard } from '@/screens/trainingsAndCourses/courses/CoursesScreen';
 import { EventCard } from '@/screens/events/EventsScreen';
 import { EnterpriseRow } from '@/screens/enterprise/EnterprisesScreen';
 import { ProductGridCard } from '@/screens/shop/products/ProductsScreen';

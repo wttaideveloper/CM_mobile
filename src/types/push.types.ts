@@ -6,8 +6,16 @@ export type PushNotificationType =
   (typeof PUSH_NOTIFICATION_TYPES)[keyof typeof PUSH_NOTIFICATION_TYPES];
 
 export type PushNotificationData = {
+  /** Legacy chat type; training routes use `category`. */
   type?: PushNotificationType | string;
   conversationId?: string;
+  category?: string;
+  trainingId?: string;
+  enrolmentId?: string;
+  status?: string;
+  announcementId?: string;
+  discussionId?: string;
+  certificateUrl?: string;
 };
 
 export type RegisterDeviceRequest = {

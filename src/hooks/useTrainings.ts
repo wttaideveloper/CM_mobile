@@ -3,6 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { trainingService } from '@/services/training.service';
+import { useAuthStore } from '@/stores/auth.store';
 import type { ApiError } from '@/types/api.types';
 import type {
   TrainingDetailView,
@@ -11,9 +12,9 @@ import type {
   TrainingWishlistApiItem,
 } from '@/types/training.types';
 import { mapAssessmentDetailToExam } from '@/utils/mapAssessmentDetailToExam';
-import { mapTrainingsApiToListItems } from '@/utils/marketTraining.mapper';
-import { mapTrainingContentToProgressPath } from '@/utils/marketTrainingContent.mapper';
-import { mapWishlistApiItem } from '@/utils/marketTrainingWishlist.mapper';
+import { mapTrainingsApiToListItems } from '@/utils/training.mapper';
+import { mapTrainingContentToProgressPath } from '@/utils/trainingContent.mapper';
+import { mapWishlistApiItem } from '@/utils/trainingWishlist.mapper';
 
 export const trainingKeys = {
   all: ['trainings'] as const,
@@ -21,21 +22,32 @@ export const trainingKeys = {
     [...trainingKeys.all, 'list', params] as const,
   marketPreview: () => [...trainingKeys.all, 'market-preview'] as const,
   detail: (id: string) => [...trainingKeys.all, 'detail', id] as const,
-  content: (id: string) => [...trainingKeys.all, 'content', id] as const,
-  progress: (id: string) => [...trainingKeys.all, 'progress', id] as const,
+  content: (id: string, userId = '') =>
+    [...trainingKeys.all, 'content', userId, id] as const,
+  progress: (id: string, userId = '') =>
+    [...trainingKeys.all, 'progress', userId, id] as const,
   assessment: (trainingId: string, assessmentId: string) =>
     [...trainingKeys.all, 'assessment', trainingId, assessmentId] as const,
   assignments: (trainingId: string) =>
     [...trainingKeys.all, 'assignments', trainingId] as const,
-  wishlist: () => [...trainingKeys.all, 'wishlist'] as const,
-  enrolments: (status?: string) =>
-    [...trainingKeys.all, 'enrolments', status ?? 'all'] as const,
+  wishlist: (userId = '') =>
+    [...trainingKeys.all, 'wishlist', userId] as const,
+  enrolments: (userId = '', status?: string) =>
+    [...trainingKeys.all, 'enrolments', userId, status ?? 'all'] as const,
   reviews: (id: string) => [...trainingKeys.all, 'reviews', id] as const,
   discussions: (id: string) => [...trainingKeys.all, 'discussions', id] as const,
   announcements: (id: string) =>
     [...trainingKeys.all, 'announcements', id] as const,
   certificate: (id: string) => [...trainingKeys.all, 'certificate', id] as const,
 };
+
+function currentTrainingUserId(): string {
+  return useAuthStore.getState().user?.id?.trim() || '';
+}
+
+function useTrainingUserId(): string {
+  return useAuthStore((s) => s.user?.id?.trim() || '');
+}
 
 export function isApiTrainingId(id?: string | null): boolean {
   if (!id) return false;
@@ -45,7 +57,7 @@ export function isApiTrainingId(id?: string | null): boolean {
 }
 
 /** Market home: first page; UI shows first 2. */
-export function useMarketTrainingsPreview() {
+export function useTrainingsPreview() {
   const query = useQuery({
     queryKey: trainingKeys.marketPreview(),
     queryFn: () =>
@@ -133,10 +145,11 @@ export function useTraining(id?: string) {
 
 /** GET /api/v1/trainings/{id}/content — enrolled curriculum for progress screen. */
 export function useTrainingContent(id?: string) {
-  const enabled = isApiTrainingId(id);
+  const userId = useTrainingUserId();
+  const enabled = isApiTrainingId(id) && Boolean(userId);
 
   const query = useQuery({
-    queryKey: trainingKeys.content(id ?? ''),
+    queryKey: trainingKeys.content(id ?? '', userId),
     queryFn: () => trainingService.getContent(id!),
     enabled,
     staleTime: 30_000,
@@ -166,10 +179,11 @@ export function useTrainingContent(id?: string) {
 
 /** GET /api/v1/trainings/{id}/progress — resume lesson + watch positions. */
 export function useTrainingProgress(id?: string) {
-  const enabled = isApiTrainingId(id);
+  const userId = useTrainingUserId();
+  const enabled = isApiTrainingId(id) && Boolean(userId);
 
   return useQuery({
-    queryKey: trainingKeys.progress(id ?? ''),
+    queryKey: trainingKeys.progress(id ?? '', userId),
     queryFn: () => trainingService.getProgress(id!),
     enabled,
     staleTime: 15_000,
@@ -209,10 +223,11 @@ export function useCompleteTrainingLesson(trainingId?: string) {
       trainingService.completeLesson(id, { lesson_id: lessonId }),
     onSuccess: () => {
       if (!isApiTrainingId(id)) return;
-      void queryClient.invalidateQueries({ queryKey: trainingKeys.content(id) });
-      void queryClient.invalidateQueries({ queryKey: trainingKeys.progress(id) });
+      const userId = currentTrainingUserId();
+      void queryClient.invalidateQueries({ queryKey: trainingKeys.content(id, userId) });
+      void queryClient.invalidateQueries({ queryKey: trainingKeys.progress(id, userId) });
       void queryClient.invalidateQueries({
-        queryKey: trainingKeys.enrolments(),
+        queryKey: trainingKeys.enrolments(userId),
       });
       void queryClient.invalidateQueries({
         queryKey: trainingKeys.certificate(id),
@@ -266,9 +281,10 @@ export function useRecordLiveSessionAttendance(trainingId?: string) {
       trainingService.recordLiveSessionAttendance(id, sessionId, {}),
     onSuccess: () => {
       if (!isApiTrainingId(id)) return;
-      void queryClient.invalidateQueries({ queryKey: trainingKeys.content(id) });
+      const userId = currentTrainingUserId();
+      void queryClient.invalidateQueries({ queryKey: trainingKeys.content(id, userId) });
       void queryClient.invalidateQueries({
-        queryKey: trainingKeys.enrolments(),
+        queryKey: trainingKeys.enrolments(userId),
       });
     },
   });
@@ -287,9 +303,10 @@ export function useRecordLessonAttendance(trainingId?: string) {
       trainingService.recordLessonAttendance(id, lessonId, {}),
     onSuccess: () => {
       if (!isApiTrainingId(id)) return;
-      void queryClient.invalidateQueries({ queryKey: trainingKeys.content(id) });
+      const userId = currentTrainingUserId();
+      void queryClient.invalidateQueries({ queryKey: trainingKeys.content(id, userId) });
       void queryClient.invalidateQueries({
-        queryKey: trainingKeys.enrolments(),
+        queryKey: trainingKeys.enrolments(userId),
       });
     },
   });
@@ -374,7 +391,8 @@ export function useSubmitTrainingAssessment(trainingId?: string) {
       }),
     onSuccess: (_result, variables) => {
       if (!isApiTrainingId(id)) return;
-      void queryClient.invalidateQueries({ queryKey: trainingKeys.content(id) });
+      const userId = currentTrainingUserId();
+      void queryClient.invalidateQueries({ queryKey: trainingKeys.content(id, userId) });
       void queryClient.invalidateQueries({
         queryKey: trainingKeys.assignments(id),
       });
@@ -384,7 +402,7 @@ export function useSubmitTrainingAssessment(trainingId?: string) {
         });
       }
       void queryClient.invalidateQueries({
-        queryKey: trainingKeys.enrolments(),
+        queryKey: trainingKeys.enrolments(userId),
       });
     },
   });
@@ -409,15 +427,16 @@ export function useEnrollTraining() {
         custom_values: input.custom_values,
       }),
     onSuccess: (_data, variables) => {
+      const userId = currentTrainingUserId();
       void queryClient.invalidateQueries({ queryKey: trainingKeys.all });
       void queryClient.invalidateQueries({
         queryKey: trainingKeys.detail(variables.id),
       });
       void queryClient.invalidateQueries({
-        queryKey: trainingKeys.enrolments(),
+        queryKey: trainingKeys.enrolments(userId),
       });
       void queryClient.invalidateQueries({
-        queryKey: trainingKeys.wishlist(),
+        queryKey: trainingKeys.wishlist(userId),
       });
     },
   });
@@ -451,9 +470,11 @@ function isPendingApprovalStatus(status?: string | null): boolean {
 
 /** GET /api/v1/trainings/my/enrolments */
 export function useMyTrainingEnrolments(status?: string) {
+  const userId = useTrainingUserId();
   const query = useQuery({
-    queryKey: trainingKeys.enrolments(status),
+    queryKey: trainingKeys.enrolments(userId, status),
     queryFn: () => trainingService.getMyEnrolments(status),
+    enabled: Boolean(userId),
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     retry: 1,
@@ -494,9 +515,11 @@ export function useMyTrainingEnrolments(status?: string) {
 
 /** GET /api/v1/trainings/my/wishlist */
 export function useMyTrainingWishlist() {
+  const userId = useTrainingUserId();
   const query = useQuery({
-    queryKey: trainingKeys.wishlist(),
+    queryKey: trainingKeys.wishlist(userId),
     queryFn: () => trainingService.getMyWishlist(),
+    enabled: Boolean(userId),
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     retry: 1,
@@ -535,13 +558,15 @@ export function useToggleTrainingWishlist() {
       return { trainingId: input.trainingId, removed: false as const, row };
     },
     onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: trainingKeys.wishlist() });
+      const userId = currentTrainingUserId();
+      const wishlistKey = trainingKeys.wishlist(userId);
+      await queryClient.cancelQueries({ queryKey: wishlistKey });
       const previous = queryClient.getQueryData<TrainingWishlistApiItem[]>(
-        trainingKeys.wishlist(),
+        wishlistKey,
       );
 
       queryClient.setQueryData<TrainingWishlistApiItem[]>(
-        trainingKeys.wishlist(),
+        wishlistKey,
         (current = []) => {
           if (input.wishlisted) {
             return current.filter(
@@ -571,17 +596,18 @@ export function useToggleTrainingWishlist() {
         },
       );
 
-      return { previous };
+      return { previous, wishlistKey };
     },
     onError: (_error, _input, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(trainingKeys.wishlist(), context.previous);
+      if (context?.previous && context.wishlistKey) {
+        queryClient.setQueryData(context.wishlistKey, context.previous);
       }
     },
     onSuccess: (result) => {
       if (!result.removed && result.row) {
+        const wishlistKey = trainingKeys.wishlist(currentTrainingUserId());
         queryClient.setQueryData<TrainingWishlistApiItem[]>(
-          trainingKeys.wishlist(),
+          wishlistKey,
           (current = []) => {
             const withoutTemp = current.filter(
               (row) =>

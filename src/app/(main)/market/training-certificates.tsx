@@ -1,3 +1,3 @@
-import { MarketTrainingCertificatesScreen } from '@/screens/market/MarketTrainingCertificatesScreen';
+import { TrainingCertificatesScreen } from '@/screens/trainingsAndCourses/TrainingCertificatesScreen';
 
-export default MarketTrainingCertificatesScreen;
+export default TrainingCertificatesScreen;

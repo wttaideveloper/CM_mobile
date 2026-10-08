@@ -26,7 +26,7 @@ import { MarketBusinessAvatar } from '@/components/market/MarketBusinessAvatar';
 import {
   MARKET_BORDER,
   MARKET_BUSINESSES,
-  MARKET_EVENTS,
+  // MARKET_EVENTS, // static course teaser — kept in data file, unused while hidden
   MARKET_GREEN,
   MARKET_MUTED,
   MARKET_OFFERS,
@@ -38,13 +38,13 @@ import {
   type MarketOffer,
   type MarketPillar,
 } from '@/components/market/marketDashboardData';
-import { MARKET_TRAININGS } from '@/components/market/marketTrainingData';
-import { MarketTrainingCard } from '@/components/market/MarketTrainingCard';
+// import { MARKET_TRAININGS } from '@/components/trainingsAndCourses/trainingData'; // static teasers hidden
+import { TrainingCard } from '@/components/trainingsAndCourses/TrainingCard';
 import { FEATURED_BUSINESSES_ALL } from '@/components/market/marketBusinessListData';
 import type { Event } from '@/constants/events';
 import { useEvents } from '@/hooks/useEvents';
 import { useMarketHomeData } from '@/hooks/useMarketHome';
-import { useMarketTrainingsPreview } from '@/hooks/useTrainings';
+import { useTrainingsPreview } from '@/hooks/useTrainings';
 import { IST_TIMEZONE } from '@/utils/dateTime';
 import { detailHref } from '@/utils/searchNavigation';
 import {
@@ -299,7 +299,7 @@ export function MarketBody({
     isFetching,
   } = useMarketHomeData(searchQuery);
   const { items: apiTrainingsPreview, isLoading: isTrainingsLoading } =
-    useMarketTrainingsPreview();
+    useTrainingsPreview();
   const { data: apiEvents, isLoading: isEventsLoading } = useEvents();
 
   const featuredBusinesses =
@@ -348,11 +348,11 @@ export function MarketBody({
   const bizTitle = isSearching ? 'Businesses' : 'Featured businesses';
   const showLoading = isLoading || (isFetching && isSearching);
 
-  // MARKET_EVENTS now holds only its "course" entry (the fabricated "event"
-  // entry was removed from the data file) — the real event row comes from
-  // the Events API instead.
+  // Real event row from Events API.
   const realEventTeaserItems = (apiEvents ?? []).slice(0, 1).map(toMarketEventItem);
-  const eventTeaserItems = [...realEventTeaserItems, ...MARKET_EVENTS];
+  // MARKET_EVENTS held a static "course" teaser — hide for now (keep data file).
+  // const eventTeaserItems = [...realEventTeaserItems, ...MARKET_EVENTS];
+  const eventTeaserItems = [...realEventTeaserItems];
 
   return (
     <View style={styles.body}>
@@ -455,7 +455,7 @@ export function MarketBody({
       {showEvents ? (
         <View style={styles.section}>
           <SectionLabel
-            title="Events & courses"
+            title="Events"
             action="See all"
             onActionPress={() => router.push('/(main)/events')}
           />
@@ -509,9 +509,9 @@ export function MarketBody({
       {showTrainings ? (
         <View style={styles.section}>
           <SectionLabel
-            title="Trainings"
+            title="Trainings & courses"
             action="See all"
-            onActionPress={() => router.push('/(main)/market/trainings')}
+            onActionPress={() => router.push('/(main)/(tabs)/events-training')}
           />
           {isTrainingsLoading && apiTrainingsPreview.length === 0 ? (
             <View style={styles.bizLoading}>
@@ -519,11 +519,13 @@ export function MarketBody({
             </View>
           ) : null}
           {apiTrainingsPreview.map((item) => (
-            <MarketTrainingCard key={`api-${item.id}`} item={item} />
+            <TrainingCard key={`api-${item.id}`} item={item} />
           ))}
+          {/* Static training teasers — hide for now (keep MARKET_TRAININGS data).
           {MARKET_TRAININGS.slice(0, 2).map((item) => (
-            <MarketTrainingCard key={`static-${item.id}`} item={item} />
+            <TrainingCard key={`static-${item.id}`} item={item} />
           ))}
+          */}
         </View>
       ) : null}
 

@@ -254,19 +254,22 @@ export function MarketChatIcon({ color = '#257d3f', size = 16 }: IconProps) {
 }
 
 export function MarketInboxIcon({ color = '#fff', size = 18 }: IconProps) {
+  // Classic inbox tray (readable at small header sizes).
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M4 6h16v12H4z"
+        d="M22 12h-6l-2 3h-4l-2-3H2"
         stroke={color}
-        strokeWidth={1.7}
+        strokeWidth={1.85}
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
       <Path
-        d="M4 13h4a4 4 0 0 0 8 0h4"
+        d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"
         stroke={color}
-        strokeWidth={1.7}
+        strokeWidth={1.85}
         strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </Svg>
   );

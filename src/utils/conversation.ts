@@ -5,6 +5,16 @@ export function isApiConversationId(conversationId: string): boolean {
   return UUID_RE.test(conversationId);
 }
 
+/**
+ * Messaging is allowed only while status is `open`.
+ * Archive uses `is_archived` separately and must not block send.
+ */
 export function isConversationClosed(status: string): boolean {
-  return status.toLowerCase() === 'closed';
+  const normalized = status.trim().toLowerCase();
+  if (!normalized) return false;
+  return normalized !== 'open';
+}
+
+export function isConversationOpen(status: string): boolean {
+  return !isConversationClosed(status);
 }

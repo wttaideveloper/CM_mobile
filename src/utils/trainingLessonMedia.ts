@@ -182,7 +182,8 @@ export function resolveLessonBodyText(
 export function resolveAbsoluteApiUrl(url: string): string {
   const trimmed = trim(url);
   if (!trimmed) return '';
-  if (/^(file|content|asset|ph|assets-library):/i.test(trimmed)) return trimmed;
+  // Keep data URIs / local schemes intact (do not prefix with API host).
+  if (/^(data|file|content|asset|ph|assets-library):/i.test(trimmed)) return trimmed;
 
   const configuredBase = API_CONFIG.BASE_URL.replace(/\/$/, '');
   // If env points at an insecure IP, still serve media via the known HTTPS host.

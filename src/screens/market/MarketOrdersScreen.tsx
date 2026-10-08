@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,28 +8,15 @@ import { MarketOrdersHeader } from '@/components/market/MarketOrdersHeader';
 import {
   ORDERS_BG,
   ORDERS_GREEN,
-  ORDERS_TABS,
   type OrdersTab,
 } from '@/components/market/marketOrdersData';
 import { useScrollToTopOnFocus } from '@/hooks/useScrollToTopOnFocus';
 
-function parseOrdersTab(value?: string | string[]): OrdersTab {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (raw && (ORDERS_TABS as string[]).includes(raw)) {
-    return raw as OrdersTab;
-  }
-  return 'Subscriptions';
-}
-
 export function MarketOrdersScreen() {
   const insets = useSafeAreaInsets();
   const scrollRef = useScrollToTopOnFocus();
-  const { tab } = useLocalSearchParams<{ tab?: string }>();
-  const [activeTab, setActiveTab] = useState<OrdersTab>(() => parseOrdersTab(tab));
-
-  useEffect(() => {
-    setActiveTab(parseOrdersTab(tab));
-  }, [tab]);
+  const [activeTab, setActiveTab] =
+    useState<OrdersTab>('Trainings and Courses');
 
   return (
     <View style={styles.screen}>

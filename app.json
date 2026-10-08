@@ -77,6 +77,15 @@
         }
       ],
       [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow InvigorateHealth to access your photos.",
+          "savePhotosPermission": "Allow InvigorateHealth to save photos and videos from chat.",
+          "isAccessMediaLocationEnabled": true,
+          "granularPermissions": ["photo", "video"]
+        }
+      ],
+      [
         "expo-speech-recognition",
         {
           "microphonePermission": "Allow InvigorateHealth to use the microphone for voice typing.",

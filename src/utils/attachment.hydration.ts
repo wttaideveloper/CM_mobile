@@ -7,12 +7,13 @@ import {
 } from '@/services/attachments.service';
 import type { ApiMessage } from '@/types/message.types';
 
+import { decodeAttachmentFileName } from './attachmentFileName';
 import { mapApiMessagesToChatMessages } from './message.mapper';
 import { inferChatAttachmentType } from './attachmentType';
 
 function mapAttachmentType(detail: AttachmentDetailResponse, messageType: string): ChatAttachmentType {
   return inferChatAttachmentType({
-    fileName: detail.file_name,
+    fileName: decodeAttachmentFileName(detail.file_name),
     mimeType: detail.mime_type,
     attachmentType: detail.attachment_type,
     messageType,
@@ -37,7 +38,7 @@ export function applyAttachmentDetailToChatMessage(
         duration: message.voice?.duration ?? '0:00',
         transcript: message.voice?.transcript ?? 'Voice message',
         uri: downloadUrl,
-        fileName: detail.file_name,
+        fileName: decodeAttachmentFileName(detail.file_name),
       },
     };
   }
@@ -49,16 +50,25 @@ export function applyAttachmentDetailToChatMessage(
     typeof detail.file_size === 'number'
       ? `${Math.max(1, Math.round(detail.file_size / 1024))} KB`
       : message.attachment?.size ?? '—';
+  const decodedName =
+    decodeAttachmentFileName(detail.file_name) ||
+    decodeAttachmentFileName(message.attachment?.name) ||
+    'Attachment';
 
   return {
     ...message,
     attachmentId: detail.id,
     attachment: {
       type: attachmentType,
-      name: detail.file_name || message.attachment?.name || 'Attachment',
+      name: decodedName,
       size: fileSizeKb,
       thumbnail: attachmentType === 'image' || attachmentType === 'video' ? downloadUrl : undefined,
-      uri: attachmentType === 'pdf' || attachmentType === 'word' ? downloadUrl : undefined,
+      uri:
+        attachmentType === 'pdf' ||
+        attachmentType === 'word' ||
+        attachmentType === 'video'
+          ? downloadUrl
+          : undefined,
       storage: message.attachment?.storage ?? 'S3',
     },
   };

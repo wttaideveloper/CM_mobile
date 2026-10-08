@@ -275,6 +275,12 @@ export async function downloadTrainingToLibrary(args: {
     return false;
   }
 
+  const userId = useAuthStore.getState().user?.id?.trim() || '';
+  if (!userId) {
+    Alert.alert('Download', 'Please sign in to save downloads.');
+    return false;
+  }
+
   const id = trainingDownloadId(args.trainingId, args.lessonId);
   const fileName = fileNameFromUrl(
     url,
@@ -307,6 +313,7 @@ export async function downloadTrainingToLibrary(args: {
 
     await useTrainingDownloadsStore.getState().upsert({
       id,
+      userId,
       trainingId: args.trainingId,
       trainingTitle: args.trainingTitle,
       lessonId: args.lessonId,

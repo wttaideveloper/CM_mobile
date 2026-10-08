@@ -13,10 +13,14 @@ export function formatDocDate(iso: string): string {
 
 export function MediaTile({
   item,
+  downloading,
   onPress,
+  onDownload,
 }: {
   item: MediaGalleryItem;
+  downloading?: boolean;
   onPress: (item: MediaGalleryItem) => void;
+  onDownload: (item: MediaGalleryItem) => void;
 }) {
   const uri = item.thumbnail ?? item.uri;
 
@@ -44,6 +48,27 @@ export function MediaTile({
           <Ionicons name="play" size={14} color="#FFFFFF" />
         </View>
       ) : null}
+      <Pressable
+        onPress={(event) => {
+          event.stopPropagation?.();
+          onDownload(item);
+        }}
+        disabled={downloading}
+        accessibilityRole="button"
+        accessibilityLabel={`Download ${item.name}`}
+        hitSlop={6}
+        style={({ pressed }) => [
+          styles.mediaDownloadBtn,
+          pressed && styles.pressed,
+          downloading && styles.downloadBtnDisabled,
+        ]}
+      >
+        {downloading ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <Ionicons name="download-outline" size={16} color="#FFFFFF" />
+        )}
+      </Pressable>
     </Pressable>
   );
 }
@@ -51,22 +76,27 @@ export function MediaTile({
 export function DocRow({
   item,
   opening,
+  downloading,
   onPress,
+  onDownload,
 }: {
   item: MediaGalleryItem;
   opening: boolean;
+  downloading?: boolean;
   onPress: (item: MediaGalleryItem) => void;
+  onDownload: (item: MediaGalleryItem) => void;
 }) {
   const ext = item.kind === 'word' ? 'DOC' : 'PDF';
+  const busy = opening || downloading;
 
   return (
     <Pressable
       onPress={() => onPress(item)}
       accessibilityRole="button"
       accessibilityLabel={`Open ${item.name}`}
-      accessibilityState={{ disabled: opening, busy: opening }}
+      accessibilityState={{ disabled: busy, busy }}
       style={({ pressed }) => [styles.docRow, pressed && styles.pressed]}
-      disabled={opening}
+      disabled={busy}
     >
       <View style={styles.docIconBox}>
         <Ionicons
@@ -85,6 +115,27 @@ export function DocRow({
           {item.createdAt ? ` · ${formatDocDate(item.createdAt)}` : ''}
         </Text>
       </View>
+      <Pressable
+        onPress={(event) => {
+          event.stopPropagation?.();
+          onDownload(item);
+        }}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel={`Download ${item.name}`}
+        hitSlop={8}
+        style={({ pressed }) => [
+          styles.docActionBtn,
+          pressed && styles.pressed,
+          busy && styles.downloadBtnDisabled,
+        ]}
+      >
+        {downloading ? (
+          <ActivityIndicator size="small" color={PRIMARY} />
+        ) : (
+          <Ionicons name="download-outline" size={20} color={PRIMARY} />
+        )}
+      </Pressable>
       {opening ? (
         <ActivityIndicator size="small" color={PRIMARY} />
       ) : (

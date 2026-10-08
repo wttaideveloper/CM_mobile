@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,9 +8,16 @@ import { AuthenticatedChatImage } from '@/components/chat/AuthenticatedChatImage
 type ChatImageViewerProps = {
   uri: string;
   onClose: () => void;
+  downloading?: boolean;
+  onDownload?: () => void;
 };
 
-export function ChatImageViewer({ uri, onClose }: ChatImageViewerProps) {
+export function ChatImageViewer({
+  uri,
+  onClose,
+  downloading = false,
+  onDownload,
+}: ChatImageViewerProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -21,6 +28,24 @@ export function ChatImageViewer({ uri, onClose }: ChatImageViewerProps) {
           <Pressable onPress={onClose} style={styles.backBtn} hitSlop={12}>
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </Pressable>
+          {onDownload ? (
+            <Pressable
+              onPress={onDownload}
+              disabled={downloading}
+              style={styles.actionBtn}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Download photo"
+            >
+              {downloading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="download-outline" size={24} color="#FFFFFF" />
+              )}
+            </Pressable>
+          ) : (
+            <View style={styles.actionBtn} />
+          )}
         </View>
 
         <View style={styles.imageArea}>
@@ -47,10 +72,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingBottom: 8,
   },
   backBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',

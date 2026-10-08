@@ -20,6 +20,7 @@ import {
   mapUserNotificationItems,
 } from "@/utils/notification.mapper";
 import { chatHref } from "@/utils/chatNavigation";
+import { resolveNotificationHref } from "@/utils/notificationNavigation";
 import { isSmallDevice } from "@/utils/responsive";
 
 const ITEM_GAP = isSmallDevice ? 8 : 10;
@@ -175,6 +176,22 @@ export function NotificationsScreen() {
         }
       });
 
+      const href = resolveNotificationHref({
+        category: item.category || item.notificationType,
+        trainingId: item.trainingId,
+        enrolmentId: item.enrolmentId,
+        status: item.status,
+        announcementId: item.announcementId,
+        discussionId: item.discussionId,
+        certificateUrl: item.certificateUrl,
+        conversationId: item.conversationId,
+      });
+
+      if (href) {
+        router.push(href);
+        return;
+      }
+
       if (item.conversationId) {
         router.push(chatHref(item.conversationId));
         return;
@@ -182,7 +199,7 @@ export function NotificationsScreen() {
 
       if (__DEV__) {
         console.log(
-          "[NOTIFICATIONS] Tapped notification without chat route",
+          "[NOTIFICATIONS] Tapped notification without route",
           item,
         );
       }

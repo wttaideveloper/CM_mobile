@@ -7,7 +7,8 @@ import {
   getTrainingProgressPath,
   type TrainingDay,
   type TrainingLesson,
-} from '@/components/market/marketTrainingProgressData';
+} from '@/components/trainingsAndCourses/trainingProgressData';
+import { useAuthStore } from '@/stores/auth.store';
 
 /** Videos auto-complete once watched at least this far. */
 export const VIDEO_COMPLETE_THRESHOLD = 98;
@@ -29,7 +30,8 @@ type TrainingProgressBucket = {
 };
 
 type TrainingProgressState = {
-  byTraining: Record<string, TrainingProgressBucket>;
+  /** userId → trainingId → progress */
+  byUser: Record<string, Record<string, TrainingProgressBucket>>;
   getBucket: (trainingId: string) => TrainingProgressBucket;
   setActiveLesson: (trainingId: string, lessonId: string | undefined) => void;
   setVideoWatchPercent: (
@@ -67,12 +69,18 @@ const EMPTY_BUCKET: TrainingProgressBucket = {
 
 const emptyBucket = (): TrainingProgressBucket => EMPTY_BUCKET;
 
+function currentUserId(): string | null {
+  const id = useAuthStore.getState().user?.id?.trim();
+  return id || null;
+}
+
 function ensureBucket(
-  state: { byTraining: Record<string, TrainingProgressBucket> },
+  state: { byUser: Record<string, Record<string, TrainingProgressBucket>> },
+  userId: string,
   trainingId: string,
 ): TrainingProgressBucket {
   return (
-    state.byTraining[trainingId] ?? {
+    state.byUser[userId]?.[trainingId] ?? {
       completedLessons: {},
       videoWatchPercent: {},
       examAttempts: {},
@@ -80,28 +88,51 @@ function ensureBucket(
   );
 }
 
+function writeBucket(
+  state: { byUser: Record<string, Record<string, TrainingProgressBucket>> },
+  userId: string,
+  trainingId: string,
+  bucket: TrainingProgressBucket,
+): { byUser: Record<string, Record<string, TrainingProgressBucket>> } {
+  return {
+    byUser: {
+      ...state.byUser,
+      [userId]: {
+        ...(state.byUser[userId] ?? {}),
+        [trainingId]: bucket,
+      },
+    },
+  };
+}
+
 export const useTrainingProgressStore = create<TrainingProgressState>(
   (set, get) => ({
-    byTraining: {},
+    byUser: {},
 
-    getBucket: (trainingId) => get().byTraining[trainingId] ?? emptyBucket(),
+    getBucket: (trainingId) => {
+      const userId = currentUserId();
+      if (!userId) return emptyBucket();
+      return get().byUser[userId]?.[trainingId] ?? emptyBucket();
+    },
 
     setActiveLesson: (trainingId, lessonId) => {
+      const userId = currentUserId();
+      if (!userId) return;
       set((state) => {
-        const prev = ensureBucket(state, trainingId);
-        return {
-          byTraining: {
-            ...state.byTraining,
-            [trainingId]: { ...prev, activeLessonId: lessonId },
-          },
-        };
+        const prev = ensureBucket(state, userId, trainingId);
+        return writeBucket(state, userId, trainingId, {
+          ...prev,
+          activeLessonId: lessonId,
+        });
       });
     },
 
     setVideoWatchPercent: (trainingId, lessonId, percent) => {
+      const userId = currentUserId();
+      if (!userId) return;
       const clamped = Math.max(0, Math.min(100, Math.round(percent)));
       set((state) => {
-        const prev = ensureBucket(state, trainingId);
+        const prev = ensureBucket(state, userId, trainingId);
         const nextWatch = {
           ...prev.videoWatchPercent,
           [lessonId]: Math.max(
@@ -116,49 +147,41 @@ export const useTrainingProgressStore = create<TrainingProgressState>(
         ) {
           completedLessons[lessonId] = new Date().toISOString();
         }
-        return {
-          byTraining: {
-            ...state.byTraining,
-            [trainingId]: {
-              ...prev,
-              videoWatchPercent: nextWatch,
-              completedLessons,
-              activeLessonId:
-                completedLessons[lessonId] && prev.activeLessonId === lessonId
-                  ? undefined
-                  : prev.activeLessonId,
-            },
-          },
-        };
+        return writeBucket(state, userId, trainingId, {
+          ...prev,
+          videoWatchPercent: nextWatch,
+          completedLessons,
+          activeLessonId:
+            completedLessons[lessonId] && prev.activeLessonId === lessonId
+              ? undefined
+              : prev.activeLessonId,
+        });
       });
     },
 
     completeLesson: (trainingId, lessonId) => {
+      const userId = currentUserId();
+      if (!userId) return;
       set((state) => {
-        const prev = ensureBucket(state, trainingId);
-        return {
-          byTraining: {
-            ...state.byTraining,
-            [trainingId]: {
-              ...prev,
-              completedLessons: {
-                ...prev.completedLessons,
-                [lessonId]: new Date().toISOString(),
-              },
-              videoWatchPercent: {
-                ...prev.videoWatchPercent,
-                [lessonId]: Math.max(
-                  prev.videoWatchPercent[lessonId] ?? 0,
-                  100,
-                ),
-              },
-              activeLessonId:
-                prev.activeLessonId === lessonId
-                  ? undefined
-                  : prev.activeLessonId,
-            },
+        const prev = ensureBucket(state, userId, trainingId);
+        return writeBucket(state, userId, trainingId, {
+          ...prev,
+          completedLessons: {
+            ...prev.completedLessons,
+            [lessonId]: new Date().toISOString(),
           },
-        };
+          videoWatchPercent: {
+            ...prev.videoWatchPercent,
+            [lessonId]: Math.max(
+              prev.videoWatchPercent[lessonId] ?? 0,
+              100,
+            ),
+          },
+          activeLessonId:
+            prev.activeLessonId === lessonId
+              ? undefined
+              : prev.activeLessonId,
+        });
       });
     },
 
@@ -170,8 +193,10 @@ export const useTrainingProgressStore = create<TrainingProgressState>(
       scorePercent,
       passed,
     }) => {
+      const userId = currentUserId();
+      if (!userId) return;
       set((state) => {
-        const prev = ensureBucket(state, trainingId);
+        const prev = ensureBucket(state, userId, trainingId);
         const completedLessons = { ...prev.completedLessons };
         if (lessonId) {
           completedLessons[lessonId] = new Date().toISOString();
@@ -183,25 +208,20 @@ export const useTrainingProgressStore = create<TrainingProgressState>(
           if (match) completedLessons[match.id] = new Date().toISOString();
         }
 
-        return {
-          byTraining: {
-            ...state.byTraining,
-            [trainingId]: {
-              ...prev,
-              completedLessons,
-              examAttempts: {
-                ...prev.examAttempts,
-                [examId]: {
-                  examId,
-                  answers,
-                  scorePercent,
-                  passed,
-                  submittedAt: new Date().toISOString(),
-                },
-              },
+        return writeBucket(state, userId, trainingId, {
+          ...prev,
+          completedLessons,
+          examAttempts: {
+            ...prev.examAttempts,
+            [examId]: {
+              examId,
+              answers,
+              scorePercent,
+              passed,
+              submittedAt: new Date().toISOString(),
             },
           },
-        };
+        });
       });
     },
 

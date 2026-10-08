@@ -13,12 +13,13 @@ import { AppStatusBar, StatusBarFill } from '@/components/AppStatusBar';
 
 const CHAT_STATUS_BAR = '#257d3f';
 import { ChatImageViewer } from '@/components/chat/ChatImageViewer';
+import { ChatVideoViewer } from '@/components/chat/ChatVideoViewer';
 import { DocRow, MediaTile } from '@/components/chat/ChatMediaScreenParts';
 import { DEV_USER } from '@/constants/devUser';
 import { useConversationMedia } from '@/hooks/useConversationMedia';
 import { useAuthStore } from '@/stores/auth.store';
 import { groupGalleryItems, type MediaGalleryItem } from '@/utils/conversationMedia';
-import { openChatAttachment } from '@/utils/openChatAttachment';
+import { openChatAttachment, saveChatAttachmentToDevice } from '@/utils/openChatAttachment';
 import { PRIMARY, styles, TEXT_BLACK } from '@/screens/chat/ChatMediaScreen.styles';
 
 type MediaTab = 'media' | 'docs';
@@ -31,7 +32,13 @@ export function ChatMediaScreen() {
 
   const [activeTab, setActiveTab] = useState<MediaTab>('media');
   const [viewerImageUri, setViewerImageUri] = useState<string | null>(null);
+  const [viewerVideo, setViewerVideo] = useState<{
+    uri: string;
+    fileName?: string;
+  } | null>(null);
   const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
+  const [viewerItem, setViewerItem] = useState<MediaGalleryItem | null>(null);
 
   const { mediaItems, docItems, loading, error } = useConversationMedia(conversationId, currentUserId);
 
@@ -45,14 +52,48 @@ export function ChatMediaScreen() {
     [docItems],
   );
 
+  const itemKey = (item: MediaGalleryItem) => item.attachmentId ?? item.messageId;
+
   const handleMediaPress = (item: MediaGalleryItem) => {
+    if (item.kind === 'video') {
+      const uri = item.uri || item.thumbnail;
+      if (!uri) return;
+      setViewerItem(item);
+      setViewerVideo({ uri, fileName: item.name });
+      return;
+    }
+
     const uri = item.thumbnail ?? item.uri;
     if (!uri) return;
+    setViewerItem(item);
     setViewerImageUri(uri);
   };
 
+  const handleDownload = async (item: MediaGalleryItem) => {
+    const key = itemKey(item);
+    if (downloadingAttachmentId === key) return;
+
+    setDownloadingAttachmentId(key);
+    try {
+      await saveChatAttachmentToDevice({
+        attachmentId: item.attachmentId,
+        fileName:
+          item.name ||
+          (item.kind === 'image'
+            ? 'image.jpg'
+            : item.kind === 'video'
+              ? 'video.mp4'
+              : 'attachment'),
+        uri: item.uri ?? item.thumbnail,
+        type: item.kind,
+      });
+    } finally {
+      setDownloadingAttachmentId((current) => (current === key ? null : current));
+    }
+  };
+
   const handleDocPress = async (item: MediaGalleryItem) => {
-    const openingKey = item.attachmentId ?? item.messageId;
+    const openingKey = itemKey(item);
     setOpeningAttachmentId(openingKey);
 
     try {
@@ -65,6 +106,16 @@ export function ChatMediaScreen() {
     } finally {
       setOpeningAttachmentId((current) => (current === openingKey ? null : current));
     }
+  };
+
+  const closeImageViewer = () => {
+    setViewerImageUri(null);
+    setViewerItem(null);
+  };
+
+  const closeVideoViewer = () => {
+    setViewerVideo(null);
+    setViewerItem(null);
   };
 
   const activeCount = activeTab === 'media' ? mediaItems.length : docItems.length;
@@ -134,7 +185,13 @@ export function ChatMediaScreen() {
               <Text style={styles.sectionTitle}>{section.title}</Text>
               <View style={styles.mediaGrid}>
                 {section.items.map((item) => (
-                  <MediaTile key={item.messageId} item={item} onPress={handleMediaPress} />
+                  <MediaTile
+                    key={item.messageId}
+                    item={item}
+                    downloading={downloadingAttachmentId === itemKey(item)}
+                    onPress={handleMediaPress}
+                    onDownload={(media) => void handleDownload(media)}
+                  />
                 ))}
               </View>
             </View>
@@ -152,8 +209,10 @@ export function ChatMediaScreen() {
           renderItem={({ item }) => (
             <DocRow
               item={item}
-              opening={openingAttachmentId === (item.attachmentId ?? item.messageId)}
+              opening={openingAttachmentId === itemKey(item)}
+              downloading={downloadingAttachmentId === itemKey(item)}
               onPress={(doc) => void handleDocPress(doc)}
+              onDownload={(doc) => void handleDownload(doc)}
             />
           )}
           ItemSeparatorComponent={() => <View style={styles.docSeparator} />}
@@ -161,7 +220,28 @@ export function ChatMediaScreen() {
       )}
 
       {viewerImageUri ? (
-        <ChatImageViewer uri={viewerImageUri} onClose={() => setViewerImageUri(null)} />
+        <ChatImageViewer
+          uri={viewerImageUri}
+          onClose={closeImageViewer}
+          downloading={
+            viewerItem ? downloadingAttachmentId === itemKey(viewerItem) : false
+          }
+          onDownload={
+            viewerItem ? () => void handleDownload(viewerItem) : undefined
+          }
+        />
+      ) : null}
+
+      {viewerVideo ? (
+        <ChatVideoViewer
+          uri={viewerVideo.uri}
+          fileName={viewerVideo.fileName}
+          onClose={closeVideoViewer}
+          saving={viewerItem ? downloadingAttachmentId === itemKey(viewerItem) : false}
+          onDownload={
+            viewerItem ? () => void handleDownload(viewerItem) : undefined
+          }
+        />
       ) : null}
     </View>
   );

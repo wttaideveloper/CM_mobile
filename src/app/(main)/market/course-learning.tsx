@@ -1,3 +1,3 @@
-import { CourseLearningScreen } from '@/screens/market/CourseLearningScreen';
+import { CourseLearningScreen } from '@/screens/trainingsAndCourses/CourseLearningScreen';
 
 export default CourseLearningScreen;

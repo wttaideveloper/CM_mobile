@@ -1,4 +1,11 @@
-export const IST_TIMEZONE = 'Asia/Kolkata';
+import {
+  DEFAULT_TIME_ZONE,
+  normalizeTimeZone,
+} from '@/constants/timeZones';
+
+export { DEFAULT_TIME_ZONE, normalizeTimeZone } from '@/constants/timeZones';
+
+export const IST_TIMEZONE = DEFAULT_TIME_ZONE;
 
 /** Exported for event.mapper.ts's meal/accommodation purchase/service-window parsing — see its own doc comment for why those fields need a different naive-timestamp fallback than parseApiDate's UTC default. */
 export const HAS_TIMEZONE = /[zZ]|[+-]\d{2}:\d{2}$/;
@@ -106,4 +113,85 @@ export function formatSessionStartLabel(date: Date): string {
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+/**
+ * Parse a naive ISO datetime (`2026-10-08T18:00:00`, no offset) as wall-clock
+ * time in an IANA zone (e.g. Africa/Dar_es_Salaam), returning the absolute Date.
+ *
+ * Avoids the common bug of appending `Z` then formatting in that zone
+ * (18:00 → wrongly shown as 9:00 PM in UTC+3).
+ */
+export function parseWallDateTimeInTimeZone(
+  wallIso: string,
+  timeZone: string,
+): Date {
+  const trimmed = wallIso.trim();
+  if (!trimmed) return new Date(Number.NaN);
+
+  if (HAS_TIMEZONE.test(trimmed)) {
+    return parseApiDate(trimmed);
+  }
+
+  const match = trimmed.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/,
+  );
+  if (!match) {
+    return parseApiDate(trimmed);
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6] ?? '0');
+
+  const desiredAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  const zone = normalizeTimeZone(timeZone);
+
+  let dtf: Intl.DateTimeFormat;
+  try {
+    dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return new Date(desiredAsUtc);
+  }
+
+  const readZonedAsUtcMs = (instant: number): number => {
+    const parts = dtf.formatToParts(new Date(instant));
+    const map: Record<string, string> = {};
+    for (const part of parts) {
+      if (part.type !== 'literal') map[part.type] = part.value;
+    }
+    let h = Number(map.hour);
+    if (h === 24) h = 0;
+    return Date.UTC(
+      Number(map.year),
+      Number(map.month) - 1,
+      Number(map.day),
+      h,
+      Number(map.minute),
+      Number(map.second),
+    );
+  };
+
+  // desiredAsUtc treated as UTC instant → see what wall time that is in zone,
+  // then shift so the wall time matches the requested components.
+  const actualAsUtc = readZonedAsUtcMs(desiredAsUtc);
+  let corrected = desiredAsUtc - (actualAsUtc - desiredAsUtc);
+
+  // Second pass for DST boundaries.
+  const actualAsUtc2 = readZonedAsUtcMs(corrected);
+  corrected = desiredAsUtc - (actualAsUtc2 - corrected);
+
+  return new Date(corrected);
 }

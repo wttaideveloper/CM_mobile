@@ -1,3 +1,3 @@
-import { MarketTrainingAttendanceScreen } from '@/screens/market/MarketTrainingAttendanceScreen';
+import { TrainingAttendanceScreen } from '@/screens/trainingsAndCourses/TrainingAttendanceScreen';
 
-export default MarketTrainingAttendanceScreen;
+export default TrainingAttendanceScreen;

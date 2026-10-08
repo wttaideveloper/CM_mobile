@@ -85,11 +85,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       },
       {
         id: 'my-orders',
-        title: 'My Orders',
-        subtitle: 'Subscriptions and past orders',
+        title: 'Subscriptions',
+        subtitle: 'Trainings and courses',
         icon: 'bag',
         kind: 'link',
-        href: '/(main)/market/orders?tab=Subscriptions',
+        href: '/(main)/market/orders',
       },
       {
         id: 'my-trainings',

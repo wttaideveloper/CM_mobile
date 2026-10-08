@@ -40,8 +40,16 @@ export function getCachedAuthenticatedImage(
   uri: string,
   accessToken: string | null | undefined,
 ): string | null {
-  if (!uri || !accessToken) return null;
-  return mediaCache.get(cacheKey(uri, accessToken)) ?? null;
+  if (!uri) return null;
+  if (accessToken) {
+    const exact = mediaCache.get(cacheKey(uri, accessToken));
+    if (exact) return exact;
+  }
+  // Token refresh changes the cache key — reuse any prior local file for this URL.
+  for (const [key, value] of mediaCache) {
+    if (key.startsWith(`${uri}::`)) return value;
+  }
+  return null;
 }
 
 export function getCachedAuthenticatedAttachment(
@@ -91,7 +99,8 @@ export async function downloadAuthenticatedAttachment(
   }
 
   const extension = extensionFromFileName(fileName, 'm4a');
-  const localPath = `${FileSystem.cacheDirectory}chat-attach-${Date.now()}.${extension}`;
+  // Unique path — parallel downloads in the same ms must not overwrite each other.
+  const localPath = `${FileSystem.cacheDirectory}chat-attach-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`;
 
   let result = await downloadToCache(uri, token, localPath);
 
@@ -113,6 +122,18 @@ export async function downloadAuthenticatedAttachment(
   return result.uri;
 }
 
+/** Prefer real extension from the remote URL so Android Glide/expo-image decode correctly. */
+function imageFileNameFromUri(uri: string): string {
+  try {
+    const path = uri.split('?')[0] ?? uri;
+    const leaf = path.split('/').pop() ?? '';
+    if (/\.(jpe?g|png|gif|webp|bmp|heic)$/i.test(leaf)) return leaf;
+  } catch {
+    /* ignore */
+  }
+  return 'image.jpg';
+}
+
 export async function downloadAuthenticatedImage(uri: string): Promise<string> {
-  return downloadAuthenticatedAttachment(uri, undefined, 'image.jpg');
+  return downloadAuthenticatedAttachment(uri, undefined, imageFileNameFromUri(uri));
 }

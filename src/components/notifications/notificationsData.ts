@@ -41,6 +41,14 @@ export type StaticNotification = {
   icon: NotifIconKind;
   conversationId?: string;
   notificationType?: string;
+  /** Inbox/API category used for deep-link routing. */
+  category?: string;
+  trainingId?: string;
+  enrolmentId?: string;
+  status?: string;
+  announcementId?: string;
+  discussionId?: string;
+  certificateUrl?: string;
 };
 
 export const NOTIF_FILTERS: NotifFilter[] = [

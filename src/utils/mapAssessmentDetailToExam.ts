@@ -2,7 +2,7 @@ import type {
   McqQuestion,
   McqQuestionType,
   TrainingExam,
-} from '@/components/market/marketTrainingProgressData';
+} from '@/components/trainingsAndCourses/trainingProgressData';
 import type {
   TrainingAssessmentDetailApi,
   TrainingAssessmentDetailQuestionApi,
@@ -21,6 +21,11 @@ function resolveQuestionType(raw?: string | null): McqQuestionType {
   // Swagger example uses "mcq"
   return 'single_choice';
 }
+
+const TRUE_FALSE_OPTIONS = [
+  { id: 'true', label: 'True' },
+  { id: 'false', label: 'False' },
+] as const;
 
 function mapQuestion(
   question: TrainingAssessmentDetailQuestionApi,
@@ -43,8 +48,10 @@ function mapQuestion(
   }
 
   const questionType = resolveQuestionType(question.question_type);
-  if (options.length === 0 && (questionType === 'single_choice' || questionType === 'multiple_select' || questionType === 'true_false')) {
-    // leave empty — UI will show text if needed
+
+  // API often sends true_false with an empty options array — supply radios.
+  if (questionType === 'true_false' && options.length === 0) {
+    options = TRUE_FALSE_OPTIONS.map((opt) => ({ ...opt }));
   }
 
   return {
@@ -53,8 +60,7 @@ function mapQuestion(
     options,
     correctOptionId: text(question.correct_answer) || undefined,
     questionType:
-      options.length === 0 &&
-      (questionType === 'single_choice' || questionType === 'true_false')
+      options.length === 0 && questionType === 'single_choice'
         ? 'short_answer'
         : questionType,
   };

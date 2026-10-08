@@ -17,10 +17,10 @@ export function canCopyMessage(message: ChatMessage): boolean {
   return message.messageType !== 'deleted' && getCopyableMessageText(message) != null;
 }
 
-/** Image / document attachments that can be saved to the device. */
+/** Image / video / document attachments that can be saved to the device. */
 export function canDownloadAttachment(message: ChatMessage): boolean {
   if (message.messageType === 'deleted') return false;
 
   const type = message.attachment?.type;
-  return type === 'image' || type === 'pdf' || type === 'word';
+  return type === 'image' || type === 'video' || type === 'pdf' || type === 'word';
 }

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { createVideoPlayer } from 'expo-video';
 
 import { useAuthenticatedAttachmentUri } from '@/hooks/useAuthenticatedAttachmentUri';
 import { Dimensions, Pressable, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
@@ -13,6 +14,13 @@ import { ChatLinkText } from '@/components/chat/ChatLinkText';
 import { isSmallDevice } from '@/utils/responsive';
 import { sanitizeChatText } from '@/utils/sanitizeChatText';
 import { shadowSm } from '@/utils/shadows';
+
+function formatVideoDurationLabel(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+}
 
 const PRIMARY = '#1F5D4E';
 const PAGE_BG = '#FFFFFF';
@@ -158,6 +166,112 @@ function ImageMessageBubble({
   );
 }
 
+function VideoMessageBubble({
+  message,
+  isUser,
+  onVideoPress,
+  onLongPress,
+}: {
+  message: ChatMessage;
+  isUser: boolean;
+  onVideoPress?: (message: ChatMessage) => void;
+  onLongPress?: () => void;
+}) {
+  const att = message.attachment!;
+  const mediaUri = att.uri || att.thumbnail;
+  const { uri: localUri } = useAuthenticatedAttachmentUri(
+    mediaUri,
+    att.name || 'video.mp4',
+    { enabled: Boolean(mediaUri) && !att.duration?.trim() },
+  );
+  const [resolvedDuration, setResolvedDuration] = useState<string | null>(
+    () => att.duration?.trim() || null,
+  );
+
+  useEffect(() => {
+    const fromMessage = att.duration?.trim();
+    if (fromMessage) {
+      setResolvedDuration(fromMessage);
+      return;
+    }
+    if (!localUri) return;
+
+    let cancelled = false;
+    let sub: { remove: () => void } | null = null;
+    let player: ReturnType<typeof createVideoPlayer> | null = null;
+
+    try {
+      player = createVideoPlayer(localUri);
+      player.muted = true;
+      sub = player.addListener('statusChange', ({ status }) => {
+        if (cancelled || status !== 'readyToPlay') return;
+        try {
+          const duration = player?.duration ?? 0;
+          if (duration > 0) {
+            setResolvedDuration(formatVideoDurationLabel(duration));
+          }
+        } catch {
+          // Released.
+        }
+        try {
+          sub?.remove();
+          player?.release();
+        } catch {
+          // Ignore.
+        }
+        sub = null;
+        player = null;
+      });
+    } catch {
+      // Could not probe duration.
+    }
+
+    return () => {
+      cancelled = true;
+      try {
+        sub?.remove();
+        player?.release();
+      } catch {
+        // Ignore.
+      }
+    };
+  }, [att.duration, localUri]);
+
+  return (
+    <View
+      style={[
+        styles.imageBubble,
+        isUser ? styles.imageBubbleUser : styles.imageBubbleProvider,
+      ]}
+    >
+      <Pressable
+        onPress={() => onVideoPress?.(message)}
+        onLongPress={onLongPress}
+        delayLongPress={400}
+        style={styles.imageBubbleBody}
+        accessibilityRole="button"
+        accessibilityLabel={`Play video ${att.name || ''}`}
+      >
+        <View style={[styles.imageBubblePhoto, styles.videoBubbleStage]} />
+        <View style={styles.imageBubbleOverlay} />
+        <View style={styles.videoPlayBadge} pointerEvents="none">
+          <Ionicons name="play" size={28} color="#FFFFFF" />
+        </View>
+        {/* WhatsApp-style length on the preview (message list), not the fullscreen player. */}
+        {resolvedDuration ? (
+          <Text style={styles.videoDurationText} pointerEvents="none">
+            {resolvedDuration}
+          </Text>
+        ) : null}
+      </Pressable>
+      <View style={styles.imageBubbleFooter}>
+        <Text style={styles.imageBubbleTime}>{message.timestamp}</Text>
+        {isUser ? <ReadReceipt status={message.status} /> : null}
+      </View>
+    </View>
+  );
+}
+
 function AttachmentCard({
   message,
   isUser,
@@ -174,6 +288,7 @@ function AttachmentCard({
   const att = message.attachment!;
   const isMedia = att.type === 'image' || att.type === 'video';
   const isOpenableDocument = att.type === 'pdf' || att.type === 'word';
+  const isOpenable = isOpenableDocument || att.type === 'video';
 
   const content = (
     <>
@@ -235,7 +350,7 @@ function AttachmentCard({
 
   return (
     <Pressable
-      onPress={onPress && isOpenableDocument ? () => onPress(message) : undefined}
+      onPress={onPress && isOpenable ? () => onPress(message) : undefined}
       onLongPress={onLongPress}
       delayLongPress={400}
       disabled={opening}
@@ -500,18 +615,24 @@ export function ChatMessageItem({
   isGroup = false,
   onDeleteMessage,
   onImagePress,
+  onVideoPress,
   onAttachmentPress,
   openingAttachmentId,
   onLongPressMessage,
+  hasActiveSelection = false,
+  onDismissSelection,
   selectedForEdit,
 }: {
   message: ChatMessage;
   isGroup?: boolean;
   onDeleteMessage?: (messageId: string) => void;
   onImagePress?: (uri: string) => void;
+  onVideoPress?: (message: ChatMessage) => void;
   onAttachmentPress?: (message: ChatMessage) => void;
   openingAttachmentId?: string | null;
   onLongPressMessage?: (message: ChatMessage) => void;
+  hasActiveSelection?: boolean;
+  onDismissSelection?: () => void;
   selectedForEdit?: boolean;
 }) {
   if (message.sender === 'system') {
@@ -529,10 +650,14 @@ export function ChatMessageItem({
   const isVoiceMessage = message.messageType === 'voice';
   const isImageMessage =
     message.messageType === 'attachment' && message.attachment?.type === 'image';
+  const isVideoMessage =
+    message.messageType === 'attachment' && message.attachment?.type === 'video';
   const isDocumentMessage =
     message.messageType === 'attachment' &&
     (message.attachment?.type === 'pdf' || message.attachment?.type === 'word');
   const isImageAttachment = isImageMessage && !!message.attachment?.thumbnail;
+  const isVideoAttachment =
+    isVideoMessage && Boolean(message.attachment?.uri || message.attachment?.thumbnail);
   const canDelete = Boolean(onDeleteMessage && isUser && message.messageType !== 'deleted');
   const canEdit =
     Boolean(onLongPressMessage) &&
@@ -545,23 +670,30 @@ export function ChatMessageItem({
   const canOpenMessageMenu = canEdit || canDelete || canCopy || canDownload;
 
   const handleLongPress = canOpenMessageMenu ? () => onLongPressMessage?.(message) : undefined;
+  const handleDismissPress = hasActiveSelection ? () => onDismissSelection?.() : undefined;
 
   if (message.messageType === 'deleted') {
     return (
-      <View style={styles.messageRowWrap}>
-        {selectedForEdit ? <View style={styles.selectionHighlight} pointerEvents="none" /> : null}
-        <View style={isUser ? styles.userRow : styles.providerRow}>
-          <View style={styles.deletedBubble}>
-            <Text style={styles.deletedText}>🚫 {message.text}</Text>
+      <Pressable onPress={handleDismissPress} disabled={!hasActiveSelection}>
+        <View style={styles.messageRowWrap}>
+          {selectedForEdit ? <View style={styles.selectionHighlight} pointerEvents="none" /> : null}
+          <View style={isUser ? styles.userRow : styles.providerRow}>
+            <View style={styles.deletedBubble}>
+              <Text style={styles.deletedText}>🚫 {message.text}</Text>
+            </View>
           </View>
         </View>
-      </View>
+      </Pressable>
     );
   }
 
   if (isDocumentMessage) {
     return (
-      <Pressable onLongPress={handleLongPress} delayLongPress={400}>
+      <Pressable
+        onPress={handleDismissPress}
+        onLongPress={handleLongPress}
+        delayLongPress={400}
+      >
         <View style={styles.messageRowWrap}>
           {selectedForEdit ? <View style={styles.selectionHighlight} pointerEvents="none" /> : null}
           <View style={isUser ? styles.userRow : styles.providerRow}>
@@ -577,7 +709,7 @@ export function ChatMessageItem({
               <DocumentMessageBubble
                 message={message}
                 isUser={isUser}
-                onPress={onAttachmentPress}
+                onPress={hasActiveSelection ? undefined : onAttachmentPress}
                 onLongPress={handleLongPress}
                 opening={
                   openingAttachmentId != null &&
@@ -594,7 +726,11 @@ export function ChatMessageItem({
 
   if (isImageMessage) {
     return (
-      <Pressable onLongPress={handleLongPress} delayLongPress={400}>
+      <Pressable
+        onPress={handleDismissPress}
+        onLongPress={handleLongPress}
+        delayLongPress={400}
+      >
         <View style={styles.messageRowWrap}>
           {selectedForEdit ? <View style={styles.selectionHighlight} pointerEvents="none" /> : null}
           <View style={isUser ? styles.userRow : styles.providerRow}>
@@ -611,7 +747,44 @@ export function ChatMessageItem({
                 <ImageMessageBubble
                   message={message}
                   isUser={isUser}
-                  onImagePress={onImagePress}
+                  onImagePress={hasActiveSelection ? undefined : onImagePress}
+                  onLongPress={handleLongPress}
+                />
+              ) : (
+                <ImageLoadingBubble message={message} isUser={isUser} />
+              )}
+              <Reactions reactions={message.reactions} isUser={isUser} />
+            </View>
+          </View>
+        </View>
+      </Pressable>
+    );
+  }
+
+  if (isVideoMessage) {
+    return (
+      <Pressable
+        onPress={handleDismissPress}
+        onLongPress={handleLongPress}
+        delayLongPress={400}
+      >
+        <View style={styles.messageRowWrap}>
+          {selectedForEdit ? <View style={styles.selectionHighlight} pointerEvents="none" /> : null}
+          <View style={isUser ? styles.userRow : styles.providerRow}>
+            <View style={[styles.bubbleWrap, styles.imageBubbleWrap, isUser && styles.bubbleWrapUser]}>
+              {showSenderName ? (
+                <Text
+                  style={[styles.senderName, { color: getGroupSenderColor(message.senderName!) }]}
+                  numberOfLines={1}
+                >
+                  {message.senderName}
+                </Text>
+              ) : null}
+              {isVideoAttachment ? (
+                <VideoMessageBubble
+                  message={message}
+                  isUser={isUser}
+                  onVideoPress={hasActiveSelection ? undefined : onVideoPress}
                   onLongPress={handleLongPress}
                 />
               ) : (
@@ -639,6 +812,7 @@ export function ChatMessageItem({
           </Text>
         ) : null}
         <Pressable
+          onPress={handleDismissPress}
           onLongPress={handleLongPress}
           delayLongPress={400}
           style={[
@@ -903,6 +1077,34 @@ const styles = StyleSheet.create({
   imageBubbleOverlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.08)',
+  },
+  videoBubbleStage: {
+    backgroundColor: '#1a1a1a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoPlayBadge: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 3,
+  },
+  videoDurationText: {
+    position: 'absolute',
+    left: 8,
+    bottom: 8,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   imageBubbleFooter: {
     position: 'absolute',

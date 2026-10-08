@@ -10,8 +10,8 @@ import {
   TRAINING_REVIEWS,
   TRAINING_SESSIONS,
   type TrainingListItem,
-} from '@/components/market/marketTrainingData';
-import { getTrainingProgressPath } from '@/components/market/marketTrainingProgressData';
+} from '@/components/trainingsAndCourses/trainingData';
+import { getTrainingProgressPath } from '@/components/trainingsAndCourses/trainingProgressData';
 
 type StaticDetailSource = {
   description: string;
@@ -338,6 +338,9 @@ export function buildStaticTrainingDetail(id?: string): TrainingDetailView {
     enrolled: source.enrolled,
     available: source.available,
     enrolmentDeadline: source.enrolmentDeadline,
+    enrolmentGate: 'open',
+    enrolmentGateMessage: '',
+    enrolmentOpensLabel: '',
     registrationStatus: source.registrationStatus,
     requiresApproval: listItem.mode === 'Hybrid',
     prerequisites: source.prerequisites,

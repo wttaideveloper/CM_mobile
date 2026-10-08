@@ -1,5 +1,6 @@
 import type { ChatMessage, ChatMessageStatus, ChatAttachmentType } from '@/constants/chat';
 import type { ApiMessage } from '@/types/message.types';
+import { decodeAttachmentFileName } from '@/utils/attachmentFileName';
 import { inferChatAttachmentType } from '@/utils/attachmentType';
 import {
   formatISTShortDate,
@@ -100,9 +101,10 @@ export function mapApiMessageToChatMessage(
   if (messageType === 'attachment') {
     const downloadUrl = String(rawAny.download_url ?? rawAny.file_url ?? rawAny.url ?? '');
     const thumbnailUrl = String(rawAny.thumbnail_url ?? rawAny.thumbnail ?? downloadUrl ?? '');
-    const fileName = String(
-      rawAny.file_name ?? rawAny.fileName ?? (safeContent || 'Attachment'),
-    );
+    const fileName =
+      decodeAttachmentFileName(
+        String(rawAny.file_name ?? rawAny.fileName ?? (safeContent || 'Attachment')),
+      ) || 'Attachment';
     const fileSizeBytes = typeof rawAny.file_size === 'number' ? rawAny.file_size : undefined;
     const fileSizeKb =
       typeof fileSizeBytes === 'number' ? `${Math.max(1, Math.round(fileSizeBytes / 1024))} KB` : '—';
@@ -129,6 +131,10 @@ export function mapApiMessageToChatMessage(
         name: fileName,
         size: fileSizeKb,
         thumbnail: thumbnailUrl || undefined,
+        uri:
+          guessType === 'video' || guessType === 'pdf' || guessType === 'word'
+            ? downloadUrl || thumbnailUrl || undefined
+            : undefined,
         storage: storage as 'S3' | 'Azure Blob',
       },
       isEdited,

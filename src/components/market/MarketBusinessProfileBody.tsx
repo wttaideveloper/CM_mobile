@@ -1,7 +1,6 @@
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
 
 import {
   BizProfileClockIcon,
@@ -31,7 +30,6 @@ export function MarketBusinessProfileBody({
   profile,
   enterpriseId = '',
 }: MarketBusinessProfileBodyProps) {
-  const router = useRouter();
   const [logoFailed, setLogoFailed] = useState(false);
   const showLogo = Boolean(profile.logoUrl) && !logoFailed;
 
@@ -74,36 +72,25 @@ export function MarketBusinessProfileBody({
         </View>
       </View>
 
-      <View style={styles.actions}>
-        <Pressable
-          style={({ pressed }) => [styles.messageBtn, pressed && styles.pressed]}
-          onPress={() => router.push('/(main)/market/business-chat')}
-          accessibilityRole="button"
-          accessibilityLabel="Message"
-          accessibilityHint={`Opens a chat with ${profile.fullName}`}
-        >
-          <Text style={styles.messageText}>Message</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [
-            styles.websiteBtn,
-            !profile.websiteUrl && styles.websiteBtnDisabled,
-            pressed && profile.websiteUrl && styles.pressed,
-          ]}
-          onPress={openWebsite}
-          disabled={!profile.websiteUrl}
-          accessibilityRole="button"
-          accessibilityLabel="Website"
-          accessibilityHint={
-            profile.websiteUrl
-              ? 'Opens the business website in your browser'
-              : 'Not available yet'
-          }
-          accessibilityState={{ disabled: !profile.websiteUrl }}
-        >
-          <Text style={styles.websiteText}>Website</Text>
-        </Pressable>
-      </View>
+      <Pressable
+        style={({ pressed }) => [
+          styles.websiteBtn,
+          !profile.websiteUrl && styles.websiteBtnDisabled,
+          pressed && profile.websiteUrl && styles.pressed,
+        ]}
+        onPress={openWebsite}
+        disabled={!profile.websiteUrl}
+        accessibilityRole="button"
+        accessibilityLabel="Website"
+        accessibilityHint={
+          profile.websiteUrl
+            ? 'Opens the business website in your browser'
+            : 'Not available yet'
+        }
+        accessibilityState={{ disabled: !profile.websiteUrl }}
+      >
+        <Text style={styles.websiteText}>Website</Text>
+      </Pressable>
 
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>About</Text>
@@ -198,25 +185,7 @@ const styles = StyleSheet.create({
     fontSize: c(12.5, 11.5),
     color: BIZ_PROFILE_MUTED,
   },
-  actions: {
-    flexDirection: 'row',
-    gap: c(10, 8),
-  },
-  messageBtn: {
-    flex: 1,
-    height: NU.searchH,
-    borderRadius: 99,
-    backgroundColor: BIZ_PROFILE_TEAL,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  messageText: {
-    fontSize: c(14.5, 13.5),
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
   websiteBtn: {
-    flex: 1,
     height: NU.searchH,
     borderRadius: 99,
     backgroundColor: '#FFFFFF',

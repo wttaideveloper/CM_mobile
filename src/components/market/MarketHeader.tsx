@@ -95,7 +95,7 @@ export function MarketHeader({
             style={styles.iconBtn}
             onPress={() => router.push('/(main)/market/orders')}
             accessibilityRole="button"
-            accessibilityLabel="Orders and subscriptions"
+            accessibilityLabel="Subscriptions"
           >
             <MarketBookmarkIcon size={c(18, 16)} />
           </Pressable>

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -18,6 +19,7 @@ import {
   NOTIF_BODY,
   NOTIF_BORDER,
   NOTIF_GREEN,
+  NOTIF_MUTED,
   NOTIF_TEAL,
   type NotifFilter,
   type NotifGroupLabel,
@@ -31,9 +33,14 @@ import {
 } from '@/services/notification.service';
 import { chatHref } from '@/utils/chatNavigation';
 import { mapUserNotificationsToDashItems } from '@/utils/notification.mapper';
+import { resolveNotificationHref } from '@/utils/notificationNavigation';
 import { c, NU } from '@/utils/newUiCompact';
 
 const GROUP_ORDER: NotifGroupLabel[] = ['TODAY', 'YESTERDAY', 'EARLIER'];
+const LOADING_MIN_HEIGHT = Math.max(
+  Dimensions.get('window').height * 0.52,
+  320,
+);
 
 export function NotificationsDashScreen() {
   const router = useRouter();
@@ -124,6 +131,23 @@ export function NotificationsDashScreen() {
         }
       });
 
+      const href = resolveNotificationHref({
+        category: item.category || item.notificationType,
+        trainingId: item.trainingId,
+        enrolmentId: item.enrolmentId,
+        status: item.status,
+        announcementId: item.announcementId,
+        discussionId: item.discussionId,
+        certificateUrl: item.certificateUrl,
+        conversationId: item.conversationId,
+      });
+
+      if (href) {
+        router.push(href);
+        return;
+      }
+
+      // Legacy chat-only fallback.
       if (item.conversationId) {
         router.push(chatHref(item.conversationId));
       }
@@ -172,9 +196,12 @@ export function NotificationsDashScreen() {
         />
 
         {isLoading ? (
-          <View style={styles.stateBox}>
-            <ActivityIndicator color={NOTIF_GREEN} />
-            <Text style={styles.stateText}>Loading notifications…</Text>
+          <View style={styles.loadingCenter} accessibilityLabel="Loading notifications">
+            <View style={styles.spinnerRing}>
+              <ActivityIndicator size="large" color={NOTIF_GREEN} />
+            </View>
+            <Text style={styles.loadingTitle}>Loading notifications</Text>
+            <Text style={styles.loadingHint}>Just a moment…</Text>
           </View>
         ) : errorMessage ? (
           <View style={styles.stateBox}>
@@ -214,6 +241,40 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     flexGrow: 1,
   },
+  loadingCenter: {
+    minHeight: LOADING_MIN_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: NU.hPad,
+    gap: c(10, 8),
+  },
+  spinnerRing: {
+    width: c(72, 64),
+    height: c(72, 64),
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: NOTIF_BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: c(4, 2),
+    shadowColor: '#164744',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  loadingTitle: {
+    fontSize: NU.cardTitle,
+    fontWeight: '800',
+    color: NOTIF_TEAL,
+    textAlign: 'center',
+  },
+  loadingHint: {
+    fontSize: NU.bodySm,
+    color: NOTIF_MUTED,
+    textAlign: 'center',
+  },
   stateBox: {
     marginHorizontal: NU.hPad,
     marginTop: NU.bodyPadTop,
@@ -221,26 +282,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: NOTIF_BORDER,
     borderRadius: NU.cardRadius,
-    padding: c(22, 18),
+    paddingVertical: c(32, 26),
+    paddingHorizontal: c(22, 18),
     gap: c(10, 8),
     alignItems: 'center',
   },
   stateTitle: {
     fontSize: NU.cardTitleLg,
-    fontWeight: '700',
+    fontWeight: '800',
     color: NOTIF_TEAL,
     textAlign: 'center',
   },
   stateText: {
     fontSize: NU.body,
-    lineHeight: c(19, 17),
+    lineHeight: c(20, 18),
     color: NOTIF_BODY,
     textAlign: 'center',
   },
   retryText: {
     marginTop: c(4, 2),
+    paddingVertical: c(10, 8),
+    paddingHorizontal: c(16, 14),
+    borderRadius: 99,
+    overflow: 'hidden',
+    backgroundColor: '#e6f4e8',
     fontSize: NU.link,
-    fontWeight: '700',
+    fontWeight: '800',
     color: NOTIF_GREEN,
   },
 });

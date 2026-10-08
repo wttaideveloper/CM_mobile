@@ -24,6 +24,7 @@ export function NotificationsHeader({
 }: NotificationsHeaderProps) {
   const router = useRouter();
   const scale = SCREEN_W / DESIGN_W;
+  const allCaughtUp = unreadLabel.toLowerCase().includes('caught up');
 
   return (
     <View style={styles.header}>
@@ -42,7 +43,10 @@ export function NotificationsHeader({
       />
       <View style={styles.topRow}>
         <Pressable
-          style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+          style={({ pressed }) => [
+            styles.iconBtn,
+            pressed && styles.iconBtnPressed,
+          ]}
           onPress={() => router.back()}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
@@ -55,9 +59,27 @@ export function NotificationsHeader({
           <Text style={styles.title} accessibilityRole="header">
             Notifications
           </Text>
-          <Text style={styles.subtitle} accessibilityLiveRegion="polite">
-            {unreadLabel}
-          </Text>
+          <View style={styles.subtitleRow}>
+            <View
+              style={[
+                styles.statusPill,
+                allCaughtUp ? styles.statusPillCalm : styles.statusPillActive,
+              ]}
+            >
+              <View
+                style={[
+                  styles.statusDot,
+                  allCaughtUp ? styles.statusDotCalm : styles.statusDotActive,
+                ]}
+              />
+              <Text
+                style={styles.subtitle}
+                accessibilityLiveRegion="polite"
+              >
+                {unreadLabel}
+              </Text>
+            </View>
+          </View>
         </View>
         <Pressable
           disabled={markAllDisabled}
@@ -70,10 +92,12 @@ export function NotificationsHeader({
           accessibilityRole="button"
           accessibilityLabel="Mark all read"
           accessibilityState={{ disabled: !!markAllDisabled }}
-          accessibilityHint={markAllDisabled ? undefined : 'Marks every notification as read'}
+          accessibilityHint={
+            markAllDisabled ? undefined : 'Marks every notification as read'
+          }
         >
           <NotifCheckIcon />
-          <Text style={styles.markAllText}>Mark all read</Text>
+          <Text style={styles.markAllText}>Mark all</Text>
         </Pressable>
       </View>
     </View>
@@ -110,6 +134,7 @@ const styles = StyleSheet.create({
   },
   titleBlock: {
     flex: 1,
+    gap: c(6, 5),
   },
   title: {
     fontSize: NU.title,
@@ -117,29 +142,58 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.4,
   },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: c(6, 5),
+    paddingVertical: c(4, 3),
+    paddingHorizontal: c(10, 8),
+    borderRadius: 99,
+  },
+  statusPillActive: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  statusPillCalm: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  statusDot: {
+    width: c(7, 6),
+    height: c(7, 6),
+    borderRadius: 99,
+  },
+  statusDotActive: {
+    backgroundColor: '#fff4b0',
+  },
+  statusDotCalm: {
+    backgroundColor: 'rgba(255,255,255,0.75)',
+  },
   subtitle: {
-    marginTop: c(2, 2),
     fontSize: NU.subtitle,
-    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   markAll: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: c(7, 5),
+    gap: c(6, 5),
     paddingVertical: c(10, 8),
-    paddingHorizontal: c(15, 12),
+    paddingHorizontal: c(12, 10),
     borderRadius: 99,
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
   markAllText: {
     fontSize: NU.chipFont,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   markAllPressed: {
     backgroundColor: 'rgba(255,255,255,0.3)',
   },
   markAllDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
 });

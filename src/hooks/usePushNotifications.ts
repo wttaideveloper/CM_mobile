@@ -1,5 +1,6 @@
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import {
   PUSH_DATA_KEYS,
@@ -8,7 +9,18 @@ import {
 import { registerDevicePushToken } from '@/services/pushRegistration.service';
 import type { PushNotificationData } from '@/types/push.types';
 import { chatHref } from '@/utils/chatNavigation';
+import {
+  consolidatePresentedChatNotifications,
+  dismissChatNotificationsForConversation,
+  isChatMessagePush,
+  shouldPresentChatPushSystemUI,
+  stackIncomingChatPush,
+} from '@/utils/chatPushNotifications';
 import { isRemotePushSupported } from '@/utils/isRemotePushSupported';
+import {
+  notificationFieldsFromRecord,
+  resolveNotificationHref,
+} from '@/utils/notificationNavigation';
 import { pushLog, pushWarn } from '@/utils/pushLog';
 
 type NotificationResponse = import('expo-notifications').NotificationResponse;
@@ -53,14 +65,46 @@ export function parsePushNotificationData(
     }
   }
 
+  // If backend stringifies metadata as JSON, merge it.
+  const metadataRaw = data.metadata;
+  if (typeof metadataRaw === 'string' && metadataRaw.trim().startsWith('{')) {
+    try {
+      const parsed = asRecord(JSON.parse(metadataRaw));
+      if (parsed) {
+        data = { ...data, ...parsed };
+      }
+    } catch {
+      // ignore
+    }
+  } else {
+    const metadataObj = asRecord(metadataRaw);
+    if (metadataObj) {
+      data = { ...data, ...metadataObj };
+    }
+  }
+
+  const fields = notificationFieldsFromRecord(
+    readString(data, PUSH_DATA_KEYS.CATEGORY, 'notification_category'),
+    data,
+  );
+
   return {
-    conversationId: readString(
-      data,
-      PUSH_DATA_KEYS.CONVERSATION_ID,
-      'conversation_id',
-      'conversationID',
-    ),
+    conversationId:
+      fields.conversationId ||
+      readString(
+        data,
+        PUSH_DATA_KEYS.CONVERSATION_ID,
+        'conversation_id',
+        'conversationID',
+      ),
     type: readString(data, PUSH_DATA_KEYS.TYPE, 'notification_type', 'notificationType'),
+    category: fields.category,
+    trainingId: fields.trainingId,
+    enrolmentId: fields.enrolmentId,
+    status: fields.status,
+    announcementId: fields.announcementId,
+    discussionId: fields.discussionId,
+    certificateUrl: fields.certificateUrl,
   };
 }
 
@@ -72,24 +116,69 @@ function getResponseKey(response: NotificationResponse): string {
   ].join(':');
 }
 
+/** Full payload dump for backend verification (tag / collapseKey / thread-id / data). */
+function logIncomingPushPayload(
+  notification: import('expo-notifications').Notification,
+  source: string,
+): void {
+  const content = notification.request.content;
+  const trigger = notification.request.trigger as
+    | {
+        type?: string;
+        remoteMessage?: {
+          collapseKey?: string | null;
+          messageId?: string | null;
+          data?: Record<string, string>;
+          notification?: {
+            tag?: string | null;
+            channelId?: string | null;
+            title?: string | null;
+            body?: string | null;
+          } | null;
+        };
+      }
+    | null
+    | undefined;
+
+  const remote = trigger && typeof trigger === 'object' ? trigger.remoteMessage : undefined;
+
+  // Flat fields so Metro shows them without expanding nested objects.
+  pushLog(`Push payload (${source})`, {
+    appState: AppState.currentState,
+    identifier: notification.request.identifier,
+    title: content.title,
+    body: content.body,
+    conversationId:
+      (content.data as Record<string, unknown> | undefined)?.conversationId ??
+      (content.data as Record<string, unknown> | undefined)?.conversation_id ??
+      null,
+    triggerType: trigger && typeof trigger === 'object' ? trigger.type : trigger,
+    fcmMessageId: remote?.messageId ?? null,
+    fcmCollapseKey: remote?.collapseKey ?? null,
+    fcmNotificationTag: remote?.notification?.tag ?? null,
+    fcmChannelId: remote?.notification?.channelId ?? null,
+    fcmData: remote?.data ?? null,
+    contentData: content.data ?? null,
+  });
+}
+
 export function usePushNotifications(isAuthenticated: boolean) {
   const router = useRouter();
-  const pendingConversationIdRef = useRef<string | null>(null);
+  const pendingHrefRef = useRef<Href | null>(null);
   const lastHandledResponseKeyRef = useRef<string | null>(null);
 
-  const openChatFromPush = useCallback(
-    (conversationId: string, source: string) => {
+  const openHrefFromPush = useCallback(
+    (href: Href, source: string) => {
       if (!isAuthenticated) {
-        pendingConversationIdRef.current = conversationId;
-        pushLog('Queued chat deep link until authenticated', { conversationId, source });
+        pendingHrefRef.current = href;
+        pushLog('Queued notification deep link until authenticated', { href, source });
         return;
       }
 
-      pushLog('Opening chat from push', { conversationId, source });
+      pushLog('Opening screen from push', { href, source });
 
-      // Open the conversation directly (do not hop through inbox / notifications first).
       setTimeout(() => {
-        router.push(chatHref(conversationId));
+        router.push(href);
       }, 100);
     },
     [isAuthenticated, router],
@@ -114,33 +203,56 @@ export function usePushNotifications(isAuthenticated: boolean) {
         data,
       });
 
+      const href = resolveNotificationHref({
+        category: data.category || data.type,
+        trainingId: data.trainingId,
+        enrolmentId: data.enrolmentId,
+        status: data.status,
+        announcementId: data.announcementId,
+        discussionId: data.discussionId,
+        certificateUrl: data.certificateUrl,
+        conversationId: data.conversationId,
+      });
+
+      if (data.conversationId && isChatMessagePush(data)) {
+        void dismissChatNotificationsForConversation(data.conversationId);
+      }
+
+      if (href) {
+        openHrefFromPush(href, source);
+        return;
+      }
+
+      // Legacy chat fallbacks.
       if (
         data.type === PUSH_NOTIFICATION_TYPES.CHAT_MESSAGE &&
         data.conversationId
       ) {
-        openChatFromPush(data.conversationId, source);
+        openHrefFromPush(chatHref(data.conversationId), source);
         return;
       }
 
-      // Fallback: conversationId alone is enough to open chat.
       if (data.conversationId) {
-        openChatFromPush(data.conversationId, `${source}-conversationId-only`);
+        openHrefFromPush(
+          chatHref(data.conversationId),
+          `${source}-conversationId-only`,
+        );
         return;
       }
 
-      pushWarn('Notification tapped — no chat navigation (missing conversationId)', data);
+      pushWarn('Notification tapped — no navigation target', data);
     },
-    [openChatFromPush],
+    [openHrefFromPush],
   );
 
   // Flush queued deep link after login / auth becomes ready.
   useEffect(() => {
-    if (!isAuthenticated || !pendingConversationIdRef.current) return;
+    if (!isAuthenticated || !pendingHrefRef.current) return;
 
-    const conversationId = pendingConversationIdRef.current;
-    pendingConversationIdRef.current = null;
-    openChatFromPush(conversationId, 'pending-after-auth');
-  }, [isAuthenticated, openChatFromPush]);
+    const href = pendingHrefRef.current;
+    pendingHrefRef.current = null;
+    openHrefFromPush(href, 'pending-after-auth');
+  }, [isAuthenticated, openHrefFromPush]);
 
   useEffect(() => {
     if (!isRemotePushSupported()) {
@@ -156,27 +268,50 @@ export function usePushNotifications(isAuthenticated: boolean) {
       if (cancelled) return;
 
       Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldPlaySound: true,
-          shouldSetBadge: true,
-        }),
+        handleNotification: async (notification) => {
+          logIncomingPushPayload(notification, 'handler');
+          const raw = notification.request.content.data as
+            | Record<string, unknown>
+            | undefined;
+          const data = parsePushNotificationData(raw);
+          const present = shouldPresentChatPushSystemUI(data, raw);
+
+          return {
+            shouldShowBanner: present,
+            shouldShowList: present,
+            shouldPlaySound: present,
+            shouldSetBadge: true,
+          };
+        },
       });
 
       subscriptions.push(
         Notifications.addNotificationReceivedListener((notification) => {
-          const data = parsePushNotificationData(
-            notification.request.content.data as Record<string, unknown> | undefined,
-          );
+          logIncomingPushPayload(notification, 'received-listener');
+          const raw = notification.request.content.data as
+            | Record<string, unknown>
+            | undefined;
+          const data = parsePushNotificationData(raw);
 
-          pushLog('Notification received (foreground/background)', {
-            title: notification.request.content.title,
-            body: notification.request.content.body,
-            data,
-          });
+          if (isChatMessagePush(data)) {
+            void stackIncomingChatPush({
+              title: notification.request.content.title,
+              body: notification.request.content.body,
+              data,
+              rawData: raw,
+            });
+          }
         }),
       );
+
+      const onAppStateChange = (nextState: AppStateStatus) => {
+        if (nextState === 'active') {
+          void consolidatePresentedChatNotifications();
+        }
+      };
+      const appStateSub = AppState.addEventListener('change', onAppStateChange);
+      subscriptions.push({ remove: () => appStateSub.remove() });
+      void consolidatePresentedChatNotifications();
 
       subscriptions.push(
         Notifications.addNotificationResponseReceivedListener((response) => {

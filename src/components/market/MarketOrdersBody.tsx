@@ -2,107 +2,21 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import {
-  MarketBagIcon,
-  MarketBowlIcon,
-  MarketHeartIcon,
-  MarketPulseIcon,
-  MarketUserIcon,
-} from '@/components/market/MarketIcons';
-import {
-  ACTIVE_PRODUCT_SUB,
-  ACTIVE_SERVICE_SUB,
   ORDERS_BORDER,
   ORDERS_GREEN,
   ORDERS_MUTED,
   ORDERS_TEAL,
   ORDERS_TRACK,
-  PAST_ORDERS,
   type OrdersTab,
-  type PastOrder,
 } from '@/components/market/marketOrdersData';
-import { MY_ENROLLED_TRAININGS } from '@/components/market/marketTrainingMyEnrollData';
+// import { MY_ENROLLED_TRAININGS } from '@/components/trainingsAndCourses/trainingMyEnrollData'; // static samples hidden
 import { c, NU } from '@/utils/newUiCompact';
 
-function PastOrderIcon({ order }: { order: PastOrder }) {
-  const props = { color: order.iconColor, size: 19 };
-  switch (order.icon) {
-    case 'pulse':
-      return <MarketPulseIcon {...props} />;
-    case 'bowl':
-      return <MarketBowlIcon {...props} />;
-    case 'heart':
-      return <MarketHeartIcon {...props} />;
-  }
-}
-
-function SubscriptionsBody() {
-  const router = useRouter();
-
-  return (
-    <>
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Active subscriptions</Text>
-
-        <View style={styles.subCard}>
-          <View style={styles.subTop}>
-            <View style={styles.subIconGreen}>
-              <MarketBagIcon color={ORDERS_GREEN} size={22} />
-            </View>
-            <View style={styles.subCopy}>
-              <Text style={styles.subTitle}>{ACTIVE_PRODUCT_SUB.title}</Text>
-              <Text style={styles.subVendor}>{ACTIVE_PRODUCT_SUB.vendor}</Text>
-            </View>
-            <Text style={styles.activeBadge}>ACTIVE</Text>
-          </View>
-
-          <View style={styles.detailBox}>
-            <View>
-              <Text style={styles.detailLabel}>Next delivery</Text>
-              <Text style={styles.detailValue}>
-                {ACTIVE_PRODUCT_SUB.nextDelivery}
-              </Text>
-            </View>
-            <View style={styles.detailRight}>
-              <Text style={styles.detailLabel}>Renews at</Text>
-              <Text style={styles.detailValue}>{ACTIVE_PRODUCT_SUB.renewsAt}</Text>
-            </View>
-          </View>
-
-          <View style={styles.actions}>
-            <Pressable style={styles.actionBtn} accessibilityRole="button">
-              <Text style={styles.actionText}>Skip a week</Text>
-            </Pressable>
-            <Pressable style={styles.actionBtn} accessibilityRole="button">
-              <Text style={styles.actionText}>Manage</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <Pressable
-          style={styles.serviceCard}
-          accessibilityRole="button"
-          onPress={() => router.push('/(main)/market/course-learning')}
-        >
-          <View style={styles.subIconPurple}>
-            <MarketUserIcon color="#8352c0" size={22} />
-          </View>
-          <View style={styles.serviceCopy}>
-            <Text style={styles.subTitle}>{ACTIVE_SERVICE_SUB.title}</Text>
-            <Text style={styles.subVendor}>{ACTIVE_SERVICE_SUB.vendorProgress}</Text>
-            <View style={styles.track}>
-              <View
-                style={[
-                  styles.fill,
-                  { width: `${ACTIVE_SERVICE_SUB.progress}%` },
-                ]}
-              />
-            </View>
-          </View>
-        </Pressable>
-      </View>
-    </>
-  );
-}
+/* Past orders helpers — tab removed for client build.
+function PastOrderIcon({ order }: { order: PastOrder }) { ... }
+function PastOrdersBody() { ... PAST_ORDERS ... }
+function SubscriptionsBody() { ... }
+*/
 
 function TrainingsBody() {
   const router = useRouter();
@@ -111,7 +25,7 @@ function TrainingsBody() {
     <View style={styles.section}>
       <Text style={styles.sectionLabel}>My enrolled trainings</Text>
       <Text style={styles.helper}>
-        Static preview · tap a training to attend (QR pass or day-wise links)
+        Open My Learning from Market → My trainings for live enrolments.
       </Text>
       <Pressable
         onPress={() => router.push('/(main)/market/training-wishlist')}
@@ -119,71 +33,18 @@ function TrainingsBody() {
       >
         <Text style={styles.wishlistLink}>Open wishlist ›</Text>
       </Pressable>
+      <Pressable
+        onPress={() => router.push('/(main)/market/my-trainings')}
+        accessibilityRole="button"
+      >
+        <Text style={styles.wishlistLink}>Open my enrolments ›</Text>
+      </Pressable>
 
+      {/* Static enrolment samples — hide for now (keep MY_ENROLLED_TRAININGS).
       {MY_ENROLLED_TRAININGS.map((item) => (
-        <Pressable
-          key={item.id}
-          style={styles.trainingCard}
-          accessibilityRole="button"
-          onPress={() =>
-            router.push({
-              pathname: '/(main)/market/my-training-progress',
-              params: { id: item.id },
-            })
-          }
-        >
-          <View style={styles.trainingTop}>
-            <View style={[styles.modePill, { backgroundColor: item.badgeBg }]}>
-              <Text style={[styles.modePillText, { color: item.badgeColor }]}>
-                {item.mode.toUpperCase()}
-              </Text>
-            </View>
-            <Text style={styles.enrollCode}>{item.enrollmentCode}</Text>
-          </View>
-          <Text style={styles.subTitle}>{item.title}</Text>
-          <Text style={styles.subVendor}>
-            {item.vendor} · {item.progressLabel}
-          </Text>
-          <View style={styles.detailBox}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.detailLabel}>Next session</Text>
-              <Text style={styles.detailValue}>{item.nextSession}</Text>
-            </View>
-            <Text style={[styles.attendCta, { color: item.accent }]}>Open ›</Text>
-          </View>
-        </Pressable>
+        ...
       ))}
-    </View>
-  );
-}
-
-function PastOrdersBody() {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>Past orders</Text>
-      <View style={styles.pastCard}>
-        {PAST_ORDERS.map((order, index) => (
-          <View
-            key={order.id}
-            style={[
-              styles.pastRow,
-              index < PAST_ORDERS.length - 1 && styles.pastRowBorder,
-            ]}
-          >
-            <View style={[styles.pastIcon, { backgroundColor: order.iconBg }]}>
-              <PastOrderIcon order={order} />
-            </View>
-            <View style={styles.pastCopy}>
-              <Text style={styles.pastTitle}>{order.title}</Text>
-              <Text style={styles.pastDetail}>{order.detail}</Text>
-            </View>
-            <View style={styles.pastRight}>
-              <Text style={styles.pastPrice}>{order.price}</Text>
-              <Text style={styles.pastAction}>{order.action}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
+      */}
     </View>
   );
 }
@@ -191,9 +52,7 @@ function PastOrdersBody() {
 export function MarketOrdersBody({ activeTab }: { activeTab: OrdersTab }) {
   return (
     <View style={styles.body}>
-      {activeTab === 'Subscriptions' ? <SubscriptionsBody /> : null}
-      {activeTab === 'Trainings' ? <TrainingsBody /> : null}
-      {activeTab === 'Past orders' ? <PastOrdersBody /> : null}
+      {activeTab === 'Trainings and Courses' ? <TrainingsBody /> : null}
     </View>
   );
 }
@@ -214,6 +73,28 @@ const styles = StyleSheet.create({
     letterSpacing: 1.3,
     textTransform: 'uppercase',
     color: ORDERS_MUTED,
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: ORDERS_BORDER,
+    borderRadius: NU.cardRadius,
+    paddingVertical: c(28, 22),
+    paddingHorizontal: c(18, 14),
+    gap: c(8, 6),
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: NU.cardTitle,
+    fontWeight: '800',
+    color: ORDERS_TEAL,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    fontSize: NU.body,
+    lineHeight: c(20, 18),
+    color: ORDERS_MUTED,
+    textAlign: 'center',
   },
   helper: {
     marginTop: -c(4, 2),

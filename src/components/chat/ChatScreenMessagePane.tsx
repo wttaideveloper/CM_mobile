@@ -43,6 +43,8 @@ type ChatScreenMessagePaneProps = {
   bottomInset: number;
   inputDisabled: boolean;
   conversationIsClosed: boolean;
+  /** Live chat details still loading — hide composer without implying closed/limit. */
+  conversationLoading?: boolean;
   mode: string;
   draft: string;
   onChangeDraft: (value: string) => void;
@@ -54,8 +56,11 @@ type ChatScreenMessagePaneProps = {
   onComposerRowLayout: (event: LayoutChangeEvent) => void;
   onDeleteMessage?: (messageId: string) => void;
   onImagePress: (uri: string) => void;
+  onVideoPress: (message: ChatMessage) => void;
   onAttachmentPress: (message: ChatMessage) => void;
   onLongPressMessage: (message: ChatMessage) => void;
+  /** Clear highlight + action menu when user taps outside the selection. */
+  onDismissSelection: () => void;
   onLoadOlder: () => void;
   onScrollToIndexFailed: (info: { index: number; averageItemLength: number }) => void;
 };
@@ -84,6 +89,7 @@ export function ChatScreenMessagePane({
   bottomInset,
   inputDisabled,
   conversationIsClosed,
+  conversationLoading = false,
   mode,
   draft,
   onChangeDraft,
@@ -95,11 +101,15 @@ export function ChatScreenMessagePane({
   onComposerRowLayout,
   onDeleteMessage,
   onImagePress,
+  onVideoPress,
   onAttachmentPress,
   onLongPressMessage,
+  onDismissSelection,
   onLoadOlder,
   onScrollToIndexFailed,
 }: ChatScreenMessagePaneProps) {
+  const hasActiveSelection = Boolean(selectedEditMessageId);
+
   return (
     <View style={styles.flex}>
       <Animated.View style={[styles.messageListWrap, listWrapStyle]}>
@@ -107,7 +117,7 @@ export function ChatScreenMessagePane({
           ref={listRef}
           inverted
           data={invertedMessages}
-          extraData={invertedMessages.length}
+          extraData={`${invertedMessages.length}:${selectedEditMessageId ?? ''}`}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <ChatMessageItem
@@ -115,9 +125,12 @@ export function ChatScreenMessagePane({
               isGroup={isGroup}
               onDeleteMessage={isLiveConversation ? onDeleteMessage : undefined}
               onImagePress={onImagePress}
+              onVideoPress={onVideoPress}
               onAttachmentPress={(message) => onAttachmentPress(message)}
               openingAttachmentId={openingAttachmentId}
               onLongPressMessage={onLongPressMessage}
+              hasActiveSelection={hasActiveSelection}
+              onDismissSelection={onDismissSelection}
               selectedForEdit={
                 selectedEditMessageId === item.id ||
                 highlightedMessageId === item.id ||
@@ -133,6 +146,7 @@ export function ChatScreenMessagePane({
           initialNumToRender={Math.min(invertedMessages.length, 30)}
           maxToRenderPerBatch={15}
           windowSize={11}
+          onScrollBeginDrag={hasActiveSelection ? onDismissSelection : undefined}
           onScrollToIndexFailed={onScrollToIndexFailed}
           ListFooterComponent={
             hasOlder ? (
@@ -170,21 +184,32 @@ export function ChatScreenMessagePane({
           {inputDisabled ? (
             <View style={styles.composerDisabled}>
               <Text style={styles.composerDisabledText}>
-                {isLiveConversation && conversationIsClosed
-                  ? 'This chat is closed'
-                  : mode === 'readonly'
-                    ? 'Chat closed · Book again to start a new conversation'
-                    : 'Message limit reached · Book this service to continue'}
+                {isLiveConversation && conversationLoading
+                  ? 'Loading conversation…'
+                  : isLiveConversation && conversationIsClosed
+                    ? 'This conversation is closed'
+                    : mode === 'readonly'
+                      ? 'Chat closed · Book again to start a new conversation'
+                      : 'Message limit reached · Book this service to continue'}
               </Text>
             </View>
           ) : (
             <ChatComposer
               draft={draft}
-              onChangeDraft={onChangeDraft}
+              onChangeDraft={(value) => {
+                if (hasActiveSelection) onDismissSelection();
+                onChangeDraft(value);
+              }}
               onSend={onSend}
               voice={voice}
-              onAttach={onAttach}
-              onCameraPress={onCameraPress}
+              onAttach={() => {
+                if (hasActiveSelection) onDismissSelection();
+                onAttach();
+              }}
+              onCameraPress={() => {
+                if (hasActiveSelection) onDismissSelection();
+                onCameraPress();
+              }}
               focusRequestKey={focusRequestKey}
               inputSessionKey={editingMessageId ?? 'compose'}
               inputNativeID={CHAT_INPUT_NATIVE_ID}

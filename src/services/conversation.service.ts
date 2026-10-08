@@ -1,6 +1,5 @@
 import { DEV_PROVIDER } from '@/constants/devUser';
 import { API_CONFIG } from '@/config';
-import { useAuthStore } from '@/stores/auth.store';
 import type {
   ArchiveConversationRequest,
   ArchiveConversationResponse,
@@ -68,7 +67,6 @@ export async function openServiceConversation({
     providerId: resolvedProviderId,
     providerName: resolvedProviderName,
     providerRole: DEV_PROVIDER.role,
-    hasAccessToken: Boolean(useAuthStore.getState().accessToken),
   });
 
   const payload: CreateConversationRequest = {
@@ -84,7 +82,8 @@ export async function openServiceConversation({
         user_id: resolvedProviderId,
       },
     ],
-    subject: resolvedProviderName || serviceName,
+    // Subject should be the service title (not provider name).
+    subject: serviceName?.trim() || resolvedProviderName || 'Service',
   };
 
   console.log('[ServiceChat] STEP 4b — payload ready', payload);

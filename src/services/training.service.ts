@@ -30,8 +30,8 @@ import type {
   TrainingWishlistApiItem,
   TrainingsListApiResponse,
 } from '@/types/training.types';
-import { mapTrainingApiToDetailView } from '@/utils/marketTraining.mapper';
-import { mapTrainingReviewsResponse } from '@/utils/marketTrainingReviews.mapper';
+import { mapTrainingApiToDetailView } from '@/utils/training.mapper';
+import { mapTrainingReviewsResponse } from '@/utils/trainingReviews.mapper';
 import { asPlainText } from '@/utils/trainingLessonMedia';
 import { normalizeTrainingDiscussion, normalizeTrainingDiscussions } from '@/utils/trainingDiscussions.mapper';
 

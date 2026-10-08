@@ -5,13 +5,13 @@ export const ORDERS_MUTED = '#7c9585';
 export const ORDERS_BORDER = '#dbeadd';
 export const ORDERS_TRACK = '#eef4ee';
 
-export type OrdersTab = 'Subscriptions' | 'Trainings' | 'Past orders';
+export type OrdersTab = 'Trainings and Courses';
 
-export const ORDERS_TABS: OrdersTab[] = [
-  'Subscriptions',
-  'Trainings',
-  'Past orders',
-];
+export const ORDERS_TABS: OrdersTab[] = ['Trainings and Courses'];
+
+// Previous tabs (removed from UI for client build):
+// 'Subscriptions' | 'Trainings and Courses' | 'Past orders'
+
 
 export type ActiveProductSub = {
   id: string;

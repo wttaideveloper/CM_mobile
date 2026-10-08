@@ -18,6 +18,24 @@ const TAB_ICON_SIZE = 22;
 /** First viewport shows exactly these many tabs edge-to-edge */
 const VISIBLE_TABS = 5;
 
+/** Routes kept off the tab bar (still reachable by deep link / router). */
+const HIDDEN_TAB_ROUTES = new Set([
+  'profile', // 2nd Me — hide for now
+  'coach',
+  'shop',
+  'explore',
+]);
+
+/** Visible order on the tab bar. */
+const TAB_ORDER = [
+  'index',
+  'enterprises',
+  'market',
+  'events-training',
+  'events',
+  'me',
+];
+
 type TabName =
   | 'home'
   | 'enterprises'
@@ -103,14 +121,20 @@ export function ScrollableMainTabBar({
   const { bottom } = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
-  const visibleRoutes = useMemo(
-    () =>
-      state.routes.filter((route) => {
-        const href = descriptors[route.key]?.options?.href;
-        return href !== null;
-      }),
-    [descriptors, state.routes],
-  );
+  const visibleRoutes = useMemo(() => {
+    const filtered = state.routes.filter((route) => {
+      if (HIDDEN_TAB_ROUTES.has(route.name)) return false;
+      const href = descriptors[route.key]?.options?.href;
+      return href !== null;
+    });
+    return filtered.sort((a, b) => {
+      const ai = TAB_ORDER.indexOf(a.name);
+      const bi = TAB_ORDER.indexOf(b.name);
+      const aRank = ai === -1 ? Number.MAX_SAFE_INTEGER : ai;
+      const bRank = bi === -1 ? Number.MAX_SAFE_INTEGER : bi;
+      return aRank - bRank;
+    });
+  }, [descriptors, state.routes]);
   const tabWidth = screenWidth / VISIBLE_TABS;
   const paddingBottom = Math.max(bottom, 8);
 

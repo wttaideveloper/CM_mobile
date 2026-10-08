@@ -109,6 +109,8 @@ export type TrainingApiItem = {
   course_type?: string | null;
   capacity?: string | number | null;
   enrolled_count?: string | number | null;
+  /** Alias used by list/detail payloads when `enrolled_count` is absent. */
+  current_participants?: string | number | null;
   available_slots?: string | number | null;
   waitlist_count?: string | number | null;
   price?: string | number | null;
@@ -696,6 +698,10 @@ export type TrainingDetailView = {
   enrolled: string;
   available: string;
   enrolmentDeadline: string;
+  /** Enrolment window / capacity gate for detail CTA. */
+  enrolmentGate: 'open' | 'not_yet_open' | 'closed' | 'full';
+  enrolmentGateMessage: string;
+  enrolmentOpensLabel: string;
   registrationStatus: string;
   requiresApproval: boolean;
   prerequisites: string;

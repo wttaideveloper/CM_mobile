@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
 import { create } from 'zustand';
 
-import { markActiveChatReadOnLogout } from '@/services/chatRead.service';
 import {
   clearAuthSession,
   loadAuthSession,
   saveAuthSession,
 } from '@/services/authSession.storage';
+import { clearStaleKeychainSessionOnFreshInstall } from '@/services/installSession.guard';
 import {
   fetchDevToken,
   fetchMe,
@@ -419,10 +419,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initializeSession: async () => {
+    if (__DEV__) {
+      console.log('[Auth] initializeSession start');
+    }
     set({ isAuthReady: false });
 
     try {
-      const stored = await loadAuthSession();
+      // iOS Keychain can survive delete+reinstall; clear it on fresh sandbox.
+      await clearStaleKeychainSessionOnFreshInstall();
+
+      const stored = await Promise.race([
+        loadAuthSession(),
+        new Promise<null>((resolve) => {
+          setTimeout(() => {
+            if (__DEV__) {
+              console.warn('[Auth] SecureStore load timed out — treating as logged out');
+            }
+            resolve(null);
+          }, 3_000);
+        }),
+      ]);
       if (!stored?.accessToken?.trim() || !stored?.refreshToken?.trim()) {
         if (__DEV__) {
           console.log('[Auth] No persisted session — show auth flow');
@@ -467,7 +483,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           if (__DEV__) {
             console.warn('[Auth] Session restore failed — clearing', refreshError);
           }
-          await clearAuthSession().catch(() => {});
+          void clearAuthSession().catch(() => {});
           set({
             authAccessToken: null,
             tenantAccessToken: null,
@@ -478,7 +494,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       if (!isAuthenticatedMe(me)) {
-        await clearAuthSession().catch(() => {});
+        void clearAuthSession().catch(() => {});
         set({ authAccessToken: null, tenantAccessToken: null, refreshToken: null });
         return;
       }
@@ -486,7 +502,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const loginUser = mapLoginUserToAuthUser(me.data);
       const restoredAccessToken = get().authAccessToken;
       if (!restoredAccessToken) {
-        await clearAuthSession().catch(() => {});
+        void clearAuthSession().catch(() => {});
         set({ authAccessToken: null, tenantAccessToken: null, refreshToken: null });
         return;
       }
@@ -523,7 +539,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (__DEV__) {
         console.warn('[Auth] initializeSession error — clearing session', error);
       }
-      await clearAuthSession().catch(() => {});
+      void clearAuthSession().catch(() => {});
       set({
         isAuthenticated: false,
         accessToken: null,
@@ -596,6 +612,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           return;
         }
 
+        // Lazy import avoids auth.store ↔ conversation.service require cycle at startup.
+        const { markActiveChatReadOnLogout } = await import('@/services/chatRead.service');
         await markActiveChatReadOnLogout();
       } catch (error) {
         if (__DEV__) {

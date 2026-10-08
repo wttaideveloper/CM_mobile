@@ -25,6 +25,12 @@ export type NotificationListItem = {
   read: boolean;
   conversationId?: string;
   messageId?: string;
+  trainingId?: string;
+  enrolmentId?: string;
+  status?: string;
+  announcementId?: string;
+  discussionId?: string;
+  certificateUrl?: string;
   createdAt?: string;
 };
 
@@ -74,6 +80,66 @@ const DASH_TYPE_STYLE: Record<
     filter: 'Other',
   },
   sale: { icon: 'trend', color: '#d94848', bg: '#fde8e8', filter: 'Other' },
+  training_enrolment_confirmation: {
+    icon: 'book',
+    color: '#1e6fd9',
+    bg: '#e8f0fe',
+    filter: 'Courses',
+  },
+  enrolment_approved: {
+    icon: 'award',
+    color: '#2f7d32',
+    bg: '#e6f4e8',
+    filter: 'Courses',
+  },
+  enrolment_rejected: {
+    icon: 'book',
+    color: '#d94848',
+    bg: '#fde8e8',
+    filter: 'Courses',
+  },
+  enrolment_cancelled: {
+    icon: 'book',
+    color: '#d94848',
+    bg: '#fde8e8',
+    filter: 'Courses',
+  },
+  training_new: {
+    icon: 'book',
+    color: '#1e6fd9',
+    bg: '#e8f0fe',
+    filter: 'Courses',
+  },
+  training_certificate: {
+    icon: 'award',
+    color: '#2f7d32',
+    bg: '#e6f4e8',
+    filter: 'Courses',
+  },
+  training_announcement: {
+    icon: 'book',
+    color: '#1e6fd9',
+    bg: '#e8f0fe',
+    filter: 'Courses',
+  },
+  training_answer: {
+    icon: 'book',
+    color: '#1e6fd9',
+    bg: '#e8f0fe',
+    filter: 'Courses',
+  },
+  training_reminder: {
+    icon: 'sun',
+    color: '#e08b00',
+    bg: '#fff4e0',
+    filter: 'Courses',
+  },
+  training_final_day: {
+    icon: 'sun',
+    color: '#e08b00',
+    bg: '#fff4e0',
+    filter: 'Courses',
+  },
 };
 
 const DEFAULT_DASH_STYLE = {
@@ -125,7 +191,9 @@ function readStringField(
 
 /** Prefer category for UI/routing (API sends type=automatic, category=chat_message). */
 function pickDisplayType(item: UserNotificationItem): string {
-  const category = item.category?.trim();
+  const category =
+    item.category?.trim() ||
+    readStringField(item.metadata ?? undefined, 'category');
   if (category) return category;
   return item.notification_type?.trim() || 'notification';
 }
@@ -134,18 +202,30 @@ export function mapUserNotificationItem(
   item: UserNotificationItem,
 ): NotificationListItem {
   const metadata = item.metadata ?? undefined;
+  const category =
+    item.category?.trim() ||
+    readStringField(metadata, 'category') ||
+    undefined;
 
   return {
     id: item.id,
     notificationId: item.notification_id?.trim() || item.id,
     notificationType: pickDisplayType(item),
-    category: item.category?.trim() || undefined,
+    category,
     title: item.title?.trim() || 'Notification',
     description: item.message?.trim() || '',
     timestamp: formatNotificationTimestamp(item.created_at),
     read: item.is_read,
     conversationId: readStringField(metadata, 'conversation_id'),
     messageId: readStringField(metadata, 'message_id'),
+    trainingId: readStringField(metadata, 'training_id'),
+    enrolmentId:
+      readStringField(metadata, 'enrolment_id') ||
+      readStringField(metadata, 'enrollment_id'),
+    status: readStringField(metadata, 'status'),
+    announcementId: readStringField(metadata, 'announcement_id'),
+    discussionId: readStringField(metadata, 'discussion_id'),
+    certificateUrl: readStringField(metadata, 'certificate_url'),
     createdAt: item.created_at,
   };
 }
@@ -176,6 +256,13 @@ export function mapUserNotificationsToDashItems(
       icon: style.icon,
       conversationId: item.conversationId,
       notificationType: item.notificationType,
+      category: item.category,
+      trainingId: item.trainingId,
+      enrolmentId: item.enrolmentId,
+      status: item.status,
+      announcementId: item.announcementId,
+      discussionId: item.discussionId,
+      certificateUrl: item.certificateUrl,
     };
   });
 }

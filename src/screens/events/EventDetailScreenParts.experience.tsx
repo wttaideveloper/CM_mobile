@@ -15,7 +15,7 @@ import {
 } from '@/utils/eventCalendar';
 import { PRIMARY, TEXT_MUTED, styles } from '@/screens/events/EventDetailScreen.styles';
 
-/** Same open-in-browser pattern already used for training documents (MarketTrainingDetailBody.tsx) — no new dependency. */
+/** Same open-in-browser pattern already used for training documents (TrainingDetailBody.tsx) — no new dependency. */
 async function openExternalUrl(url: string): Promise<void> {
   const target = url.startsWith('http') ? url : `https://${url}`;
   try {

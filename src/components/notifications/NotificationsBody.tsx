@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   NotifAwardIcon,
+  NotifBellEmptyIcon,
   NotifBookIcon,
   NotifDropIcon,
   NotifDumbbellIcon,
@@ -21,6 +22,7 @@ import {
   type NotifIconKind,
   type StaticNotification,
 } from '@/components/notifications/notificationsData';
+import { shadowSm } from '@/utils/shadows';
 import { c, NU } from '@/utils/newUiCompact';
 
 type NotificationsBodyProps = {
@@ -50,6 +52,54 @@ function NotifIcon({ kind, color }: { kind: NotifIconKind; color: string }) {
   }
 }
 
+function NotificationRow({
+  item,
+  unread,
+  onPress,
+}: {
+  item: StaticNotification;
+  unread: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        unread && styles.rowUnread,
+        pressed && styles.rowPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title}${unread ? ', unread' : ''}. ${item.body}. ${item.time}.`}
+      accessibilityHint={unread ? 'Double tap to mark as read' : undefined}
+    >
+      {unread ? <View style={styles.unreadAccent} /> : null}
+      <View
+        style={[styles.iconWrap, { backgroundColor: item.bg }]}
+        importantForAccessibility="no-hide-descendants"
+      >
+        <NotifIcon kind={item.icon} color={item.color} />
+      </View>
+      <View style={styles.copy}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={2}>
+            {item.title}
+          </Text>
+          {unread ? (
+            <View style={styles.newPill}>
+              <Text style={styles.newPillText}>New</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text style={styles.bodyText} numberOfLines={3}>
+          {item.body}
+        </Text>
+        <Text style={styles.time}>{item.time}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 export function NotificationsBody({
   filter,
   onFilterChange,
@@ -60,7 +110,12 @@ export function NotificationsBody({
 }: NotificationsBodyProps) {
   return (
     <View style={styles.body}>
-      <View style={styles.chips}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chips}
+        style={styles.chipsScroll}
+      >
         {NOTIF_FILTERS.map((item) => {
           const active = item === filter;
           return (
@@ -82,14 +137,19 @@ export function NotificationsBody({
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       {groups.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>No notifications</Text>
+          <View style={styles.emptyIconWrap}>
+            <NotifBellEmptyIcon color={NOTIF_GREEN} size={32} />
+          </View>
+          <Text style={styles.emptyTitle}>
+            {filter === 'Unread' ? 'You’re all caught up' : 'No notifications'}
+          </Text>
           <Text style={styles.emptyBody}>
             {filter === 'Unread'
-              ? 'You’re all caught up. New updates will show here.'
+              ? 'New updates will show here when they arrive.'
               : filter === 'All'
                 ? 'You’ll see your updates here when new activity arrives.'
                 : 'Nothing in this filter right now. Try another category.'}
@@ -98,58 +158,26 @@ export function NotificationsBody({
       ) : (
         groups.map((group) => (
           <View key={group.label} style={styles.group}>
-            <Text style={styles.groupLabel}>{group.label}</Text>
-            <View style={styles.card}>
-              {group.items.map((item, index) => {
+            <View style={styles.groupHeader}>
+              <Text style={styles.groupLabel}>{group.label}</Text>
+              <View style={styles.groupCount}>
+                <Text style={styles.groupCountText}>{group.items.length}</Text>
+              </View>
+            </View>
+            <View style={styles.stack}>
+              {group.items.map((item) => {
                 const unread =
                   item.unread && !(readIds?.has(item.id) ?? false);
-                const isLast = index === group.items.length - 1;
-                const rowContent = (
-                  <>
-                    <View
-                      style={[
-                        styles.dot,
-                        { backgroundColor: unread ? '#2f7d32' : 'transparent' },
-                      ]}
-                    />
-                    <View
-                      style={[styles.iconWrap, { backgroundColor: item.bg }]}
-                      importantForAccessibility="no-hide-descendants"
-                    >
-                      <NotifIcon kind={item.icon} color={item.color} />
-                    </View>
-                    <View style={styles.copy}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.title}>{item.title}</Text>
-                        <Text style={styles.time}>{item.time}</Text>
-                      </View>
-                      <Text style={styles.bodyText}>{item.body}</Text>
-                    </View>
-                  </>
-                );
-                const a11yLabel = `${item.title}${unread ? ', unread' : ''}. ${item.body}. ${item.time}.`;
-
                 return (
-                  <Pressable
+                  <NotificationRow
                     key={item.id}
+                    item={item}
+                    unread={unread}
                     onPress={() => {
                       onItemPress?.(item);
                       if (unread) onMarkRead?.(item.id);
                     }}
-                    style={({ pressed }) => [
-                      styles.row,
-                      unread && styles.rowUnread,
-                      isLast && styles.rowLast,
-                      pressed && styles.rowPressed,
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={a11yLabel}
-                    accessibilityHint={
-                      unread ? 'Double tap to mark as read' : undefined
-                    }
-                  >
-                    {rowContent}
-                  </Pressable>
+                  />
                 );
               })}
             </View>
@@ -162,19 +190,22 @@ export function NotificationsBody({
 
 const styles = StyleSheet.create({
   body: {
-    paddingHorizontal: NU.hPad,
     paddingTop: NU.bodyPadTop,
     paddingBottom: NU.bodyPadBottom,
     gap: NU.sectionGap,
   },
+  chipsScroll: {
+    marginHorizontal: 0,
+  },
   chips: {
+    paddingHorizontal: NU.hPad,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: c(9, 7),
+    gap: c(8, 6),
+    paddingBottom: c(2, 1),
   },
   chip: {
-    paddingVertical: NU.chipPadV,
-    paddingHorizontal: NU.chipPadH,
+    paddingVertical: c(9, 7),
+    paddingHorizontal: c(14, 12),
     borderRadius: 99,
     borderWidth: 1,
   },
@@ -187,104 +218,159 @@ const styles = StyleSheet.create({
     borderColor: NOTIF_CHIP_BORDER,
   },
   chipPressed: {
-    opacity: 0.8,
+    opacity: 0.85,
   },
   chipText: {
     fontSize: NU.chipFont,
-    fontWeight: '600',
+    fontWeight: '700',
     color: NOTIF_BODY,
   },
   chipTextActive: {
     color: '#FFFFFF',
   },
   group: {
+    paddingHorizontal: NU.hPad,
     gap: c(10, 8),
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: c(8, 6),
   },
   groupLabel: {
     fontSize: NU.label,
     fontWeight: '800',
-    letterSpacing: 1.3,
+    letterSpacing: 1.2,
     color: NOTIF_MUTED,
   },
-  card: {
+  groupCount: {
+    minWidth: c(20, 18),
+    height: c(20, 18),
+    paddingHorizontal: c(6, 5),
+    borderRadius: 99,
+    backgroundColor: '#e4f3e7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupCountText: {
+    fontSize: c(11, 10),
+    fontWeight: '800',
+    color: NOTIF_GREEN,
+  },
+  stack: {
+    gap: c(10, 8),
+  },
+  row: {
+    position: 'relative',
+    overflow: 'hidden',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: NOTIF_BORDER,
     borderRadius: NU.cardRadius,
-    overflow: 'hidden',
-  },
-  row: {
-    padding: NU.cardPad,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f6f0',
+    paddingVertical: c(14, 12),
+    paddingHorizontal: c(14, 12),
+    paddingLeft: c(14, 12),
     flexDirection: 'row',
-    gap: NU.cardGap,
+    gap: c(12, 10),
     alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
+    ...shadowSm,
   },
   rowUnread: {
-    backgroundColor: '#fafffb',
+    backgroundColor: '#fbfffc',
+    borderColor: '#cfe8d4',
   },
   rowPressed: {
     backgroundColor: '#eef7ef',
   },
-  rowLast: {
-    borderBottomWidth: 0,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    marginTop: c(8, 6),
-    borderRadius: c(4, 3),
+  unreadAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: NOTIF_GREEN,
   },
   iconWrap: {
-    width: NU.iconBtn,
-    height: NU.iconBtn,
-    borderRadius: NU.iconBtnRadius,
+    width: c(44, 40),
+    height: c(44, 40),
+    borderRadius: c(14, 12),
     alignItems: 'center',
     justifyContent: 'center',
   },
   copy: {
     flex: 1,
+    minWidth: 0,
+    gap: c(4, 3),
   },
   titleRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: c(10, 8),
+    alignItems: 'flex-start',
+    gap: c(8, 6),
   },
   title: {
     flex: 1,
     fontSize: NU.cardTitle,
-    fontWeight: '700',
+    fontWeight: '800',
     color: NOTIF_TEAL,
+    letterSpacing: -0.2,
   },
-  time: {
-    fontSize: NU.label,
-    color: NOTIF_TIME,
+  newPill: {
+    marginTop: c(1, 0),
+    paddingHorizontal: c(8, 6),
+    paddingVertical: c(3, 2),
+    borderRadius: 99,
+    backgroundColor: '#e6f4e8',
+  },
+  newPillText: {
+    fontSize: c(10.5, 10),
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    color: NOTIF_GREEN,
+    textTransform: 'uppercase',
   },
   bodyText: {
-    marginTop: c(5, 4),
     fontSize: NU.body,
-    lineHeight: c(19, 17),
+    lineHeight: c(20, 18),
     color: NOTIF_BODY,
   },
+  time: {
+    marginTop: c(2, 1),
+    fontSize: NU.label,
+    fontWeight: '600',
+    color: NOTIF_TIME,
+  },
   empty: {
+    marginHorizontal: NU.hPad,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: NOTIF_BORDER,
     borderRadius: NU.cardRadius,
-    padding: c(22, 18),
-    gap: c(6, 4),
+    paddingVertical: c(36, 30),
+    paddingHorizontal: c(22, 18),
+    alignItems: 'center',
+    gap: c(8, 6),
+    ...shadowSm,
+  },
+  emptyIconWrap: {
+    width: c(64, 56),
+    height: c(64, 56),
+    borderRadius: 99,
+    backgroundColor: '#e8f6eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: c(6, 4),
   },
   emptyTitle: {
     fontSize: NU.cardTitleLg,
-    fontWeight: '700',
+    fontWeight: '800',
     color: NOTIF_TEAL,
+    textAlign: 'center',
   },
   emptyBody: {
     fontSize: NU.body,
-    lineHeight: c(19, 17),
+    lineHeight: c(20, 18),
     color: NOTIF_BODY,
+    textAlign: 'center',
+    maxWidth: 280,
   },
 });

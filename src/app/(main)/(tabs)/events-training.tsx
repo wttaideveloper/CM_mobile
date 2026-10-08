@@ -1,3 +1,3 @@
-import { EventsTrainingTabScreen } from '@/screens/eventsTraining/EventsTrainingTabScreen';
+import { EventsTrainingTabScreen } from '@/screens/trainingsAndCourses/EventsTrainingTabScreen';
 
 export default EventsTrainingTabScreen;

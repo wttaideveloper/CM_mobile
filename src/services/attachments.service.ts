@@ -5,6 +5,7 @@ import { API_CONFIG } from '@/config';
 import { DEV_USER } from '@/constants/devUser';
 import { useAuthStore } from '@/stores/auth.store';
 import type { ApiMessage } from '@/types/message.types';
+import { decodeAttachmentFileName } from '@/utils/attachmentFileName';
 
 export type AttachmentUploadResponse = {
   id: string;
@@ -118,7 +119,11 @@ export async function uploadAttachment({
     },
   );
 
-  return response.data;
+  const uploaded = response.data;
+  return {
+    ...uploaded,
+    file_name: decodeAttachmentFileName(uploaded.file_name) || fileName,
+  };
 }
 
 export type AttachmentMessageType = 'image' | 'document' | 'audio' | 'video';
@@ -179,7 +184,7 @@ function buildMessageFromUpload(
     id: uploaded.message_id,
     conversation_id: uploaded.conversation_id || '',
     sender_id: senderId,
-    content: uploaded.file_name,
+    content: decodeAttachmentFileName(uploaded.file_name) || uploaded.file_name,
     message_type: messageType,
     attachment_id: uploaded.id,
     is_deleted: false,
@@ -213,6 +218,7 @@ export function parseAttachmentResponse(
   fileNameHint?: string,
 ): AttachmentDetailResponse {
   const fallbackUrl = buildAttachmentDownloadUrl(attachmentId);
+  const hintName = decodeAttachmentFileName(fileNameHint) || 'Attachment';
 
   if (typeof data === 'string' && data.trim()) {
     return {
@@ -220,8 +226,8 @@ export function parseAttachmentResponse(
       conversation_id: '',
       message_id: '',
       uploaded_by: '',
-      file_name: fileNameHint || 'Attachment',
-      mime_type: inferMimeTypeFromName(fileNameHint || ''),
+      file_name: hintName,
+      mime_type: inferMimeTypeFromName(hintName),
       file_size: 0,
       attachment_type: 'image',
       download_url: resolveAttachmentUrl(data.trim()),
@@ -231,7 +237,10 @@ export function parseAttachmentResponse(
 
   if (data && typeof data === 'object') {
     const raw = data as Record<string, unknown>;
-    const resolvedName = String(raw.file_name ?? raw.filename ?? fileNameHint ?? 'Attachment');
+    const resolvedName =
+      decodeAttachmentFileName(
+        String(raw.file_name ?? raw.filename ?? fileNameHint ?? 'Attachment'),
+      ) || 'Attachment';
     const downloadPath = String(
       raw.download_url ?? raw.url ?? raw.file_url ?? raw.path ?? fallbackUrl,
     );
@@ -255,8 +264,8 @@ export function parseAttachmentResponse(
     conversation_id: '',
     message_id: '',
     uploaded_by: '',
-    file_name: fileNameHint || 'Attachment',
-    mime_type: inferMimeTypeFromName(fileNameHint || ''),
+    file_name: hintName,
+    mime_type: inferMimeTypeFromName(hintName),
     file_size: 0,
     attachment_type: 'image',
     download_url: fallbackUrl,

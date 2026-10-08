@@ -7,6 +7,7 @@ import {
   BackHandler,
   FlatList,
   Keyboard,
+  Platform,
   View,
   type LayoutChangeEvent,
 } from 'react-native';
@@ -25,7 +26,10 @@ import {
 } from '@/components/chat/ChatDropdownMenus';
 import { ChatHeader } from '@/components/chat/ChatHeader';
 import { CHAT_COMPOSER_BASE_HEIGHT } from '@/components/chat/ChatKeyboardScrollView';
+import { ChatAttachModeSheet } from '@/components/chat/ChatAttachModeSheet';
+import { ChatCameraModeSheet } from '@/components/chat/ChatCameraModeSheet';
 import { ChatImageViewer } from '@/components/chat/ChatImageViewer';
+import { ChatVideoViewer } from '@/components/chat/ChatVideoViewer';
 import {
   ChatAiSummaryCard,
   ChatGroupMembers,
@@ -66,6 +70,7 @@ import { isApiConversationId, isConversationClosed } from '@/utils/conversation'
 import { chatMediaHref } from '@/utils/chatNavigation';
 import { paramValue, parseMode } from '@/utils/chatRouteParams';
 import { canCopyMessage, canDownloadAttachment, getCopyableMessageText } from '@/utils/chatMessage';
+import { dismissChatNotificationsForConversation } from '@/utils/chatPushNotifications';
 import { formatISTDateTime, parseApiDate } from '@/utils/dateTime';
 import { mapApiMessageToChatMessage } from '@/utils/message.mapper';
 import {
@@ -148,11 +153,17 @@ export function ChatScreen() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(meta.hasOlderMessages);
   const voiceRecorder = useVoiceRecorder();
-  const { openCamera } = useChatCamera();
+  const { openCameraPhoto, openCameraVideo, openPhotoLibrary } = useChatCamera();
+  const [cameraModeSheetVisible, setCameraModeSheetVisible] = useState(false);
+  const [attachModeSheetVisible, setAttachModeSheetVisible] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const messagesRef = useRef(messages);
   const [composerRowHeight, setComposerRowHeight] = useState(CHAT_COMPOSER_BASE_HEIGHT);
   const [viewerImageUri, setViewerImageUri] = useState<string | null>(null);
+  const [viewerVideo, setViewerVideo] = useState<{
+    uri: string;
+    fileName?: string;
+  } | null>(null);
   const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
@@ -176,6 +187,7 @@ export function ChatScreen() {
       if (!isLiveConversation) return undefined;
 
       setActiveChatConversation(conversationId);
+      void dismissChatNotificationsForConversation(conversationId);
 
       return () => {
         const latestIncoming = [...messagesRef.current]
@@ -232,7 +244,8 @@ export function ChatScreen() {
   const inputDisabled =
     !canSend ||
     apiConversation?.is_read_only === true ||
-    (isLiveConversation && conversationIsClosed);
+    // Wait for conversation details so a closed chat never briefly shows the composer.
+    (isLiveConversation && (!apiConversation || conversationIsClosed));
   const showFullFeatures = meta.mode === 'full';
 
   // Own bubbles (right): sender_id === GET /auth/me user id
@@ -589,6 +602,18 @@ export function ChatScreen() {
     };
   }, [conversationId, isLiveConversation]);
 
+  /** Inverted list: offset 0 is the newest bubble (visual bottom). */
+  const scrollToLatest = useCallback((animated = true) => {
+    const jump = () => {
+      listRef.current?.scrollToOffset({ offset: 0, animated });
+    };
+    // Wait for the optimistic bubble to mount, then jump to newest.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(jump);
+    });
+    setTimeout(jump, 80);
+  }, []);
+
   const scrollToMessage = useCallback(
     (messageId: string) => {
       const index = invertedMessages.findIndex((message) => message.id === messageId);
@@ -633,18 +658,52 @@ export function ChatScreen() {
   }, []);
 
   useEffect(() => {
-    if (!viewerImageUri) return undefined;
+    if (!viewerImageUri && !viewerVideo) return undefined;
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (viewerVideo) {
+        setViewerVideo(null);
+        return true;
+      }
       setViewerImageUri(null);
       return true;
     });
 
     return () => subscription.remove();
-  }, [viewerImageUri]);
+  }, [viewerImageUri, viewerVideo]);
 
-  const appendUploadedMessage = (apiMessage: ApiMessage, pendingId?: string) => {
-    const mapped = mapApiMessageToChatMessage(apiMessage, currentUserId);
+  const appendUploadedMessage = (
+    apiMessage: ApiMessage,
+    pendingIdOrOptions?:
+      | string
+      | {
+          pendingId?: string;
+          durationLabel?: string;
+          localUri?: string;
+        },
+  ) => {
+    const options =
+      typeof pendingIdOrOptions === 'string'
+        ? { pendingId: pendingIdOrOptions }
+        : pendingIdOrOptions ?? {};
+    const pendingId = options.pendingId;
+
+    let mapped = mapApiMessageToChatMessage(apiMessage, currentUserId);
+    if (
+      mapped.attachment &&
+      (options.durationLabel || options.localUri)
+    ) {
+      mapped = {
+        ...mapped,
+        attachment: {
+          ...mapped.attachment,
+          duration: options.durationLabel ?? mapped.attachment.duration,
+          uri: options.localUri ?? mapped.attachment.uri,
+          thumbnail: options.localUri ?? mapped.attachment.thumbnail,
+        },
+      };
+    }
+
     setMessages((prev) => {
       const withoutPending = pendingId
         ? prev.filter((m) => m.id !== pendingId)
@@ -660,12 +719,34 @@ export function ChatScreen() {
       }
       return [...withoutPending, mapped];
     });
+    scrollToLatest();
 
     if (apiMessage.attachment_id) {
       void hydrateSingleChatMessageFromApi(apiMessage, currentUserId)
         .then((hydrated) => {
           setMessages((prev) =>
-            prev.map((m) => (m.id === hydrated.id ? hydrated : m)),
+            prev.map((m) => {
+              if (m.id !== hydrated.id) return m;
+              if (!hydrated.attachment) return hydrated;
+              return {
+                ...hydrated,
+                attachment: {
+                  ...hydrated.attachment,
+                  duration:
+                    hydrated.attachment.duration ||
+                    options.durationLabel ||
+                    m.attachment?.duration,
+                  uri:
+                    hydrated.attachment.uri ||
+                    options.localUri ||
+                    m.attachment?.uri,
+                  thumbnail:
+                    hydrated.attachment.thumbnail ||
+                    options.localUri ||
+                    m.attachment?.thumbnail,
+                },
+              };
+            }),
           );
         })
         .catch((error) => {
@@ -720,57 +801,126 @@ export function ChatScreen() {
       },
     ]);
     setShowTyping(true);
+    scrollToLatest();
   };
 
-  const handleCameraPhoto = async () => {
-    if (inputDisabled || isSending) return;
-    setSelectedEditMessage(null);
-    const photo = await openCamera();
-    if (!photo) return;
-
+  const sendPickedMedia = async (media: {
+    uri: string;
+    fileName: string;
+    fileSizeLabel: string;
+    mimeType?: string;
+    kind: 'image' | 'video';
+    durationLabel?: string;
+  }) => {
+    const attachmentType = media.kind;
     if (isLiveConversation) {
       try {
         setIsSending(true);
         const sent = await uploadAndSendAttachmentMessage({
           conversationId,
-          fileUri: photo.uri,
-          fileName: photo.fileName,
-          mimeType: undefined,
-          attachmentType: 'image',
+          fileUri: media.uri,
+          fileName: media.fileName,
+          mimeType: media.mimeType,
+          attachmentType,
         });
-        appendUploadedMessage(sent);
+        appendUploadedMessage(sent, {
+          durationLabel: media.durationLabel,
+          localUri: media.uri,
+        });
       } catch (error) {
-        if (__DEV__) console.warn('[Attachment upload] image failed:', error);
-        Alert.alert('Upload failed', 'Could not upload image.');
+        if (__DEV__) console.warn(`[Attachment upload] ${attachmentType} failed:`, error);
+        Alert.alert(
+          'Upload failed',
+          attachmentType === 'video'
+            ? 'Could not upload video.'
+            : 'Could not upload image.',
+        );
       } finally {
         setIsSending(false);
       }
       return;
     }
 
-    // Preview / readonly: show local image bubble immediately.
+    // Preview / readonly: show local media bubble immediately.
     setMessages((prev) => [
       ...prev,
       {
-        id: `photo-${Date.now()}`,
+        id: `${attachmentType}-${Date.now()}`,
         sender: 'user',
         timestamp: 'Just now',
         status: 'sent',
         messageType: 'attachment',
         attachment: {
-          type: 'image',
-          name: photo.fileName,
-          size: photo.fileSizeLabel,
-          thumbnail: photo.uri,
+          type: attachmentType,
+          name: media.fileName,
+          size: media.fileSizeLabel,
+          thumbnail: media.uri,
+          uri: media.uri,
+          duration: media.durationLabel,
           storage: 'S3',
         },
       },
     ]);
+    scrollToLatest();
+  };
+
+  const runCameraCapture = async (mode: 'photo' | 'video') => {
+    if (inputDisabled || isSending) return;
+    setSelectedEditMessage(null);
+    setCameraModeSheetVisible(false);
+    const media =
+      mode === 'photo' ? await openCameraPhoto() : await openCameraVideo();
+    if (!media) return;
+    await sendPickedMedia(media);
+  };
+
+  const handleCameraPress = () => {
+    if (inputDisabled || isSending) return;
+
+    // iOS: native alert looks fine. Android: use bottom sheet (Alert looks poor).
+    if (Platform.OS === 'ios') {
+      Alert.alert('Camera', undefined, [
+        { text: 'Take Photo', onPress: () => void runCameraCapture('photo') },
+        { text: 'Record Video', onPress: () => void runCameraCapture('video') },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
+
+    setCameraModeSheetVisible(true);
+  };
+
+  const handleGalleryMedia = async () => {
+    if (inputDisabled || isSending) return;
+    setAttachModeSheetVisible(false);
+    setSelectedEditMessage(null);
+    const media = await openPhotoLibrary();
+    if (!media) return;
+    await sendPickedMedia(media);
+  };
+
+  const handleAttachPress = () => {
+    if (inputDisabled || isSending) return;
+
+    // Same UX as camera: Alert on iOS, bottom sheet on Android.
+    // Photos → system gallery; Document → Files for PDFs/Word.
+    if (Platform.OS === 'ios') {
+      Alert.alert('Attach', undefined, [
+        { text: 'Photo Library', onPress: () => void handleGalleryMedia() },
+        { text: 'Document', onPress: () => void handleDocumentPick() },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
+
+    setAttachModeSheetVisible(true);
   };
 
   const handleAttachmentPress = useCallback(async (message: ChatMessage) => {
     const attachment = message.attachment;
-    if (!attachment || (attachment.type !== 'pdf' && attachment.type !== 'word')) return;
+    if (!attachment || (attachment.type !== 'pdf' && attachment.type !== 'word')) {
+      return;
+    }
 
     const openingKey = message.attachmentId ?? message.id;
     setOpeningAttachmentId(openingKey);
@@ -787,12 +937,29 @@ export function ChatScreen() {
     }
   }, []);
 
+  const handleVideoPress = useCallback((message: ChatMessage) => {
+    const attachment = message.attachment;
+    if (!attachment || attachment.type !== 'video') return;
+    const uri = attachment.uri || attachment.thumbnail;
+    if (!uri) return;
+    setViewerVideo({ uri, fileName: attachment.name });
+  }, []);
+
   const handleDocumentPick = async () => {
     if (inputDisabled || isSending) return;
+    setAttachModeSheetVisible(false);
     setSelectedEditMessage(null);
 
     const result = await DocumentPicker.getDocumentAsync({
-      type: '*/*',
+      // Keep Files for documents only — photos/videos go through Photo Library.
+      type: [
+        'application/pdf',
+        'com.adobe.pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'public.text',
+        'public.data',
+      ],
       copyToCacheDirectory: true,
       multiple: false,
     });
@@ -835,6 +1002,7 @@ export function ChatScreen() {
           },
         },
       ]);
+      scrollToLatest();
 
       try {
         setIsSending(true);
@@ -874,7 +1042,7 @@ export function ChatScreen() {
         },
       },
     ]);
-
+    scrollToLatest();
   };
 
   const voiceControls = {
@@ -889,7 +1057,14 @@ export function ChatScreen() {
 
   const handleSend = async () => {
     const text = draft.trim();
-    if (!text || inputDisabled || isSending) return;
+    if (!text || isSending) return;
+
+    if (isLiveConversation && (conversationIsClosed || apiConversation?.is_read_only)) {
+      Alert.alert('Conversation closed', 'This conversation is closed');
+      return;
+    }
+
+    if (inputDisabled) return;
 
     if (editingMessageId && isLiveConversation) {
       try {
@@ -931,6 +1106,7 @@ export function ChatScreen() {
       ]);
       setDraft('');
       setShowTyping(true);
+      scrollToLatest();
       return;
     }
 
@@ -950,6 +1126,7 @@ export function ChatScreen() {
         messageType: 'text',
       },
     ]);
+    scrollToLatest();
 
     try {
       const sentMessage = await sendMessageViaSocket({
@@ -964,6 +1141,7 @@ export function ChatScreen() {
         if (withoutPending.some((m) => m.id === mapped.id)) return withoutPending;
         return [...withoutPending, mapped];
       });
+      scrollToLatest(false);
     } catch (error) {
       setMessages((prev) => prev.filter((m) => m.id !== pendingId));
       setDraft(text);
@@ -973,7 +1151,12 @@ export function ChatScreen() {
           ? String((error as { message: string }).message)
           : 'Could not send message. Please try again.';
 
-      Alert.alert('Send failed', message);
+      if (/closed|read[_\s-]?only|not open/i.test(message)) {
+        setApiConversation((prev) => (prev ? { ...prev, status: 'closed' } : prev));
+        Alert.alert('Conversation closed', 'This conversation is closed');
+      } else {
+        Alert.alert('Send failed', message);
+      }
     } finally {
       setIsSending(false);
     }
@@ -1071,7 +1254,13 @@ export function ChatScreen() {
 
     await saveChatAttachmentToDevice({
       attachmentId: message.attachmentId,
-      fileName: attachment.name || (attachment.type === 'image' ? 'image.jpg' : 'attachment'),
+      fileName:
+        attachment.name ||
+        (attachment.type === 'image'
+          ? 'image.jpg'
+          : attachment.type === 'video'
+            ? 'video.mp4'
+            : 'attachment'),
       uri,
       type: attachment.type,
     });
@@ -1162,19 +1351,22 @@ export function ChatScreen() {
       bottomInset={insets.bottom}
       inputDisabled={inputDisabled}
       conversationIsClosed={conversationIsClosed}
+      conversationLoading={isLiveConversation && !apiConversation}
       mode={meta.mode}
       draft={draft}
       onChangeDraft={setDraft}
       onSend={() => void handleSend()}
       voice={voiceControls}
-      onAttach={() => void handleDocumentPick()}
-      onCameraPress={() => void handleCameraPhoto()}
+      onAttach={handleAttachPress}
+      onCameraPress={() => void handleCameraPress()}
       focusRequestKey={composerFocusKey}
       onComposerRowLayout={handleComposerRowLayout}
       onDeleteMessage={handleDeleteMessage}
       onImagePress={setViewerImageUri}
+      onVideoPress={handleVideoPress}
       onAttachmentPress={(message) => void handleAttachmentPress(message)}
       onLongPressMessage={openMessageMenu}
+      onDismissSelection={clearMessageSelection}
       onLoadOlder={handleLoadOlder}
       onScrollToIndexFailed={handleScrollToIndexFailed}
     />
@@ -1250,7 +1442,7 @@ export function ChatScreen() {
         canCopy={canCopySelectedMessage}
         canDownload={canDownloadSelectedMessage}
         canDelete={canDeleteSelectedMessage}
-        onClose={() => setEditMenuOpen(false)}
+        onClose={clearMessageSelection}
         onEdit={() => {
           if (selectedEditMessage) beginInlineEdit(selectedEditMessage);
         }}
@@ -1262,6 +1454,28 @@ export function ChatScreen() {
       {viewerImageUri ? (
         <ChatImageViewer uri={viewerImageUri} onClose={() => setViewerImageUri(null)} />
       ) : null}
+
+      {viewerVideo ? (
+        <ChatVideoViewer
+          uri={viewerVideo.uri}
+          fileName={viewerVideo.fileName}
+          onClose={() => setViewerVideo(null)}
+        />
+      ) : null}
+
+      <ChatCameraModeSheet
+        visible={cameraModeSheetVisible}
+        onClose={() => setCameraModeSheetVisible(false)}
+        onTakePhoto={() => void runCameraCapture('photo')}
+        onRecordVideo={() => void runCameraCapture('video')}
+      />
+
+      <ChatAttachModeSheet
+        visible={attachModeSheetVisible}
+        onClose={() => setAttachModeSheetVisible(false)}
+        onPhotoLibrary={() => void handleGalleryMedia()}
+        onDocument={() => void handleDocumentPick()}
+      />
     </View>
   );
 }

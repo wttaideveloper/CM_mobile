@@ -91,15 +91,10 @@ export default function MainTabLayout() {
           }}
         />
         <Tabs.Screen
-          name="me"
-          options={{
-            title: 'Me',
-          }}
-        />
-        <Tabs.Screen
           name="coach"
           options={{
             title: 'Coach',
+            href: null,
           }}
         />
         <Tabs.Screen
@@ -112,6 +107,7 @@ export default function MainTabLayout() {
           }}
           options={{
             title: 'Explore',
+            href: null,
           }}
         />
         <Tabs.Screen
@@ -124,6 +120,7 @@ export default function MainTabLayout() {
           }}
           options={{
             title: 'Shop',
+            href: null,
           }}
         />
         <Tabs.Screen
@@ -136,6 +133,12 @@ export default function MainTabLayout() {
           }}
           options={{
             title: 'Events',
+          }}
+        />
+        <Tabs.Screen
+          name="me"
+          options={{
+            title: 'Me',
           }}
         />
         <Tabs.Screen

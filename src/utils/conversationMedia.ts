@@ -1,5 +1,6 @@
 import type { ChatMessage } from '@/constants/chat';
 import type { ApiMessage } from '@/types/message.types';
+import { decodeAttachmentFileName } from '@/utils/attachmentFileName';
 import { getISTDateKey, parseApiDate } from '@/utils/dateTime';
 
 export type MediaGalleryItem = {
@@ -49,7 +50,7 @@ export function toMediaGalleryItem(
     attachmentId: message.attachmentId,
     createdAt,
     kind: type,
-    name,
+    name: decodeAttachmentFileName(name) || name,
     size,
     thumbnail,
     uri,

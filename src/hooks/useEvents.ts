@@ -269,7 +269,7 @@ export type CheckoutQuoteParams = {
  * POST /api/v1/events/{id}/checkout/quote (Phase 2.8) — the authoritative
  * price preview shown before checkout/registration, debounced 350ms after
  * the last param change (same debounce window this app already uses
- * elsewhere for search-as-you-type, e.g. MarketTrainingListScreen) so
+ * elsewhere for search-as-you-type, e.g. TrainingListScreen) so
  * toggling a few selections in a row fires one request, not one per tap.
  * A pure preview — the backend re-validates everything, authoritatively,
  * at the actual checkout/registration call.

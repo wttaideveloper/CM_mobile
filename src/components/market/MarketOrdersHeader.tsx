@@ -54,7 +54,7 @@ export function MarketOrdersHeader({
         </Pressable>
         <View style={styles.titleBlock}>
           <Text style={styles.eyebrow}>Marketplace</Text>
-          <Text style={styles.title}>Orders</Text>
+          <Text style={styles.title}>Subscriptions</Text>
         </View>
       </View>
 

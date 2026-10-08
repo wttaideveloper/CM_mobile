@@ -22,6 +22,18 @@ function NativeSplashGate() {
   const isAuthReady = useAuthStore((state) => state.isAuthReady);
 
   useEffect(() => {
+    // Failsafe: never leave the native splash up if auth bootstrap stalls.
+    const failsafe = setTimeout(() => {
+      ExpoSplashScreen.hideAsync().catch(() => {});
+      if (!useAuthStore.getState().isAuthReady) {
+        useAuthStore.setState({ isAuthReady: true });
+      }
+    }, 10_000);
+
+    return () => clearTimeout(failsafe);
+  }, []);
+
+  useEffect(() => {
     if (!isAuthReady) return;
 
     // After session restore, force a readable Android status bar (native splash can leave black-on-black).

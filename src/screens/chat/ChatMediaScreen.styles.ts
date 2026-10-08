@@ -123,6 +123,26 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  mediaDownloadBtn: {
+    position: 'absolute',
+    left: 6,
+    top: 6,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  downloadBtnDisabled: {
+    opacity: 0.6,
+  },
+  docActionBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   docRow: {
     flexDirection: 'row',
     alignItems: 'center',

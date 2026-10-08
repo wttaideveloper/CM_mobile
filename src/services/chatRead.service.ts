@@ -8,6 +8,10 @@ export function setActiveChatConversation(conversationId: string | null): void {
   activeConversationId = conversationId;
 }
 
+export function getActiveChatConversationId(): string | null {
+  return activeConversationId;
+}
+
 export function setActiveChatLatestIncomingMessageId(messageId: string | null): void {
   activeLatestIncomingMessageId = messageId;
 }

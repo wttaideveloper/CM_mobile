@@ -66,7 +66,9 @@ export function MarketEventListBody({
   const router = useRouter();
   const { data: apiEvents, isLoading, isError, refetch } = useEvents();
 
-  const courseItems = MARKET_EVENTS_ALL.filter((item) => item.kind === 'course');
+  const courseItems: typeof MARKET_EVENTS_ALL = [];
+  // Static course rows from MARKET_EVENTS_ALL — hide for now (keep data file).
+  // const courseItems = MARKET_EVENTS_ALL.filter((item) => item.kind === 'course');
   const eventItems = (apiEvents ?? []).map(toEventListItem);
 
   const items =

@@ -1,3 +1,3 @@
-import { CourseDetailScreen } from '@/screens/events/courses/CourseDetailScreen';
+import { CourseDetailScreen } from '@/screens/trainingsAndCourses/courses/CourseDetailScreen';
 
 export default CourseDetailScreen;
