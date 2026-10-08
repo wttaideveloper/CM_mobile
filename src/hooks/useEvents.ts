@@ -323,6 +323,14 @@ export function useCheckoutQuote(params: CheckoutQuoteParams) {
   return {
     ...query,
     quote: query.data ?? null,
+    // A previous quote is not valid while the debounce still holds a newer
+    // selection. Callers must not submit it as though it priced the new set.
+    isSelectionPending:
+      enabled &&
+      (debounced.ticketTypeId !== ticketTypeId ||
+        debounced.quantity !== quantity ||
+        debounced.mealKey !== mealKey ||
+        debounced.accommodationKey !== accommodationKey),
   };
 }
 

@@ -12,7 +12,14 @@ import type {
  * count (see event.mapper.ts normalizeEventMealOption). A snapshot, not
  * live — re-fetch the event for a fresh value.
  */
-export type EventOptionAvailability = 'available' | 'sold_out' | 'unavailable';
+export type EventOptionAvailability =
+  | 'available'
+  | 'purchase_not_started'
+  | 'purchase_ended'
+  | 'service_ended'
+  | 'sold_out'
+  | 'inactive'
+  | 'currency_incompatible';
 
 /** Normalized meal option — id/active passthrough from the API; description/date default to null; date is pre-formatted for display (mirrors dateTime/schedule elsewhere on Event), matching option.active semantics (false = retired, kept for history). Pricing/capacity/window fields added Phase 2.8. */
 export type EventMealOption = {
@@ -29,6 +36,10 @@ export type EventMealOption = {
   /** null = unlimited (not computed). */
   remainingCapacity: number | null;
   availability: EventOptionAvailability;
+  purchaseStartAt: Date | null;
+  purchaseEndAt: Date | null;
+  serviceStartAt: Date | null;
+  serviceEndAt: Date | null;
   /** Informational/fulfilment only — when the meal is actually served. */
   serviceStartAtLabel: string | null;
   serviceEndAtLabel: string | null;
@@ -51,6 +62,10 @@ export type EventAccommodationOption = {
   capacity: number | null;
   remainingCapacity: number | null;
   availability: EventOptionAvailability;
+  purchaseStartAt: Date | null;
+  purchaseEndAt: Date | null;
+  serviceStartAt: Date | null;
+  serviceEndAt: Date | null;
   serviceStartAtLabel: string | null;
   serviceEndAtLabel: string | null;
 };

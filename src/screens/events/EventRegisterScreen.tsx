@@ -30,7 +30,7 @@ import type {
   EventFormSection,
   EventRegistrationResult,
 } from '@/types/event.types';
-import { getEventAvailability } from '@/utils/event.mapper';
+import { getCheckoutCurrencyStatus, getEventAvailability } from '@/utils/event.mapper';
 import { isModuleEnabled } from '@/utils/eventModules';
 import { EventRegisterFormField } from '@/screens/events/EventRegisterFormField';
 import { InfoCard } from '@/screens/events/EventDetailScreenParts.shared';
@@ -200,6 +200,20 @@ export function EventRegisterScreen() {
   const hasPaidSelectionIntent =
     (mealsEnabled && mealSelections.length > 0) ||
     (accommodationEnabled && accommodationSelections.length > 0);
+  const selectedMealOptions = (mealsEnabled ? event!.meals.options : []).filter((option) =>
+    mealSelections.includes(option.id),
+  );
+  const selectedAccommodationOptions = (accommodationEnabled ? event!.accommodation.options : []).filter((option) =>
+    accommodationSelections.includes(option.id),
+  );
+  const currencyStatus = getCheckoutCurrencyStatus([
+    ...selectedMealOptions.map((option) => ({ currency: option.currency, price: option.price, label: `Meal “${option.name}”` })),
+    ...selectedAccommodationOptions.map((option) => ({
+      currency: option.currency,
+      price: option.price,
+      label: `Accommodation “${option.name}”`,
+    })),
+  ]);
 
   // '' ticket_type_id: free registration never selects a ticket type — the backend
   // treats an empty id as "use the event's flat price" (same convention documented
@@ -209,6 +223,7 @@ export function EventRegisterScreen() {
     quote,
     isLoading: isQuoteLoading,
     isFetching: isQuoteFetching,
+    isSelectionPending: isQuoteSelectionPending,
     isError: isQuoteError,
     error: quoteError,
     refetch: refetchQuote,
@@ -218,7 +233,7 @@ export function EventRegisterScreen() {
     quantity: 1,
     mealSelections: mealsEnabled ? mealSelections : [],
     accommodationSelections: accommodationEnabled ? accommodationSelections : [],
-    enabled: hasPaidSelectionIntent,
+    enabled: hasPaidSelectionIntent && currencyStatus.isCompatible,
   });
 
   const goBack = () => router.back();
@@ -256,7 +271,9 @@ export function EventRegisterScreen() {
   let blockReason: string | null = null;
   let blockActionLabel = 'Back to event';
   let blockAction = goBack;
-  if (availability.kind === 'cancelled' || availability.kind === 'completed') {
+  if (availability.kind === 'event_ended') {
+    blockReason = 'Registration closed — this event has already ended.';
+  } else if (availability.kind === 'cancelled' || availability.kind === 'completed') {
     blockReason = `Registration is closed — this event is ${availability.label.replace('Event ', '').toLowerCase()}.`;
   } else if (availability.kind === 'closed') {
     blockReason = 'Registration is not currently open for this event.';
@@ -280,10 +297,8 @@ export function EventRegisterScreen() {
   // mealsEnabled/accommodationEnabled are computed earlier (needed for useCheckoutQuote,
   // which must run unconditionally before this screen's loading/not-found guards).
   // Retired options can't be newly selected — only ever offer active ones.
-  const availableMealOptions = mealsEnabled ? event.meals.options.filter((o) => o.active) : [];
-  const availableAccommodationOptions = accommodationEnabled
-    ? event.accommodation.options.filter((o) => o.active)
-    : [];
+  const availableMealOptions = mealsEnabled ? event.meals.options : [];
+  const availableAccommodationOptions = accommodationEnabled ? event.accommodation.options : [];
 
   function validate(): boolean {
     let valid = true;
@@ -323,7 +338,7 @@ export function EventRegisterScreen() {
   }
 
   function handleSubmit() {
-    if (registerMutation.isPending) {
+    if (registerMutation.isPending || !currencyStatus.isCompatible) {
       return;
     }
 
@@ -612,6 +627,8 @@ export function EventRegisterScreen() {
                 <EventOptionChips
                   options={availableMealOptions}
                   selectedIds={mealSelections}
+                  orderCurrency={currencyStatus.orderCurrency}
+                  optionKind="meal"
                   onToggle={(optionId) =>
                     setMealSelections((current) =>
                       current.includes(optionId)
@@ -629,6 +646,8 @@ export function EventRegisterScreen() {
                 <EventOptionChips
                   options={availableAccommodationOptions}
                   selectedIds={accommodationSelections}
+                  orderCurrency={currencyStatus.orderCurrency}
+                  optionKind="accommodation"
                   onToggle={(optionId) =>
                     setAccommodationSelections((current) =>
                       current.includes(optionId)
@@ -651,9 +670,9 @@ export function EventRegisterScreen() {
                     : []),
                 ]}
                 totalLabel={quote?.grandTotalLabel ?? null}
-                isLoading={isQuoteLoading}
-                isError={isQuoteError}
-                errorMessage={quoteError?.message}
+                isLoading={(isQuoteLoading || isQuoteSelectionPending) && currencyStatus.isCompatible}
+                isError={isQuoteError || !currencyStatus.isCompatible}
+                errorMessage={currencyStatus.message ?? quoteError?.message}
                 onRetry={() => void refetchQuote()}
               />
             ) : null}
@@ -662,7 +681,7 @@ export function EventRegisterScreen() {
               onPress={handleSubmit}
               disabled={
                 registerMutation.isPending ||
-                (hasPaidSelectionIntent && (isQuoteFetching || isQuoteError || !quote))
+                (hasPaidSelectionIntent && (isQuoteFetching || isQuoteSelectionPending || isQuoteError || !quote || !currencyStatus.isCompatible))
               }
               style={styles.submitBtn}
               borderRadius={14}

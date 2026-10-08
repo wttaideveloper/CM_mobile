@@ -1,7 +1,9 @@
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import type { EventOptionAvailability } from '@/constants/events';
 import { styles } from '@/screens/events/EventOptionChips.styles';
+import { getEventOptionAvailability } from '@/utils/event.mapper';
 
 /**
  * One selectable meal/accommodation option (Phase 2.8) — a structural subset
@@ -13,7 +15,13 @@ export type EventOptionChipItem = {
   name: string;
   date?: string | null;
   priceLabel: string;
+  price: number;
+  currency: string;
+  active: boolean;
   availability: EventOptionAvailability;
+  purchaseStartAt: Date | null;
+  purchaseEndAt: Date | null;
+  serviceEndAt: Date | null;
 };
 
 /**
@@ -28,16 +36,52 @@ export function EventOptionChips({
   options,
   selectedIds,
   onToggle,
+  orderCurrency,
+  optionKind,
 }: {
   options: EventOptionChipItem[];
   selectedIds: string[];
   onToggle: (id: string) => void;
+  orderCurrency: string | null;
+  optionKind: 'meal' | 'accommodation';
 }) {
+  const { t } = useTranslation();
+
+  function getUnavailableLabel(option: EventOptionChipItem, availability: EventOptionAvailability): string {
+    switch (availability) {
+      case 'sold_out':
+        return t('events.soldOut');
+      case 'purchase_not_started':
+        return option.purchaseStartAt
+          ? t('events.availableFrom', {
+              date: new Intl.DateTimeFormat('en-IN', {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              }).format(option.purchaseStartAt),
+            })
+          : t('events.unavailable');
+      case 'purchase_ended':
+        return t('events.purchaseEnded');
+      case 'service_ended':
+        return t(optionKind === 'meal' ? 'events.serviceEndedMeal' : 'events.serviceEndedAccommodation');
+      case 'currency_incompatible':
+        return t('events.differentCurrency');
+      default:
+        return t('events.unavailable');
+    }
+  }
+
   return (
     <View style={styles.optionList}>
       {options.map((option) => {
         const isSelected = selectedIds.includes(option.id);
-        const isSelectable = option.availability === 'available';
+        // A selected option must remain tappable so the person can remove it
+        // if a refreshed event made it unavailable after selection.
+        const availability = getEventOptionAvailability(
+          option,
+          isSelected ? null : orderCurrency,
+        );
+        const isSelectable = availability.isAvailable || isSelected;
         return (
           <Pressable
             key={option.id}
@@ -57,11 +101,7 @@ export function EventOptionChips({
               {option.date ? ` · ${option.date}` : ''}
             </Text>
             <Text style={[styles.optionChipSubText, !isSelectable && styles.optionChipSubTextMuted]}>
-              {isSelectable
-                ? option.priceLabel
-                : option.availability === 'sold_out'
-                  ? 'Sold out'
-                  : 'Currently unavailable'}
+              {isSelectable ? option.priceLabel : getUnavailableLabel(option, availability.kind)}
             </Text>
           </Pressable>
         );

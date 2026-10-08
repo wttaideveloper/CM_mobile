@@ -45,8 +45,8 @@ import { formatMoney } from '@/utils/currency';
 import {
   formatISTShortDate,
   formatISTTime,
-  HAS_TIMEZONE,
   parseApiDate,
+  parseWallDateTimeInTimeZone,
 } from '@/utils/dateTime';
 
 const MS_PER_DAY = 86_400_000;
@@ -113,12 +113,14 @@ function computeOptionAvailability(
   soldOut: boolean,
   purchaseStartAt: Date | null,
   purchaseEndAt: Date | null,
+  serviceEndAt: Date | null,
 ): EventOptionAvailability {
-  if (!active) return 'unavailable';
+  if (!active) return 'inactive';
   if (soldOut) return 'sold_out';
   const now = Date.now();
-  if (purchaseStartAt && purchaseStartAt.getTime() > now) return 'unavailable';
-  if (purchaseEndAt && purchaseEndAt.getTime() < now) return 'unavailable';
+  if (purchaseStartAt && purchaseStartAt.getTime() > now) return 'purchase_not_started';
+  if (purchaseEndAt && purchaseEndAt.getTime() <= now) return 'purchase_ended';
+  if (serviceEndAt && serviceEndAt.getTime() <= now) return 'service_ended';
   return 'available';
 }
 
@@ -138,12 +140,11 @@ function computeOptionAvailability(
  * (already carrying Z/±HH:MM) is never affected — this only changes the
  * fallback applied when no timezone is present at all.
  */
-function parseEventOptionWindowDate(value?: string | null): Date | null {
+function parseEventOptionWindowDate(value: string | null | undefined, timeZone?: string | null): Date | null {
   if (!value) return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
-  const normalized = HAS_TIMEZONE.test(trimmed) ? trimmed : `${trimmed}+05:30`;
-  const date = new Date(normalized);
+  const date = parseWallDateTimeInTimeZone(trimmed, timeZone ?? 'Asia/Kolkata');
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -167,6 +168,10 @@ type PricedOptionFields = {
   capacity: number | null;
   remainingCapacity: number | null;
   availability: EventOptionAvailability;
+  purchaseStartAt: Date | null;
+  purchaseEndAt: Date | null;
+  serviceStartAt: Date | null;
+  serviceEndAt: Date | null;
   serviceStartAtLabel: string | null;
   serviceEndAtLabel: string | null;
 };
@@ -175,6 +180,7 @@ type PricedOptionFields = {
 function normalizePricedOptionFields(
   option: PricedOptionSource,
   eventCurrency?: string | null,
+  timeZone?: string | null,
 ): PricedOptionFields {
   const price = Number.isFinite(option.price) ? Number(option.price) : 0;
   const currency = option.currency?.trim() || eventCurrency?.trim() || 'INR';
@@ -182,15 +188,16 @@ function normalizePricedOptionFields(
   const remainingCapacity = Number.isFinite(option.remaining_capacity)
     ? Number(option.remaining_capacity)
     : null;
-  const purchaseStartAt = parseEventOptionWindowDate(option.purchase_start_at);
-  const purchaseEndAt = parseEventOptionWindowDate(option.purchase_end_at);
-  const serviceStartAt = parseEventOptionWindowDate(option.service_start_at);
-  const serviceEndAt = parseEventOptionWindowDate(option.service_end_at);
+  const purchaseStartAt = parseEventOptionWindowDate(option.purchase_start_at, timeZone);
+  const purchaseEndAt = parseEventOptionWindowDate(option.purchase_end_at, timeZone);
+  const serviceStartAt = parseEventOptionWindowDate(option.service_start_at, timeZone);
+  const serviceEndAt = parseEventOptionWindowDate(option.service_end_at, timeZone);
   const availability = computeOptionAvailability(
     Boolean(option.active),
     Boolean(option.sold_out),
     purchaseStartAt,
     purchaseEndAt,
+    serviceEndAt,
   );
 
   if (__DEV__) {
@@ -220,6 +227,10 @@ function normalizePricedOptionFields(
     capacity,
     remainingCapacity,
     availability,
+    purchaseStartAt,
+    purchaseEndAt,
+    serviceStartAt,
+    serviceEndAt,
     serviceStartAtLabel: serviceStartAt ? formatEventDateTime(serviceStartAt) : null,
     serviceEndAtLabel: serviceEndAt ? formatEventDateTime(serviceEndAt) : null,
   };
@@ -228,6 +239,7 @@ function normalizePricedOptionFields(
 function normalizeEventMealOption(
   option: EventMealOptionApiResponse,
   eventCurrency?: string | null,
+  timeZone?: string | null,
 ): EventMealOption | null {
   const id = option?.id != null ? String(option.id).trim() : '';
   const name = option?.name?.trim();
@@ -245,7 +257,7 @@ function normalizeEventMealOption(
     description: option.description?.trim() || null,
     date: parsedDate ? formatISTShortDate(parsedDate) : null,
     active: Boolean(option.active),
-    ...normalizePricedOptionFields(option, eventCurrency),
+    ...normalizePricedOptionFields(option, eventCurrency, timeZone),
   };
 }
 
@@ -259,10 +271,11 @@ function normalizeEventMealOption(
 function normalizeEventMeals(
   meals?: EventMealsApiResponse | null,
   eventCurrency?: string | null,
+  timeZone?: string | null,
 ): EventMeals {
   const options = Array.isArray(meals?.options)
     ? meals!.options
-        .map((option) => normalizeEventMealOption(option, eventCurrency))
+        .map((option) => normalizeEventMealOption(option, eventCurrency, timeZone))
         .filter((option): option is EventMealOption => option !== null)
     : [];
   return { enabled: Boolean(meals?.enabled), options };
@@ -271,6 +284,7 @@ function normalizeEventMeals(
 function normalizeEventAccommodationOption(
   option: EventAccommodationOptionApiResponse,
   eventCurrency?: string | null,
+  timeZone?: string | null,
 ): EventAccommodationOption | null {
   const id = option?.id != null ? String(option.id).trim() : '';
   const name = option?.name?.trim();
@@ -281,7 +295,7 @@ function normalizeEventAccommodationOption(
     name,
     description: option.description?.trim() || null,
     active: Boolean(option.active),
-    ...normalizePricedOptionFields(option, eventCurrency),
+    ...normalizePricedOptionFields(option, eventCurrency, timeZone),
   };
 }
 
@@ -294,10 +308,11 @@ function normalizeEventAccommodationOption(
 function normalizeEventAccommodation(
   accommodation?: EventAccommodationApiResponse | null,
   eventCurrency?: string | null,
+  timeZone?: string | null,
 ): EventAccommodation {
   const options = Array.isArray(accommodation?.options)
     ? accommodation!.options
-        .map((option) => normalizeEventAccommodationOption(option, eventCurrency))
+        .map((option) => normalizeEventAccommodationOption(option, eventCurrency, timeZone))
         .filter((option): option is EventAccommodationOption => option !== null)
     : [];
   return { enabled: Boolean(accommodation?.enabled), options };
@@ -583,8 +598,9 @@ function mapCustomQuestions(customFields: unknown[] | null | undefined): EventFo
 }
 
 export function mapEventApiToItem(api: EventApiResponse): Event {
-  const start = safeParseDate(api.start_date);
-  const end = safeParseDate(api.end_date);
+  const timeZone = api.time_zone?.trim() || null;
+  const start = parseEventOptionWindowDate(api.start_date, timeZone);
+  const end = parseEventOptionWindowDate(api.end_date, timeZone);
 
   const price = parseNumericString(api.price);
   const isFree = price == null || price <= 0;
@@ -641,14 +657,14 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
     deliveryModeLabel: deriveDeliveryModeLabel(api),
     startDate: start,
     endDate: end,
-    timeZone: api.time_zone?.trim() || null,
+    timeZone,
     venueAddress: deriveVenueAddress(api),
     venueInstructions: api.venue?.instructions?.trim() || null,
     venueMapUrl: api.venue?.map_url?.trim() || null,
     eventType: resolveEventType(api.event_type),
     modules: normalizeEventModules(api.modules),
-    meals: normalizeEventMeals(api.meals, api.currency),
-    accommodation: normalizeEventAccommodation(api.accommodation, api.currency),
+    meals: normalizeEventMeals(api.meals, api.currency, timeZone),
+    accommodation: normalizeEventAccommodation(api.accommodation, api.currency, timeZone),
     customQuestions: mapCustomQuestions(api.custom_fields),
   };
 }
@@ -666,13 +682,91 @@ export function filterEventsByTag(events: Event[], filter: string): Event[] {
   return events.filter((event) => event.filterTags.includes(tag));
 }
 
-export type EventAvailabilityKind = 'available' | 'full' | 'closed' | 'cancelled' | 'completed';
+export type EventAvailabilityKind = 'available' | 'full' | 'closed' | 'cancelled' | 'completed' | 'event_ended';
 
 export type EventAvailability = {
   kind: EventAvailabilityKind;
   /** Empty for "available" — no status banner needed in that case. */
   label: string;
 };
+
+type PricedEventOption = {
+  active: boolean;
+  availability: EventOptionAvailability;
+  currency: string;
+  price: number;
+  purchaseStartAt: Date | null;
+  purchaseEndAt: Date | null;
+  serviceEndAt: Date | null;
+};
+
+export type EventOptionAvailabilityResult = {
+  kind: EventOptionAvailability;
+  isAvailable: boolean;
+};
+
+/**
+ * Computes a live selection state from the timestamps and availability flags
+ * supplied by the Event API. Capacity remains server-authoritative: this
+ * merely prevents an obviously unavailable option from being selected.
+ */
+export function getEventOptionAvailability(
+  option: PricedEventOption,
+  orderCurrency?: string | null,
+): EventOptionAvailabilityResult {
+  if (!option.active || option.availability === 'inactive') return { kind: 'inactive', isAvailable: false };
+  if (option.availability === 'sold_out') return { kind: 'sold_out', isAvailable: false };
+
+  const now = Date.now();
+  if (option.purchaseStartAt && option.purchaseStartAt.getTime() > now) {
+    return { kind: 'purchase_not_started', isAvailable: false };
+  }
+  if (option.purchaseEndAt && option.purchaseEndAt.getTime() <= now) {
+    return { kind: 'purchase_ended', isAvailable: false };
+  }
+  if (option.serviceEndAt && option.serviceEndAt.getTime() <= now) {
+    return { kind: 'service_ended', isAvailable: false };
+  }
+  if (option.price > 0 && orderCurrency && option.currency !== orderCurrency) {
+    return { kind: 'currency_incompatible', isAvailable: false };
+  }
+  return { kind: 'available', isAvailable: true };
+}
+
+export type CurrencySelection = {
+  currency: string;
+  price: number;
+  label: string;
+};
+
+export type CheckoutCurrencyStatus = {
+  isCompatible: boolean;
+  orderCurrency: string | null;
+  message: string | null;
+};
+
+/**
+ * Identifies the one payable currency before requesting a quote. The backend
+ * still validates the final request; this only avoids a knowingly-invalid
+ * quote and explains which selection needs changing.
+ */
+export function getCheckoutCurrencyStatus(
+  selections: CurrencySelection[],
+): CheckoutCurrencyStatus {
+  const payable = selections.filter((selection) => selection.price > 0);
+  const baseline = payable[0];
+  if (!baseline) return { isCompatible: true, orderCurrency: null, message: null };
+
+  const incompatible = payable.find((selection) => selection.currency !== baseline.currency);
+  if (!incompatible) {
+    return { isCompatible: true, orderCurrency: baseline.currency, message: null };
+  }
+  return {
+    isCompatible: false,
+    orderCurrency: baseline.currency,
+    message: `${baseline.label} is in ${baseline.currency}, but ${incompatible.label} is in ${incompatible.currency}. Please choose options using ${baseline.currency}.`,
+  };
+}
 
 /**
  * Single source of truth for what the customer can do right now, mirroring
@@ -692,6 +786,10 @@ export function getEventAvailability(event: Event): EventAvailability {
   }
   if (rawStatus === 'completed') {
     return { kind: 'completed', label: 'Event Completed' };
+  }
+  const lifecycleEnd = event.endDate ?? event.startDate;
+  if (lifecycleEnd && lifecycleEnd.getTime() < Date.now()) {
+    return { kind: 'event_ended', label: 'Registration Closed' };
   }
   if (rawStatus !== 'published') {
     return { kind: 'closed', label: 'Registration Closed' };

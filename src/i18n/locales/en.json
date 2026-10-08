@@ -119,5 +119,15 @@
   },
   "notifications": {
     "title": "Notifications"
+  },
+  "events": {
+    "unavailable": "Unavailable",
+    "soldOut": "Sold out",
+    "purchaseEnded": "Purchase period ended",
+    "serviceEndedMeal": "Service period has ended",
+    "serviceEndedAccommodation": "Accommodation period has ended",
+    "differentCurrency": "Unavailable — different currency",
+    "availableFrom": "Available from {{date}}",
+    "registrationEnded": "Registration closed — this event has already ended."
   }
 }

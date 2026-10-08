@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { useEventMeetingLink, useJoinSessionMeeting } from '@/hooks/useEvents';
 import type { Event, EventOptionAvailability } from '@/constants/events';
 import type { EventSessionSummary } from '@/types/event.types';
-import type { EventAvailability } from '@/utils/event.mapper';
+import { getEventOptionAvailability, type EventAvailability } from '@/utils/event.mapper';
 import { isModuleEnabled } from '@/utils/eventModules';
 import {
   addEventToDeviceCalendar,
@@ -329,10 +329,18 @@ export function EventResourcesSection({ resources }: { resources: Event['resourc
 /** Phase 2.8 — "Sold out" / "Currently unavailable" (outside purchase window), straight from the backend's own sold_out/purchase-window fields; never computed locally. 'available' renders nothing here (the price badge covers that case). */
 function OptionAvailabilityBadge({ availability }: { availability: EventOptionAvailability }) {
   if (availability === 'available') return null;
+  const label = {
+    sold_out: 'Sold out',
+    purchase_not_started: 'Purchase not started',
+    purchase_ended: 'Purchase period ended',
+    service_ended: 'Service period has ended',
+    inactive: 'Unavailable',
+    currency_incompatible: 'Unavailable — different currency',
+  }[availability];
   return (
     <View style={styles.experienceBadgeMuted}>
       <Text style={styles.experienceBadgeTextMuted}>
-        {availability === 'sold_out' ? 'Sold out' : 'Currently unavailable'}
+        {label}
       </Text>
     </View>
   );
@@ -353,22 +361,25 @@ export function EventMealsSection({ event }: { event: Event }) {
           </View>
         ) : (
           options.map((option, index) => (
+            (() => {
+              const availability = getEventOptionAvailability(option).kind;
+              return (
             <View
               key={option.id}
               style={[
                 styles.experienceRow,
                 index > 0 && styles.experienceRowBorder,
-                option.availability !== 'available' && styles.experienceRowDisabled,
+                availability !== 'available' && styles.experienceRowDisabled,
               ]}
             >
               <View style={styles.experienceRowHeader}>
                 <Text style={styles.experienceRowTitle}>{option.name}</Text>
-                {option.availability === 'available' ? (
+                {availability === 'available' ? (
                   <View style={styles.experienceBadge}>
                     <Text style={styles.experienceBadgeText}>{option.priceLabel}</Text>
                   </View>
                 ) : (
-                  <OptionAvailabilityBadge availability={option.availability} />
+                  <OptionAvailabilityBadge availability={availability} />
                 )}
               </View>
               {option.date ? (
@@ -378,6 +389,8 @@ export function EventMealsSection({ event }: { event: Event }) {
                 <Text style={styles.experienceRowMeta}>{option.description}</Text>
               ) : null}
             </View>
+              );
+            })()
           ))
         )}
       </View>
@@ -407,28 +420,33 @@ export function EventAccommodationSection({ event }: { event: Event }) {
           </View>
         ) : (
           options.map((option, index) => (
+            (() => {
+              const availability = getEventOptionAvailability(option).kind;
+              return (
             <View
               key={option.id}
               style={[
                 styles.experienceRow,
                 index > 0 && styles.experienceRowBorder,
-                option.availability !== 'available' && styles.experienceRowDisabled,
+                availability !== 'available' && styles.experienceRowDisabled,
               ]}
             >
               <View style={styles.experienceRowHeader}>
                 <Text style={styles.experienceRowTitle}>{option.name}</Text>
-                {option.availability === 'available' ? (
+                {availability === 'available' ? (
                   <View style={styles.experienceBadge}>
                     <Text style={styles.experienceBadgeText}>{option.priceLabel}</Text>
                   </View>
                 ) : (
-                  <OptionAvailabilityBadge availability={option.availability} />
+                  <OptionAvailabilityBadge availability={availability} />
                 )}
               </View>
               {option.description ? (
                 <Text style={styles.experienceRowMeta}>{option.description}</Text>
               ) : null}
             </View>
+              );
+            })()
           ))
         )}
       </View>

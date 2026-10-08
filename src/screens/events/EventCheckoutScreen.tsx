@@ -10,6 +10,7 @@ import { LeafyGradientButton } from '@/components/LeafyGradientButton';
 import { useCheckoutEvent, useCheckoutQuote, useEvent, useMyRegistrations } from '@/hooks/useEvents';
 import type { ApiError } from '@/types/api.types';
 import type { EventOrderApiResponse } from '@/types/event.types';
+import { getCheckoutCurrencyStatus, getEventAvailability } from '@/utils/event.mapper';
 import { isModuleEnabled } from '@/utils/eventModules';
 import { InfoCard } from '@/screens/events/EventDetailScreenParts.shared';
 import { EventOptionChips } from '@/screens/events/EventOptionChips';
@@ -84,6 +85,24 @@ export function EventCheckoutScreen() {
     : null;
   const mealsEnabled = Boolean(event) && isModuleEnabled(event!, 'meals');
   const accommodationEnabled = Boolean(event) && isModuleEnabled(event!, 'accommodation');
+  const mealOptions = mealsEnabled ? event!.meals.options : [];
+  const accommodationOptions = accommodationEnabled ? event!.accommodation.options : [];
+  const selectedMealOptions = mealOptions.filter((option) => mealSelections.includes(option.id));
+  const selectedAccommodationOptions = accommodationOptions.filter((option) => accommodationSelections.includes(option.id));
+  const currencyStatus = getCheckoutCurrencyStatus([
+    ...(selectedTicket
+      ? [{ currency: selectedTicket.currency, price: selectedTicket.effectivePrice, label: 'Your ticket' }]
+      : []),
+    ...selectedMealOptions.map((option) => ({ currency: option.currency, price: option.price, label: `Meal “${option.name}”` })),
+    ...selectedAccommodationOptions.map((option) => ({
+      currency: option.currency,
+      price: option.price,
+      label: `Accommodation “${option.name}”`,
+    })),
+  ]);
+  const eventAvailability = event ? getEventAvailability(event) : null;
+  const registrationAvailable =
+    eventAvailability?.kind === 'available' || eventAvailability?.kind === 'full';
 
   // Phase 2.8 — the authoritative price preview. Always fetched once the event (and so
   // a ticket, even the '' "flat price" fallback) is known, since checkout must never
@@ -92,6 +111,7 @@ export function EventCheckoutScreen() {
     quote,
     isLoading: isQuoteLoading,
     isFetching: isQuoteFetching,
+    isSelectionPending: isQuoteSelectionPending,
     isError: isQuoteError,
     error: quoteError,
     refetch: refetchQuote,
@@ -101,7 +121,7 @@ export function EventCheckoutScreen() {
     quantity: 1,
     mealSelections: mealsEnabled ? mealSelections : [],
     accommodationSelections: accommodationEnabled ? accommodationSelections : [],
-    enabled: Boolean(event) && !event?.isFree,
+    enabled: Boolean(event) && !event?.isFree && registrationAvailable && currencyStatus.isCompatible,
   });
 
   const goBack = () => router.back();
@@ -146,6 +166,25 @@ export function EventCheckoutScreen() {
     );
   }
 
+  if (!registrationAvailable) {
+    return (
+      <View style={styles.screen}>
+        <AppStatusBar />
+        <EmptyState
+          variant="empty"
+          title="Registration unavailable"
+          description={
+            eventAvailability?.kind === 'event_ended'
+              ? 'Registration closed — this event has already ended.'
+              : 'Registration is not currently open for this event.'
+          }
+          onAction={goBack}
+          actionLabel="Go back"
+        />
+      </View>
+    );
+  }
+
   // Mirrors the backend's own checkout gate (create_event_checkout_service):
   // the event-wide capacity check only runs for non-waitlist checkouts, so a
   // promoted waitlist entry's reserved seat must bypass this exactly like
@@ -174,12 +213,11 @@ export function EventCheckoutScreen() {
 
   // ticketOptions/hasTicketOptions/selectedTicket are computed earlier (needed for
   // useCheckoutQuote, which must run unconditionally before this screen's guards).
-  const availableMealOptions = mealsEnabled ? event.meals.options.filter((o) => o.active) : [];
-  const availableAccommodationOptions = accommodationEnabled
-    ? event.accommodation.options.filter((o) => o.active)
-    : [];
+  const availableMealOptions = mealOptions;
+  const availableAccommodationOptions = accommodationOptions;
 
   function runCheckout() {
+    if (!currencyStatus.isCompatible) return;
     checkoutMutation.mutate(
       {
         id,
@@ -211,7 +249,7 @@ export function EventCheckoutScreen() {
   }
 
   function handlePayPress() {
-    if (checkoutMutation.isPending || !quote) return;
+    if (checkoutMutation.isPending || !quote || !currencyStatus.isCompatible) return;
 
     Alert.alert(
       'Demo Payment',
@@ -460,6 +498,8 @@ export function EventCheckoutScreen() {
             <EventOptionChips
               options={availableMealOptions}
               selectedIds={mealSelections}
+              orderCurrency={currencyStatus.orderCurrency}
+              optionKind="meal"
               onToggle={(optionId) =>
                 setMealSelections((current) =>
                   current.includes(optionId)
@@ -477,6 +517,8 @@ export function EventCheckoutScreen() {
             <EventOptionChips
               options={availableAccommodationOptions}
               selectedIds={accommodationSelections}
+              orderCurrency={currencyStatus.orderCurrency}
+              optionKind="accommodation"
               onToggle={(optionId) =>
                 setAccommodationSelections((current) =>
                   current.includes(optionId)
@@ -506,9 +548,9 @@ export function EventCheckoutScreen() {
               : []
           }
           totalLabel={quote?.grandTotalLabel ?? null}
-          isLoading={isQuoteLoading}
-          isError={isQuoteError}
-          errorMessage={quoteError?.message}
+          isLoading={(isQuoteLoading || isQuoteSelectionPending) && currencyStatus.isCompatible}
+          isError={isQuoteError || !currencyStatus.isCompatible}
+          errorMessage={currencyStatus.message ?? quoteError?.message}
           onRetry={() => void refetchQuote()}
         />
 
@@ -524,7 +566,7 @@ export function EventCheckoutScreen() {
 
         <LeafyGradientButton
           onPress={handlePayPress}
-          disabled={checkoutMutation.isPending || isQuoteFetching || isQuoteError || !quote}
+          disabled={checkoutMutation.isPending || isQuoteFetching || isQuoteSelectionPending || isQuoteError || !quote || !currencyStatus.isCompatible}
           style={styles.payBtn}
           borderRadius={14}
         >
