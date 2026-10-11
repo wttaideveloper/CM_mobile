@@ -14,7 +14,7 @@ import {
 import { appColors } from '@/constants/designTokens';
 import type { Event } from '@/constants/events';
 import { useEvents } from '@/hooks/useEvents';
-import { IST_TIMEZONE } from '@/utils/dateTime';
+import { resolveEventTimeZone } from '@/utils/dateTime';
 import { detailHref } from '@/utils/searchNavigation';
 import { c, NU } from '@/utils/newUiCompact';
 
@@ -33,12 +33,9 @@ function toEventListItem(event: Event): EventListItem {
   const monthDay = event.startDate
     ? {
         top: event.startDate
-          .toLocaleDateString('en-IN', { timeZone: IST_TIMEZONE, month: 'short' })
+          .toLocaleDateString('en-US', { timeZone: resolveEventTimeZone(event.timeZone), month: 'short' })
           .toUpperCase(),
-        bottom: event.startDate.toLocaleDateString('en-IN', {
-          timeZone: IST_TIMEZONE,
-          day: 'numeric',
-        }),
+        bottom: event.startDate.toLocaleDateString('en-US', { timeZone: resolveEventTimeZone(event.timeZone), day: 'numeric' }),
       }
     : { top: '', bottom: '—' };
 

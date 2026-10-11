@@ -531,6 +531,7 @@ export function EventAddToCalendarAction({
       id: event.id,
       title: event.detailTitle,
       description: event.description,
+      schedule: event.schedule,
       start,
       end,
       location,

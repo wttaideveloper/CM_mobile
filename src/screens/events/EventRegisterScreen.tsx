@@ -271,12 +271,8 @@ export function EventRegisterScreen() {
   let blockReason: string | null = null;
   let blockActionLabel = 'Back to event';
   let blockAction = goBack;
-  if (availability.kind === 'event_ended') {
-    blockReason = 'Registration closed — this event has already ended.';
-  } else if (availability.kind === 'cancelled' || availability.kind === 'completed') {
-    blockReason = `Registration is closed — this event is ${availability.label.replace('Event ', '').toLowerCase()}.`;
-  } else if (availability.kind === 'closed') {
-    blockReason = 'Registration is not currently open for this event.';
+  if (availability.kind !== 'available' && availability.kind !== 'full') {
+    blockReason = availability.detail;
   } else if (isFullBlock) {
     blockReason = 'This event is at full capacity. Join the waitlist to be notified if a spot opens up.';
     blockActionLabel = 'Join Waitlist';

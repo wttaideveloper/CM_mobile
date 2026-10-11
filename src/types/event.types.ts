@@ -320,6 +320,8 @@ export type EventApiResponse = {
   available_seats?: number | null;
   is_full?: boolean | null;
   registration_open?: boolean | null;
+  /** Server-computed from start/end in the Event's time_zone. */
+  lifecycle_state?: 'upcoming' | 'ongoing' | 'finished' | null;
   /** Detail response only. */
   enterprise_name?: string | null;
 };
@@ -440,6 +442,8 @@ export type EventMyRegistrationApiResponse = {
   event_title: string | null;
   event_status: string | null;
   event_start: string | null;
+  /** IANA zone `event_start` (naive wall-clock) is expressed in. */
+  event_time_zone?: string | null;
   registration_status: string;
   qr_code: string | null;
   checked_in_at: string | null;
@@ -628,6 +632,8 @@ export type MyWaitlistApiResponse = {
   event_title: string | null;
   event_status: string | null;
   event_start_date: string | null;
+  /** IANA zone `event_start_date` (naive wall-clock) is expressed in. */
+  event_time_zone?: string | null;
   participant_name: string;
   participant_email: string;
   status: string;

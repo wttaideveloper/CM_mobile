@@ -107,6 +107,14 @@ export type Event = {
   isFull?: boolean;
   /** From the API's registration_open flag when present; defaults to true when null. */
   registrationOpen?: boolean;
+  /** registration_open_at as an absolute instant (naive API value read in the Event's time_zone) — null when unset. */
+  registrationOpenAt?: Date | null;
+  /** registration_close_at as an absolute instant — null when unset. */
+  registrationCloseAt?: Date | null;
+  /** registration_cutoff as an absolute instant — null when unset. */
+  registrationCutoffAt?: Date | null;
+  /** API lifecycle_state ("upcoming" | "ongoing" | "finished") — null when the API omitted it. */
+  lifecycleState?: string | null;
   /** Empty when the event has no ticket_types — checkout falls back to the flat event price. */
   ticketOptions?: EventTicketOption[];
   /** Agenda/session list (Phase 5C) — empty when the event has no sessions. */
@@ -129,7 +137,7 @@ export type Event = {
   startDate?: Date | null;
   /** Parsed end_date (Phase 5D-1) — null when the backend omitted it or it failed to parse. */
   endDate?: Date | null;
-  /** Backend's time_zone label (e.g. "Asia/Kolkata") — display-only; see eventCalendar.ts for why it isn't applied as an offset. */
+  /** Event's IANA time_zone (e.g. "America/New_York") — naive Event timestamps are read in this zone, then shown in the device zone. */
   timeZone?: string | null;
   /** Dynamic Event Type key (Phase 2) — "other" for legacy events, resolved server-side. Resolve to a display name via useEventTypes(), never a hardcoded map. */
   eventType: string;

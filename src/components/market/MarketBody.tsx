@@ -45,7 +45,6 @@ import type { Event } from '@/constants/events';
 import { useEvents } from '@/hooks/useEvents';
 import { useMarketHomeData } from '@/hooks/useMarketHome';
 import { useTrainingsPreview } from '@/hooks/useTrainings';
-import { IST_TIMEZONE } from '@/utils/dateTime';
 import { detailHref } from '@/utils/searchNavigation';
 import {
   mapEnterprisesToFeaturedBusinesses,
@@ -56,6 +55,7 @@ import {
   mapMarketHomeOffers,
 } from '@/utils/marketOffers.mapper';
 import { useOpenServiceChat } from '@/hooks/useOpenServiceChat';
+import { resolveEventTimeZone } from '@/utils/dateTime';
 import { c, NU } from '@/utils/newUiCompact';
 
 /** Real Event -> this section's existing teaser-card shape (same transform as MarketEventListBody.tsx's toEventListItem, applied to the Home dashboard's card type). */
@@ -63,12 +63,9 @@ function toMarketEventItem(event: Event): MarketEventItem {
   const monthDay = event.startDate
     ? {
         top: event.startDate
-          .toLocaleDateString('en-IN', { timeZone: IST_TIMEZONE, month: 'short' })
+          .toLocaleDateString('en-US', { timeZone: resolveEventTimeZone(event.timeZone), month: 'short' })
           .toUpperCase(),
-        bottom: event.startDate.toLocaleDateString('en-IN', {
-          timeZone: IST_TIMEZONE,
-          day: 'numeric',
-        }),
+        bottom: event.startDate.toLocaleDateString('en-US', { timeZone: resolveEventTimeZone(event.timeZone), day: 'numeric' }),
       }
     : { top: '', bottom: '—' };
 

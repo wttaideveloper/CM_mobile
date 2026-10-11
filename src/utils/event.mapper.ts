@@ -43,8 +43,14 @@ import type {
 } from '@/types/event.types';
 import { formatMoney } from '@/utils/currency';
 import {
-  formatISTShortDate,
-  formatISTTime,
+  formatCalendarDate,
+  formatEventDateTimeWithZone,
+  formatEventShortDate,
+  formatEventTime,
+  formatEventTimeZoneLabel,
+  getEventDateKey,
+  getEventTimeZoneAbbreviation,
+  getEventTimeZoneRegion,
   parseApiDate,
   parseWallDateTimeInTimeZone,
 } from '@/utils/dateTime';
@@ -125,26 +131,22 @@ function computeOptionAvailability(
 }
 
 /**
- * IST has a fixed, unchanging UTC offset (no DST) — safe to hardcode.
- * purchase_start_at/purchase_end_at/service_start_at/service_end_at are set
- * by an organizer entering a wall-clock time (e.g. a datetime-local picker),
- * not server-generated like most other API timestamps. The backend stores
- * whatever it's given verbatim, tz-aware or naive (app/utils/event_meals.py
- * _normalize_window_value: "never guesses a timezone that isn't there") — so
- * a naive value here is the organizer's own local (IST) wall-clock time, not
- * UTC. parseApiDate()'s "naive = UTC" default is correct for server-
- * generated timestamps elsewhere in the app (chat, notifications, ...) but
- * would misread a naive "12:00" meant as 12:00 IST as 12:00 UTC (17:30 IST)
- * instead — a ~5.5h shift large enough to make an option built around
- * "right now" look unavailable when it's actually open. A tz-aware value
- * (already carrying Z/±HH:MM) is never affected — this only changes the
- * fallback applied when no timezone is present at all.
+ * Reads an Event API timestamp as an absolute instant — the ONE place Mobile applies the Event's timezone.
+ * Used for start/end, registration windows and meal/accommodation purchase/service windows alike.
+ *
+ * The backend stores these as naive wall-clock time in the Event's own IANA `time_zone` (organizers enter a
+ * datetime-local value; app/utils/event_utils.py resolve_naive_or_aware), so a naive value is read in that zone
+ * with DST from the tz database, and a value that already carries Z/±HH:MM is trusted as-is. parseApiDate()'s
+ * "naive = UTC" default is for server-generated timestamps elsewhere in the app and would be wrong here.
+ *
+ * A missing time_zone is read as UTC because that is exactly what the backend does for such a record
+ * (get_event_timezone), so display and the server's accept/reject decision agree. New events always carry a zone.
  */
 function parseEventOptionWindowDate(value: string | null | undefined, timeZone?: string | null): Date | null {
   if (!value) return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
-  const date = parseWallDateTimeInTimeZone(trimmed, timeZone ?? 'Asia/Kolkata');
+  const date = parseWallDateTimeInTimeZone(trimmed, timeZone ?? 'UTC');
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -231,8 +233,8 @@ function normalizePricedOptionFields(
     purchaseEndAt,
     serviceStartAt,
     serviceEndAt,
-    serviceStartAtLabel: serviceStartAt ? formatEventDateTime(serviceStartAt) : null,
-    serviceEndAtLabel: serviceEndAt ? formatEventDateTime(serviceEndAt) : null,
+    serviceStartAtLabel: serviceStartAt ? formatEventDateTimeWithZone(serviceStartAt, timeZone) : null,
+    serviceEndAtLabel: serviceEndAt ? formatEventDateTimeWithZone(serviceEndAt, timeZone) : null,
   };
 }
 
@@ -245,17 +247,15 @@ function normalizeEventMealOption(
   const name = option?.name?.trim();
   if (!id || !name) return null;
 
-  // date is a bare YYYY-MM-DD string (backend `date` type, no time/timezone
-  // component) — same shape and safe-parse approach already proven for
-  // session_date below (buildSessionDateTimeLabel), pre-formatted here for
-  // display consistency with the rest of Event (dateTime, schedule, ...).
+  // date is a bare YYYY-MM-DD string (backend `date` type): a calendar day, not an instant, so it is shown as
+  // that same day in every zone (formatCalendarDate) — same approach as session_date (buildSessionDateTimeLabel).
   const parsedDate = safeParseDate(option.date);
 
   return {
     id,
     name,
     description: option.description?.trim() || null,
-    date: parsedDate ? formatISTShortDate(parsedDate) : null,
+    date: parsedDate ? formatCalendarDate(parsedDate) : null,
     active: Boolean(option.active),
     ...normalizePricedOptionFields(option, eventCurrency, timeZone),
   };
@@ -342,21 +342,37 @@ function safeParseDate(value?: string | null): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function formatEventDateTime(start: Date | null): string {
+/** Compact "Oct 11 · 1:40 PM EDT" for list cards — the Event's own zone, abbreviated. */
+function formatEventDateTime(start: Date | null, timeZone?: string | null): string {
   if (!start) {
     return 'Date TBA';
   }
-  return `${formatISTShortDate(start)} · ${formatISTTime(start)}`;
+  return `${formatEventShortDate(start, timeZone)} · ${formatEventTime(start, timeZone)} ${getEventTimeZoneAbbreviation(start, timeZone)}`;
 }
 
-function formatEventSchedule(start: Date | null, end: Date | null): string {
+/**
+ * Event start/end in the Event's own timezone with a clear zone label, e.g.
+ * "Oct 11 · 1:40 PM – 6:00 PM EDT · New York" (multi-day: "Oct 11 · 1:40 PM – Oct 13 · 6:00 PM EDT · New York").
+ * Deliberately NOT converted to the phone's zone. When start and end fall on either side of a DST change the
+ * start also names its own abbreviation so neither time is ambiguous.
+ */
+export function formatEventSchedule(start: Date | null, end: Date | null, timeZone?: string | null): string {
   if (!start) {
     return 'Date TBA';
   }
+  const startText = `${formatEventShortDate(start, timeZone)} · ${formatEventTime(start, timeZone)}`;
   if (!end) {
-    return `${formatISTShortDate(start)} · ${formatISTTime(start)}`;
+    return `${startText} ${formatEventTimeZoneLabel(start, timeZone)}`;
   }
-  return `${formatISTShortDate(start)} · ${formatISTTime(start)} – ${formatISTTime(end)}`;
+  const sameDay = getEventDateKey(start, timeZone) === getEventDateKey(end, timeZone);
+  const endText = sameDay
+    ? formatEventTime(end, timeZone)
+    : `${formatEventShortDate(end, timeZone)} · ${formatEventTime(end, timeZone)}`;
+  const startAbbr = getEventTimeZoneAbbreviation(start, timeZone);
+  const endAbbr = getEventTimeZoneAbbreviation(end, timeZone);
+  const region = getEventTimeZoneRegion(timeZone);
+  const startPart = startAbbr === endAbbr ? startText : `${startText} ${startAbbr}`;
+  return `${startPart} – ${endText} ${endAbbr}${region ? ` · ${region}` : ''}`;
 }
 
 /**
@@ -624,6 +640,11 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
   // Prefer the backend's own flags; fall back to capacity math only when it omits them.
   const isFull = api.is_full ?? (capacityRaw != null && registered >= capacityRaw);
   const registrationOpen = api.registration_open ?? true;
+  // Same wall-clock-in-event-zone reading the backend applies (event_utils.resolve_naive_or_aware);
+  // an explicit offset/Z in the value is preserved as-is.
+  const registrationOpenAt = parseEventOptionWindowDate(api.registration_open_at, timeZone);
+  const registrationCloseAt = parseEventOptionWindowDate(api.registration_close_at, timeZone);
+  const registrationCutoffAt = parseEventOptionWindowDate(api.registration_cutoff, timeZone);
   const ticketOptions = buildTicketOptions(api, price);
 
   return {
@@ -631,13 +652,13 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
     name: api.title,
     priceLabel,
     isFree,
-    dateTime: formatEventDateTime(start),
+    dateTime: formatEventDateTime(start, timeZone),
     location: deriveEventLocation(api),
     image: pickEventImage(api.primary_image),
     filterTags: deriveFilterTags(start, api.delivery_mode, isFree),
     detailTitle: api.title,
     status: formatEventStatus(api.status),
-    schedule: formatEventSchedule(start, end),
+    schedule: formatEventSchedule(start, end, timeZone),
     registered,
     capacity,
     priceDetail,
@@ -650,8 +671,12 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
     rawStatus: api.status,
     isFull,
     registrationOpen,
+    registrationOpenAt,
+    registrationCloseAt,
+    registrationCutoffAt,
+    lifecycleState: api.lifecycle_state ?? null,
     ticketOptions,
-    sessions: mapEventSessions(api.sessions),
+    sessions: mapEventSessions(api.sessions, timeZone),
     resources: mapEventDocuments(api.documents),
     deliveryMode: api.delivery_mode ?? '',
     deliveryModeLabel: deriveDeliveryModeLabel(api),
@@ -682,12 +707,22 @@ export function filterEventsByTag(events: Event[], filter: string): Event[] {
   return events.filter((event) => event.filterTags.includes(tag));
 }
 
-export type EventAvailabilityKind = 'available' | 'full' | 'closed' | 'cancelled' | 'completed' | 'event_ended';
+export type EventAvailabilityKind =
+  | 'available'
+  | 'full'
+  | 'registration_not_started'
+  | 'closed'
+  | 'unavailable'
+  | 'cancelled'
+  | 'completed'
+  | 'event_ended';
 
 export type EventAvailability = {
   kind: EventAvailabilityKind;
-  /** Empty for "available" — no status banner needed in that case. */
+  /** Empty for "available" — no status banner needed in that case. Short enough for a button. */
   label: string;
+  /** Full sentence for screens that explain why registration is blocked. Empty for "available" and "full". */
+  detail: string;
 };
 
 type PricedEventOption = {
@@ -770,37 +805,66 @@ export function getCheckoutCurrencyStatus(
 
 /**
  * Single source of truth for what the customer can do right now, mirroring
- * the backend's own two-part gate (event_service.py, both
- * create_registration_service and create_event_checkout_service):
- * `status in [cancelled, completed, archived, suspended] → specific reason`,
- * then `status != "published" → generic "not open" reason`. Checking
- * `rawStatus !== 'published'` covers every one of those non-terminal
- * statuses (draft, pending_approval, suspended, archived, ...) without
- * having to enumerate them by hand.
+ * the backend's own gates (event_service.py create_registration_service /
+ * create_event_checkout_service / create_waitlist_entry_service and
+ * event_utils.validate_registration_window): terminal statuses first, then
+ * `status != "published"`, then the registration window, then lifecycle.
+ *
+ * `registration_open === false` alone cannot say *why*: it is also false before
+ * the window opens. So the reason is derived from registration_open_at /
+ * registration_close_at / registration_cutoff / the event's end (all resolved
+ * in the Event's timezone by the mapper) and the flag is only the fallback for a
+ * block the timestamps do not explain. This is display only — the backend
+ * re-validates every registration, quote, checkout and waitlist request.
+ *
+ * Boundaries match the backend: not started while now <= open_at, closed once
+ * now >= close_at / cutoff, ended once now > the event's end.
  */
-export function getEventAvailability(event: Event): EventAvailability {
+export function getEventAvailability(event: Event, now: number = Date.now()): EventAvailability {
   const rawStatus = (event.rawStatus ?? '').toLowerCase();
 
   if (rawStatus === 'cancelled') {
-    return { kind: 'cancelled', label: 'Event Cancelled' };
+    return { kind: 'cancelled', label: 'Event Cancelled', detail: 'Registration is closed — this event is cancelled.' };
   }
   if (rawStatus === 'completed') {
-    return { kind: 'completed', label: 'Event Completed' };
+    return { kind: 'completed', label: 'Event Completed', detail: 'Registration is closed — this event is completed.' };
   }
   const lifecycleEnd = event.endDate ?? event.startDate;
-  if (lifecycleEnd && lifecycleEnd.getTime() < Date.now()) {
-    return { kind: 'event_ended', label: 'Registration Closed' };
+  if (event.lifecycleState === 'finished' || (lifecycleEnd && lifecycleEnd.getTime() < now)) {
+    return { kind: 'event_ended', label: 'This event has ended', detail: 'This event has ended.' };
   }
   if (rawStatus !== 'published') {
-    return { kind: 'closed', label: 'Registration Closed' };
+    const retired = rawStatus === 'archived' || rawStatus === 'suspended';
+    return {
+      kind: 'unavailable',
+      label: 'Event unavailable',
+      detail: retired ? 'This event is no longer available.' : 'This event is not published yet.',
+    };
   }
-  if (!(event.registrationOpen ?? true)) {
-    return { kind: 'closed', label: 'Registration Closed' };
+  if (event.registrationOpenAt && now <= event.registrationOpenAt.getTime()) {
+    const label = `Registration opens at ${formatEventDateTimeWithZone(event.registrationOpenAt, event.timeZone)}`;
+    return { kind: 'registration_not_started', label, detail: `${label}.` };
+  }
+  const closedByTime =
+    (event.registrationCloseAt && now >= event.registrationCloseAt.getTime()) ||
+    (event.registrationCutoffAt && now >= event.registrationCutoffAt.getTime());
+  if (closedByTime) {
+    return { kind: 'closed', label: 'Registration closed', detail: 'Registration is closed for this event.' };
+  }
+  // The flag is a snapshot from fetch time (and may sit in a query cache past a window boundary), so it only
+  // decides when the event carries no window timestamps of its own to derive from.
+  const hasWindow = Boolean(event.registrationOpenAt || event.registrationCloseAt || event.registrationCutoffAt);
+  if (!hasWindow && !(event.registrationOpen ?? true)) {
+    return {
+      kind: 'closed',
+      label: 'Registration unavailable',
+      detail: 'Registration is not open for this event right now.',
+    };
   }
   if (event.isFull ?? false) {
-    return { kind: 'full', label: 'Event Full' };
+    return { kind: 'full', label: 'Event Full', detail: '' };
   }
-  return { kind: 'available', label: '' };
+  return { kind: 'available', label: '', detail: '' };
 }
 
 const REGISTRATION_STATUS_LABELS: Record<string, string> = {
@@ -892,7 +956,8 @@ function mapPurchasedAccommodationSelections(
 export function mapMyRegistrationApiToItem(
   api: EventMyRegistrationApiResponse,
 ): MyEventRegistration {
-  const eventStart = safeParseDate(api.event_start);
+  // event_start is the event's naive wall-clock start; event_time_zone (when the API sends it) says which zone.
+  const eventStart = parseEventOptionWindowDate(api.event_start, api.event_time_zone?.trim() || null);
 
   return {
     registrationId: String(api.registration_id),
@@ -900,7 +965,7 @@ export function mapMyRegistrationApiToItem(
     eventTitle: textOrNa(api.event_title),
     eventStatus: api.event_status ?? null,
     eventStart,
-    eventStartLabel: formatEventDateTime(eventStart),
+    eventStartLabel: formatEventDateTime(eventStart, api.event_time_zone),
     registrationStatus: api.registration_status,
     registrationStatusLabel: formatRegistrationStatus(api.registration_status),
     hasQr: Boolean(api.qr_code),
@@ -935,7 +1000,7 @@ function normalizeWaitlistStatus(status: string): MyWaitlistStatus {
 }
 
 export function mapMyWaitlistApiToItem(api: MyWaitlistApiResponse): MyWaitlistEntry {
-  const eventStart = safeParseDate(api.event_start_date);
+  const eventStart = parseEventOptionWindowDate(api.event_start_date, api.event_time_zone?.trim() || null);
   const status = normalizeWaitlistStatus(api.status);
 
   return {
@@ -944,7 +1009,7 @@ export function mapMyWaitlistApiToItem(api: MyWaitlistApiResponse): MyWaitlistEn
     eventTitle: textOrNa(api.event_title),
     eventStatus: api.event_status ?? null,
     eventStart,
-    eventStartLabel: formatEventDateTime(eventStart),
+    eventStartLabel: formatEventDateTime(eventStart, api.event_time_zone),
     status,
     statusLabel: WAITLIST_STATUS_LABELS[status],
     registrationId: api.registration_id != null ? String(api.registration_id) : null,
@@ -1101,25 +1166,37 @@ function formatTimeOfDay(time?: string | null): string | null {
   return `${hour12}:${String(minute).padStart(2, '0')} ${period}`;
 }
 
-function buildSessionDateTimeLabel(session: EventSessionApiResponse): string {
-  // session_date is a date-only string (YYYY-MM-DD, no time/timezone) — safe
-  // to parse as UTC midnight and display in IST, since IST is ahead of UTC
-  // and can only push the displayed calendar date forward within the same day.
+/**
+ * session_date (YYYY-MM-DD) and start_time/end_time (HH:MM) are the organizer's wall-clock entries in the Event's
+ * timezone, so they are shown as entered — never shifted — and followed by the zone label for that day
+ * (EDT vs EST is resolved from the tz database for the session's own date).
+ */
+function buildSessionDateTimeLabel(session: EventSessionApiResponse, timeZone?: string | null): string {
   const date = safeParseDate(session.session_date);
-  const dateLabel = date ? formatISTShortDate(date) : null;
+  const dateLabel = date ? formatCalendarDate(date) : null;
   const startLabel = formatTimeOfDay(session.start_time);
   const endLabel = formatTimeOfDay(session.end_time);
   const timeLabel = startLabel && endLabel ? `${startLabel} – ${endLabel}` : startLabel;
 
-  if (dateLabel && timeLabel) return `${dateLabel} · ${timeLabel}`;
+  let zoneLabel = '';
+  const dayKey = /^\d{4}-\d{2}-\d{2}/.exec(session.session_date ?? '')?.[0];
+  if (timeLabel && dayKey) {
+    const clock = /^(\d{1,2}):(\d{2})/.exec((session.start_time ?? '').trim());
+    const hh = clock ? String(Math.min(Number(clock[1]), 23)).padStart(2, '0') : '12';
+    const at = parseEventOptionWindowDate(`${dayKey}T${hh}:${clock?.[2] ?? '00'}:00`, timeZone);
+    if (at) zoneLabel = ` ${formatEventTimeZoneLabel(at, timeZone)}`;
+  }
+
+  if (dateLabel && timeLabel) return `${dateLabel} · ${timeLabel}${zoneLabel}`;
   if (dateLabel) return dateLabel;
-  if (timeLabel) return timeLabel;
+  if (timeLabel) return `${timeLabel}${zoneLabel}`;
   return 'Time TBA';
 }
 
 function mapEventSession(
   session: EventSessionApiResponse,
   index: number,
+  timeZone?: string | null,
 ): EventSessionSummary | null {
   const title = session.title?.trim();
   if (!title) return null;
@@ -1129,7 +1206,7 @@ function mapEventSession(
     title,
     speaker: session.speaker?.trim() || null,
     location: session.location?.trim() || null,
-    dateTimeLabel: buildSessionDateTimeLabel(session),
+    dateTimeLabel: buildSessionDateTimeLabel(session, timeZone),
     // Boolean signal only — see EventSessionSummary's doc comment for why the
     // raw session.meeting_link is never carried past this function.
     hasMeetingInfo: Boolean(session.meeting_link?.trim()),
@@ -1139,10 +1216,11 @@ function mapEventSession(
 /** Maps the sessions embedded on GET /events/{id} (event.sessions) into the agenda the app renders. Respects backend ordering — sessions are already sorted server-side (event_service.py, _sort_sessions). */
 export function mapEventSessions(
   sessions?: EventSessionApiResponse[] | null,
+  timeZone?: string | null,
 ): EventSessionSummary[] {
   if (!Array.isArray(sessions)) return [];
   return sessions
-    .map((session, index) => mapEventSession(session, index))
+    .map((session, index) => mapEventSession(session, index, timeZone))
     .filter((session): session is EventSessionSummary => session !== null);
 }
 

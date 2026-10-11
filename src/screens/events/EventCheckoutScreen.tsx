@@ -173,11 +173,7 @@ export function EventCheckoutScreen() {
         <EmptyState
           variant="empty"
           title="Registration unavailable"
-          description={
-            eventAvailability?.kind === 'event_ended'
-              ? 'Registration closed — this event has already ended.'
-              : 'Registration is not currently open for this event.'
-          }
+          description={eventAvailability?.detail || 'Registration is not currently open for this event.'}
           onAction={goBack}
           actionLabel="Go back"
         />
