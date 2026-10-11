@@ -33,7 +33,7 @@ import type {
 import { getCheckoutCurrencyStatus, getEventAvailability } from '@/utils/event.mapper';
 import { isModuleEnabled } from '@/utils/eventModules';
 import { EventRegisterFormField } from '@/screens/events/EventRegisterFormField';
-import { InfoCard } from '@/screens/events/EventDetailScreenParts.shared';
+import { EventScheduleAndLocation } from '@/screens/events/EventDateTimeParts';
 import { EventOptionChips } from '@/screens/events/EventOptionChips';
 import { EventQuoteSummary } from '@/screens/events/EventQuoteSummary';
 import { PRIMARY, styles } from '@/screens/events/EventRegisterScreen.styles';
@@ -440,14 +440,7 @@ export function EventRegisterScreen() {
           </Text>
 
           <View style={styles.successSummaryCard}>
-            <View style={styles.successSummaryRow}>
-              <View style={styles.successSummaryItem}>
-                <InfoCard emoji="📅" label="Date & Time" value={event.schedule} />
-              </View>
-              <View style={styles.successSummaryItem}>
-                <InfoCard emoji="📍" label="Location" value={event.location} />
-              </View>
-            </View>
+            <EventScheduleAndLocation event={event} />
             <View style={styles.successStatusRow}>
               <Text style={styles.successStatusLabel}>Status</Text>
               <View style={styles.successStatusPill}>
@@ -527,14 +520,7 @@ export function EventRegisterScreen() {
               <Text style={styles.summaryTitle} numberOfLines={2}>
                 {event.detailTitle}
               </Text>
-              <View style={styles.summaryRow}>
-                <View style={styles.summaryItem}>
-                  <InfoCard emoji="📅" label="Date & Time" value={event.schedule} />
-                </View>
-                <View style={styles.summaryItem}>
-                  <InfoCard emoji="📍" label="Location" value={event.location} />
-                </View>
-              </View>
+              <EventScheduleAndLocation event={event} />
               <View style={styles.spotsRow}>
                 <Text style={styles.spotsText}>{spotsRemaining} spots remaining</Text>
                 <Text style={styles.priceText}>{event.priceDetail}</Text>

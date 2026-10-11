@@ -4,12 +4,12 @@ import { shadowSm } from '@/utils/shadows';
 import { isSmallDevice } from '@/utils/responsive';
 
 export const PRIMARY = '#1F5D4E';
-const MINT = '#EAF4EC';
+export const MINT = '#EAF4EC';
 export const TEXT_MUTED = '#6B7280';
-const TEXT_BLACK = '#111111';
-const CARD_BG = '#F5F5F5';
+export const TEXT_BLACK = '#111111';
+export const CARD_BG = '#F5F5F5';
 const PROVIDER_CARD_BG = '#F7FAF8';
-const BORDER = '#E8EDEA';
+export const BORDER = '#E8EDEA';
 const STATUS_ORANGE = '#FF9F0A';
 export const PROGRESS_GRADIENT_START = '#1A5336';
 export const PROGRESS_GRADIENT_END = '#4CAF50';

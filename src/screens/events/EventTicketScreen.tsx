@@ -13,7 +13,7 @@ import {
   useMyRegistrations,
   useRegistrationQrImage,
 } from '@/hooks/useEvents';
-import { InfoCard } from '@/screens/events/EventDetailScreenParts.shared';
+import { EventScheduleAndLocation } from '@/screens/events/EventDateTimeParts';
 import { PRIMARY, styles } from '@/screens/events/EventTicketScreen.styles';
 
 export function EventTicketScreen() {
@@ -182,10 +182,7 @@ export function EventTicketScreen() {
           </Text>
 
           {event ? (
-            <View style={styles.infoRow}>
-              <InfoCard emoji="📅" label="Date & Time" value={event.schedule} />
-              <InfoCard emoji="📍" label="Location" value={event.location} />
-            </View>
+            <EventScheduleAndLocation event={event} />
           ) : isEventError ? (
             <Text style={styles.qrStateText}>
               Event details couldn&rsquo;t be loaded, but your registration is still shown below.

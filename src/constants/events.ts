@@ -137,6 +137,8 @@ export type Event = {
   startDate?: Date | null;
   /** Parsed end_date (Phase 5D-1) — null when the backend omitted it or it failed to parse. */
   endDate?: Date | null;
+  /** Structured Event-zone date/time for the schedule card (date once, range, Starts/Ends, zone line). `schedule` stays the one-line text form. */
+  scheduleDisplay: import('@/utils/eventDateTimeDisplay').EventScheduleDisplay;
   /** Event's IANA time_zone (e.g. "America/New_York") — naive Event timestamps are read in this zone, then shown in the device zone. */
   timeZone?: string | null;
   /** Dynamic Event Type key (Phase 2) — "other" for legacy events, resolved server-side. Resolve to a display name via useEventTypes(), never a hardcoded map. */

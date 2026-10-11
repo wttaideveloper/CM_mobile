@@ -12,7 +12,7 @@ import type { ApiError } from '@/types/api.types';
 import type { EventOrderApiResponse } from '@/types/event.types';
 import { getCheckoutCurrencyStatus, getEventAvailability } from '@/utils/event.mapper';
 import { isModuleEnabled } from '@/utils/eventModules';
-import { InfoCard } from '@/screens/events/EventDetailScreenParts.shared';
+import { EventScheduleAndLocation } from '@/screens/events/EventDateTimeParts';
 import { EventOptionChips } from '@/screens/events/EventOptionChips';
 import { EventQuoteSummary } from '@/screens/events/EventQuoteSummary';
 import { PRIMARY, styles } from '@/screens/events/EventCheckoutScreen.styles';
@@ -430,14 +430,7 @@ export function EventCheckoutScreen() {
           <Text style={styles.summaryTitle} numberOfLines={2}>
             {event.detailTitle}
           </Text>
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryItem}>
-              <InfoCard emoji="📅" label="Date & Time" value={event.schedule} />
-            </View>
-            <View style={styles.summaryItem}>
-              <InfoCard emoji="📍" label="Location" value={event.location} />
-            </View>
-          </View>
+          <EventScheduleAndLocation event={event} />
         </View>
 
         {hasTicketOptions ? (

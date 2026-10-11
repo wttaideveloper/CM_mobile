@@ -11,7 +11,7 @@ import { useEvent, useJoinWaitlist, useLeaveWaitlist, useMyWaitlist } from '@/ho
 import { useAuthStore } from '@/stores/auth.store';
 import type { ApiError } from '@/types/api.types';
 import { getEventAvailability } from '@/utils/event.mapper';
-import { InfoCard } from '@/screens/events/EventDetailScreenParts.shared';
+import { EventScheduleAndLocation } from '@/screens/events/EventDateTimeParts';
 import { PRIMARY, styles } from '@/screens/events/EventWaitlistScreen.styles';
 
 function buildWaitlistErrorMessage(error: ApiError): string {
@@ -294,14 +294,7 @@ export function EventWaitlistScreen() {
           <Text style={styles.summaryTitle} numberOfLines={2}>
             {event.detailTitle}
           </Text>
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryItem}>
-              <InfoCard emoji="📅" label="Date & Time" value={event.schedule} />
-            </View>
-            <View style={styles.summaryItem}>
-              <InfoCard emoji="📍" label="Location" value={event.location} />
-            </View>
-          </View>
+          <EventScheduleAndLocation event={event} />
         </View>
 
         <View style={styles.infoBanner}>

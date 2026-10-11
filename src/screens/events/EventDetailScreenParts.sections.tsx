@@ -10,6 +10,7 @@ import {
 } from '@/components/dashboard/DashboardIcons';
 import type { Event } from '@/constants/events';
 import type { EventAvailability } from '@/utils/event.mapper';
+import { EventRegistrationNotice, EventScheduleCard } from '@/screens/events/EventDateTimeParts';
 import {
   HERO_HEIGHT,
   PRIMARY,
@@ -114,10 +115,8 @@ export function EventDetailContent({
         <Text style={styles.registrationMeta}>{eventTypeName}</Text>
       ) : null}
       <View style={styles.infoGrid}>
-        <View style={styles.infoRow}>
-          <InfoCard emoji="📅" label="Date & Time" value={event.schedule} />
-          <InfoCard emoji="📍" label="Location" value={event.location} />
-        </View>
+        <EventScheduleCard event={event} />
+        <InfoCard emoji="📍" label="Location" value={event.location} />
         <View style={styles.infoRow}>
           <InfoCard
             emoji="👥"
@@ -127,6 +126,8 @@ export function EventDetailContent({
           <InfoCard emoji="🎟" label="Ticket Price" value={event.priceDetail} />
         </View>
       </View>
+
+      <EventRegistrationNotice availability={availability} />
 
       <EventAddToCalendarAction event={event} availability={availability} />
 
@@ -248,7 +249,7 @@ export function EventDetailFooter({
         style={styles.registerBtn}
         borderRadius={14}
       >
-        <Text style={styles.registerBtnText} numberOfLines={1} adjustsFontSizeToFit>
+        <Text style={styles.registerBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
           {ctaLabel}
         </Text>
       </LeafyGradientButton>

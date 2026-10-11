@@ -136,6 +136,33 @@ export function getEventTimeZoneAbbreviation(date: Date, zone?: string | null): 
   return fallback || timeZone;
 }
 
+/** True when the Event has no usable time_zone, so times are being read and shown as UTC (resolveEventTimeZone's fallback). */
+export function isEventTimeZoneFallback(zone?: string | null): boolean {
+  const raw = zone?.trim();
+  if (!raw) return true;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: normalizeTimeZone(raw) });
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/** "Eastern Daylight Time" / "India Standard Time" for screen readers; falls back to the abbreviation. */
+export function getEventTimeZoneLongName(date: Date, zone?: string | null): string {
+  const timeZone = resolveEventTimeZone(zone);
+  if (timeZone === 'UTC') return 'Coordinated Universal Time';
+  try {
+    const name = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'long' })
+      .formatToParts(date)
+      .find((part) => part.type === 'timeZoneName')?.value;
+    if (name) return name;
+  } catch {
+    /* fall through */
+  }
+  return getEventTimeZoneAbbreviation(date, zone);
+}
+
 /** "New York" / "India" — the place half of the "EDT · New York" label. Empty for UTC. */
 export function getEventTimeZoneRegion(zone?: string | null): string {
   const timeZone = resolveEventTimeZone(zone);

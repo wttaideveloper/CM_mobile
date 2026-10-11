@@ -42,6 +42,7 @@ import type {
   PurchasedOption,
 } from '@/types/event.types';
 import { formatMoney } from '@/utils/currency';
+import { buildEventScheduleDisplay, getEventInstantParts, type EventInstantParts } from '@/utils/eventDateTimeDisplay';
 import {
   formatCalendarDate,
   formatEventDateTimeWithZone,
@@ -659,6 +660,7 @@ export function mapEventApiToItem(api: EventApiResponse): Event {
     detailTitle: api.title,
     status: formatEventStatus(api.status),
     schedule: formatEventSchedule(start, end, timeZone),
+    scheduleDisplay: buildEventScheduleDisplay(start, end, timeZone),
     registered,
     capacity,
     priceDetail,
@@ -723,6 +725,12 @@ export type EventAvailability = {
   label: string;
   /** Full sentence for screens that explain why registration is blocked. Empty for "available" and "full". */
   detail: string;
+  /** Short text for the sticky button when it differs from `label` (the long "opens at" sentence would not fit). */
+  ctaLabel?: string;
+  /** Before registration opens: the opening moment in the Event zone, for the registration notice. */
+  opensAt?: EventInstantParts;
+  /** While registration is open: when it will close (earliest of close_at / cutoff), if the Event sets one. */
+  closesAt?: EventInstantParts;
 };
 
 type PricedEventOption = {
@@ -843,7 +851,14 @@ export function getEventAvailability(event: Event, now: number = Date.now()): Ev
   }
   if (event.registrationOpenAt && now <= event.registrationOpenAt.getTime()) {
     const label = `Registration opens at ${formatEventDateTimeWithZone(event.registrationOpenAt, event.timeZone)}`;
-    return { kind: 'registration_not_started', label, detail: `${label}.` };
+    const opensAt = getEventInstantParts(event.registrationOpenAt, event.timeZone);
+    return {
+      kind: 'registration_not_started',
+      label,
+      detail: `${label}.`,
+      ctaLabel: `Opens ${formatEventShortDate(event.registrationOpenAt, event.timeZone)} · ${opensAt.time} ${opensAt.zoneAbbr}`,
+      opensAt,
+    };
   }
   const closedByTime =
     (event.registrationCloseAt && now >= event.registrationCloseAt.getTime()) ||
@@ -864,7 +879,13 @@ export function getEventAvailability(event: Event, now: number = Date.now()): Ev
   if (event.isFull ?? false) {
     return { kind: 'full', label: 'Event Full', detail: '' };
   }
-  return { kind: 'available', label: '', detail: '' };
+  const closeTimes = [event.registrationCloseAt, event.registrationCutoffAt]
+    .filter((d): d is Date => Boolean(d))
+    .map((d) => d.getTime());
+  const closesAt = closeTimes.length > 0
+    ? getEventInstantParts(new Date(Math.min(...closeTimes)), event.timeZone)
+    : undefined;
+  return { kind: 'available', label: '', detail: '', closesAt };
 }
 
 const REGISTRATION_STATUS_LABELS: Record<string, string> = {

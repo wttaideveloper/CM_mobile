@@ -114,7 +114,7 @@ export function EventDetailScreen() {
         ctaLabel = 'View Ticket';
         onCtaPress = () => router.push({ pathname: '/(main)/event/ticket', params: { eventId: id, registrationId: myRegistration!.registrationId } });
       } else {
-        ctaLabel = availability.label;
+        ctaLabel = availability.ctaLabel ?? availability.label;
         onCtaPress = undefined;
       }
   }
